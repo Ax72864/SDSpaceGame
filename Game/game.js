@@ -31,7 +31,7 @@ const STAR_FIELD_BOUNDS = { minX: -2600, maxX: 2600, minY: -2200, maxY: 2200 };
 const STAR_FIELD_ALPHA = { min: 0.28, max: 0.9 };
 
 const GALAXY_LEVEL_CONFIG = [
-  { planetMin: 2, planetMax: 2, asteroidMin: 3, asteroidMax: 4, preferredType: "rich", paletteKey: "sun" },
+  { planetMin: 2, planetMax: 2, asteroidMin: 3, asteroidMax: 3, preferredType: "rich", paletteKey: "sun" },
   { planetMin: 2, planetMax: 3, asteroidMin: 3, asteroidMax: 5, preferredType: "nebula", paletteKey: "mist" },
   { planetMin: 2, planetMax: 3, asteroidMin: 4, asteroidMax: 6, preferredType: "storm", paletteKey: "violet" },
   { planetMin: 3, planetMax: 4, asteroidMin: 4, asteroidMax: 6, preferredType: null, paletteKey: "frost" },
@@ -96,6 +96,8 @@ const GALAXY_PALETTES = {
 };
 
 const LEVEL_TIMER_SCALE = [1.0, 0.98, 0.96, 0.88, 0.8, 0.72, 1.2];
+const LEVEL0_SPAWN_WINDOW_SEC = 60;
+const LEVEL0_INITIAL_SPAWN_TIMER = 22;
 const LEVEL_COUNT_MUL = [1.0, 1.0, 1.05, 1.15, 1.25, 1.35, 0.7];
 const LEVEL_SPAWN_RATIO = [
   { asteroidBias: 0, pirateBase: 0.78, stationBase: 0.0 },
@@ -426,7 +428,7 @@ const state = {
   lastBuildError: "",
   particles: [],
   fireCooldown: 0,
-  spawnTimer: 22
+  spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER
 };
 
 function loadMeta() {
@@ -1950,7 +1952,12 @@ function getLevelTransitionBuffer(level) {
 }
 
 function scheduleNextSpawnTimer() {
-  state.spawnTimer = getSpawnTimerByLevel(getSpawnDifficultyLevel());
+  let timer = getSpawnTimerByLevel(getSpawnDifficultyLevel());
+  if (levelIndex(state.run.level) === 0 && state.time < LEVEL0_SPAWN_WINDOW_SEC) {
+    const postWindowGap = LEVEL0_SPAWN_WINDOW_SEC - state.time + 0.05;
+    timer = Math.max(timer, postWindowGap);
+  }
+  state.spawnTimer = timer;
 }
 
 function getWaveCountByLevel(level) {
