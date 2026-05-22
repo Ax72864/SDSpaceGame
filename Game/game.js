@@ -8,6 +8,7 @@ const objectiveEl = document.getElementById("objective");
 const currentGoalEl = document.getElementById("currentGoal");
 const nextStepEl = document.getElementById("nextStep");
 const statusAlertsEl = document.getElementById("statusAlerts");
+const resourceGuideEl = document.getElementById("resourceGuide");
 const stationDataEl = document.getElementById("stationData");
 const selectedCellPanelEl = document.getElementById("selectedCellPanel");
 const selectedCellInfoEl = document.getElementById("selectedCellInfo");
@@ -149,6 +150,15 @@ const FACILITY_ORDER = [
 
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 
+const MINING_RANGE_OFFSET = 130;
+
+const RESOURCE_VISUAL = {
+  ore: { ring: [0.95, 0.62, 0.22, 1], label: "矿石", css: "ore" },
+  metal: { ring: [0.72, 0.78, 0.88, 1], label: "金属", css: "metal" },
+  gas: { ring: [0.35, 0.92, 0.72, 1], label: "气体", css: "gas" },
+  plasma: { ring: [0.85, 0.38, 1.0, 1], label: "等离子", css: "plasma" }
+};
+
 const state = {
   paused: false,
   time: 0,
@@ -164,6 +174,7 @@ const state = {
     guideGoal: "",
     guideNext: "",
     alerts: "",
+    resourceGuide: "",
     status: "",
     selected: "",
     meta: "",
@@ -749,6 +760,50 @@ function shortResource(name) {
   }[name] || name;
 }
 
+function getHarvestableBodies() {
+  return state.bodies.filter((body) => body.resource && body.amount > 0);
+}
+
+function getMiningRange(body) {
+  return body.r + MINING_RANGE_OFFSET;
+}
+
+function getNearestResourceBody(from = state.station.pos) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const body of getHarvestableBodies()) {
+    const distance = dist(from, body);
+    if (distance < bestDist) {
+      best = body;
+      bestDist = distance;
+    }
+  }
+  if (!best) return null;
+  return { body: best, distance: bestDist, range: getMiningRange(best) };
+}
+
+function getMiningStationStatus() {
+  const miners = [...state.station.cells.values()].filter((cell) => cell.facility === "mining" && !cell.detached);
+  const activeMiners = miners.filter((cell) => cell.active && cell.enabled);
+  const inactivePower = miners.filter((cell) => cell.enabled && !cell.active);
+  const manualOff = miners.filter((cell) => !cell.enabled);
+  const harvesting = [];
+  for (const cell of activeMiners) {
+    const position = cellWorldPosition(cell);
+    const body = state.bodies.find((candidate) => candidate.amount > 0 && dist(position, candidate) < getMiningRange(candidate));
+    if (body) harvesting.push({ cell, body, resource: body.resource });
+  }
+  return { miners, activeMiners, inactivePower, manualOff, harvesting };
+}
+
+function getMiningCellTarget(cell) {
+  if (!cell || cell.facility !== "mining" || cell.detached) return null;
+  const position = cellWorldPosition(cell);
+  const body = state.bodies.find((candidate) => candidate.amount > 0 && dist(position, candidate) < getMiningRange(candidate));
+  if (!body) return null;
+  return { body, distance: dist(position, body), range: getMiningRange(body) };
+}
+
 function bindInput() {
   canvas.addEventListener("pointerdown", (event) => {
     canvas.setPointerCapture(event.pointerId);
@@ -1105,7 +1160,7 @@ function updateMiningAndResearch(dt) {
     if (cell.detached || !cell.active) continue;
     if (cell.facility === "mining") {
       const p = cellWorldPosition(cell);
-      const body = state.bodies.find((b) => b.amount > 0 && dist(p, b) < b.r + 130);
+      const body = state.bodies.find((b) => b.amount > 0 && dist(p, b) < b.r + MINING_RANGE_OFFSET);
       if (body) {
         const amount = Math.min(body.amount, 6.5 * miningBonus * dt);
         body.amount -= amount;
@@ -1588,6 +1643,7 @@ function render() {
   renderBodies();
   renderTargetAndObjective();
   renderStation();
+  renderMiningEffects();
   renderEnemies();
   renderProjectilesAndEffects();
   renderer.flush();
@@ -1602,9 +1658,53 @@ function renderBackground() {
 function renderBodies() {
   renderer.ring({ x: 0, y: 0 }, 520, 1.5, [0.25, 0.45, 0.8, 0.12], 80);
   renderer.ring({ x: 0, y: 0 }, 930, 1.5, [0.25, 0.45, 0.8, 0.1], 96);
+  const miningStatus = getMiningStationStatus();
+  const harvestingBodies = new Set(miningStatus.harvesting.map((entry) => entry.body));
+  const pulse = 0.5 + 0.5 * Math.sin(state.time * 3.2);
+
   for (const body of state.bodies) {
-    renderer.circle(body, body.r, body.color, body.type === "star" ? 60 : 34);
-    renderer.ring(body, body.r + 8, 3, [body.color[0], body.color[1], body.color[2], 0.16], 40);
+    const depleted = !body.resource || body.amount <= 0;
+    const visual = RESOURCE_VISUAL[body.resource] || RESOURCE_VISUAL.ore;
+
+    if (!depleted) {
+      const miningRange = getMiningRange(body);
+      const inHarvest = harvestingBodies.has(body);
+      const rangeAlpha = inHarvest ? 0.18 + pulse * 0.14 : 0.08 + pulse * 0.05;
+      renderer.ring(body, miningRange, 2.5, [visual.ring[0], visual.ring[1], visual.ring[2], rangeAlpha], 72);
+      renderer.ring(body, miningRange - 8, 1.2, [visual.ring[0], visual.ring[1], visual.ring[2], rangeAlpha * 0.55], 56);
+      renderer.ring(body, body.r + 16, 4.5, [visual.ring[0], visual.ring[1], visual.ring[2], 0.42 + pulse * 0.18], 44);
+      for (let i = 0; i < 4; i++) {
+        const angle = state.time * 0.45 + i * Math.PI / 2;
+        const inner = body.r + 12;
+        const outer = body.r + 26;
+        renderer.line(
+          { x: body.x + Math.cos(angle) * inner, y: body.y + Math.sin(angle) * inner },
+          { x: body.x + Math.cos(angle) * outer, y: body.y + Math.sin(angle) * outer },
+          3,
+          [visual.ring[0], visual.ring[1], visual.ring[2], 0.72]
+        );
+      }
+      if (inHarvest) {
+        renderer.ring(body, body.r + 24, 3, [0.55, 1, 0.72, 0.28 + pulse * 0.22], 36);
+      }
+    }
+
+    const bodyColor = depleted
+      ? [body.color[0] * 0.45, body.color[1] * 0.45, body.color[2] * 0.45, 0.55]
+      : body.color;
+    renderer.circle(body, body.r, bodyColor, body.type === "star" ? 60 : 34);
+    renderer.ring(body, body.r + 8, 3, [bodyColor[0], bodyColor[1], bodyColor[2], depleted ? 0.08 : 0.16], 40);
+  }
+}
+
+function renderMiningEffects() {
+  const { harvesting } = getMiningStationStatus();
+  for (const entry of harvesting) {
+    const visual = RESOURCE_VISUAL[entry.resource] || RESOURCE_VISUAL.ore;
+    const origin = cellWorldPosition(entry.cell);
+    const pulse = 0.35 + 0.25 * Math.sin(state.time * 5 + entry.cell.x);
+    renderer.line(origin, entry.body, 3.5, [visual.ring[0], visual.ring[1], visual.ring[2], pulse]);
+    renderer.circle(origin, 5, [0.55, 1, 0.72, 0.55 + pulse * 0.25], 10);
   }
 }
 
@@ -1746,7 +1846,7 @@ function pickNextForObjective(objective) {
   if (!objective) return "扩建设施、完成任务或应对来敌。";
   switch (objective.type) {
     case "mine":
-      return "建造采矿站并靠近行星/小行星（彩色天体），保持设施通电。";
+      return "建造采矿站并靠近带彩色外环的资源天体（橙=矿石、银=金属、绿=气、紫=等离子），保持设施通电。";
     case "explore":
       return state.target || hasKeyboardThrust()
         ? `${getMoveControlHint()}，或保持推进器喷口朝外，朝金色信标环移动。`
@@ -1791,15 +1891,15 @@ function buildGuideText() {
     if (objective?.type === "mine" && miningCount === 0) {
       return {
         goal: `完成星系任务：${objective.text}`,
-        next: "建造「采矿站」后，点空白处设目标，靠近蓝锈星或碎矿带采集。"
+        next: "建造「采矿站」后，驾驶空间站进入资源天体的彩色外环范围即可采集。"
       };
     }
     if (objective?.type === "mine" && miningCount > 0 && objective.progress < objective.target * 0.25) {
       return {
         goal: `完成星系任务：${objective.text}`,
         next: state.target || hasKeyboardThrust()
-          ? `${getMoveControlHint()}靠近资源天体；观察采矿站是否因电力不足停机（见下方提示）。`
-          : `${getMoveControlHint()}，或点空白处设航行目标后靠近矿石天体。`
+          ? `${getMoveControlHint()}，进入最近资源点的外环；右侧「资源采集」可看距离与状态。`
+          : `${getMoveControlHint()}，或点空白设航行目标；进入彩色外环后采矿站会自动采集。`
       };
     }
     if (objective?.type === "explore" && !state.target) {
@@ -1885,6 +1985,90 @@ function buildStatusAlerts() {
   return alerts;
 }
 
+function buildResourceGuideHtml() {
+  const nearest = getNearestResourceBody();
+  const status = getMiningStationStatus();
+  const lines = [];
+
+  if (status.harvesting.length) {
+    const groups = new Map();
+    for (const entry of status.harvesting) {
+      const label = RESOURCE_VISUAL[entry.resource]?.label || entry.resource;
+      const groupKey = `${label}·${entry.body.name}`;
+      groups.set(groupKey, (groups.get(groupKey) || 0) + 1);
+    }
+    for (const [groupKey, count] of groups) {
+      lines.push(`<div class="resource-line resource-active"><span class="resource-dot active"></span>正在采集 ${groupKey}${count > 1 ? ` ×${count}` : ""}</div>`);
+    }
+  }
+
+  if (nearest) {
+    const { body, distance, range } = nearest;
+    const visual = RESOURCE_VISUAL[body.resource] || RESOURCE_VISUAL.ore;
+    const inRange = distance <= range;
+    const gap = Math.max(0, Math.ceil(distance - range));
+    lines.push(`<div class="resource-line"><span class="resource-dot resource-${visual.css}"></span>最近资源点：<strong>${body.name}</strong> · ${visual.label} · 剩余 ${Math.floor(body.amount)}</div>`);
+    lines.push(`<div class="resource-line resource-meta">距离 ${Math.floor(distance)} / 采矿范围 ${Math.floor(range)}${inRange ? " · <span class='good'>已进入范围</span>" : ` · <span class='warn'>还需靠近 ${gap}</span>`}</div>`);
+    if (!inRange) {
+      lines.push(`<div class="resource-line resource-meta">驾驶空间站进入彩色外环；采矿站需建在框架上并通电。</div>`);
+    }
+  } else {
+    lines.push(`<div class="resource-line">当前星系暂无可用资源天体。</div>`);
+  }
+
+  if (status.miners.length === 0) {
+    lines.push(`<div class="resource-line resource-meta">尚未建造采矿站 — 选「采矿站」建在框架上，再进入资源外环。</div>`);
+  } else if (status.harvesting.length === 0) {
+    if (status.manualOff.length === status.miners.length) {
+      lines.push(`<div class="resource-line warn">采矿站已全部手动关闭 — 选中格子点「开关设施」恢复。</div>`);
+    } else if (status.inactivePower.length > 0 && status.activeMiners.length === 0) {
+      lines.push(`<div class="resource-line warn">采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。</div>`);
+    } else if (nearest && nearest.distance > nearest.range) {
+      lines.push(`<div class="resource-line warn">采矿站就绪，请进入「${nearest.body.name}」的彩色外环（还差 ${Math.ceil(nearest.distance - nearest.range)}）。</div>`);
+    } else if (nearest && nearest.body.amount <= 0) {
+      lines.push(`<div class="resource-line warn">最近资源点已采空，请前往其他带彩色外环的天体。</div>`);
+    }
+  }
+
+  return lines.join("");
+}
+
+function buildMiningAlerts() {
+  const alerts = [];
+  const status = getMiningStationStatus();
+  if (status.harvesting.length) {
+    const labels = [...new Set(status.harvesting.map((entry) => {
+      const visual = RESOURCE_VISUAL[entry.resource] || RESOURCE_VISUAL.ore;
+      return `${visual.label}（${entry.body.name}）`;
+    }))];
+    alerts.push({
+      level: "good",
+      text: `采矿进行中：${labels.join("、")}`
+    });
+  } else if (status.miners.length > 0) {
+    if (status.manualOff.length === status.miners.length) {
+      alerts.push({
+        level: "warn",
+        text: `${status.miners.length} 座采矿站已手动关闭，无法采集`
+      });
+    } else if (status.inactivePower.length > 0 && status.activeMiners.length === 0) {
+      alerts.push({
+        level: "warn",
+        text: `${status.inactivePower.length} 座采矿站因电力不足停机`
+      });
+    } else {
+      const nearest = getNearestResourceBody();
+      if (nearest && nearest.distance > nearest.range) {
+        alerts.push({
+          level: "warn",
+          text: `采矿站待命：距「${nearest.body.name}」还差 ${Math.ceil(nearest.distance - nearest.range)}，请进入彩色外环`
+        });
+      }
+    }
+  }
+  return alerts;
+}
+
 function updateHud() {
   const r = state.resources;
   const powerTight = state.power.used >= state.power.available - 0.25;
@@ -1912,10 +2096,15 @@ function updateHud() {
   }
 
   const alerts = buildStatusAlerts();
-  const alertsHtml = alerts
+  const miningAlerts = buildMiningAlerts();
+  const allAlerts = [...miningAlerts, ...alerts];
+  const alertsHtml = allAlerts
     .map((a) => `<div class="alert-item alert-${a.level}">${a.text}</div>`)
     .join("");
   setHtmlIfChanged(statusAlertsEl, "alerts", alertsHtml);
+
+  const resourceGuideHtml = buildResourceGuideHtml();
+  setHtmlIfChanged(resourceGuideEl, "resourceGuide", resourceGuideHtml);
 
   const objective = state.run.objective;
   const progress = objective ? clamp(objective.progress / objective.target, 0, 1) : 0;
@@ -1986,6 +2175,29 @@ function updateSelectedCellPanel(cell) {
     stateNote = " <span class='danger'>（喷口被遮挡）</span>";
   } else if (cell.active) {
     stateNote = " <span class='good'>（运作中）</span>";
+  }
+  if (cell.facility === "mining" && !cell.detached) {
+    if (!cell.enabled) {
+      stateNote += " <span class='danger'>（已关闭，无法采集）</span>";
+    } else if (!cell.active) {
+      stateNote += " <span class='danger'>（电力不足，无法采集）</span>";
+    } else {
+      const target = getMiningCellTarget(cell);
+      if (target) {
+        const visual = RESOURCE_VISUAL[target.body.resource] || RESOURCE_VISUAL.ore;
+        stateNote += ` <span class='good'>（正在采集 ${visual.label} @ ${target.body.name}）</span>`;
+      } else {
+        const nearest = getNearestResourceBody(cellWorldPosition(cell));
+        if (nearest) {
+          const gap = Math.max(0, Math.ceil(nearest.distance - nearest.range));
+          stateNote += gap > 0
+            ? ` <span class='warn'>（待命：距 ${nearest.body.name} 还差 ${gap}）</span>`
+            : " <span class='warn'>（范围内但暂无可用资源）</span>";
+        } else {
+          stateNote += " <span class='warn'>（待命：附近无资源点）</span>";
+        }
+      }
+    }
   }
   const html = `已选：${name} ${cell.enabled ? "<span class='good'>启用</span>" : "<span class='danger'>关闭</span>"} / 优先级 ${cell.priority}${stateNote}`;
   document.getElementById("toggleSelectedBtn").disabled = cell.facility === "core";

@@ -24,7 +24,7 @@
       <h2>建造</h2>
       <div id="buildButtons" class="button-grid"></div>
       <div class="hint">
-        默认「屏幕方向」：W=上、S=下、A=左、D=右；点右侧「移动模式」可切换为「朝向前方」。鼠标指向决定朝向，拖动画布可手动旋转/缩放。选设施后点网格或 Enter 建造；失败不退出建造模式，Esc 或「指针/航行」才退出。
+        默认「屏幕方向」：W=上、S=下、A=左、D=右；点右侧「移动模式」可切换为「朝向前方」。鼠标指向决定朝向，拖动画布可手动旋转/缩放。选设施后点网格或 Enter 建造；失败不退出建造模式，Esc 或「指针/航行」才退出。带彩色外环的天体是资源点（橙=矿石、银=金属、绿=气体、紫=等离子）；建造采矿站并驾驶进入外环即可采集。
       </div>
     </section>
 
@@ -34,6 +34,8 @@
         <div class="guide-row"><span class="guide-label">当前目标</span><span id="currentGoal" class="guide-goal">加载中…</span></div>
         <div class="guide-row"><span class="guide-label">下一步</span><span id="nextStep" class="guide-next">加载中…</span></div>
       </div>
+      <h2>资源采集</h2>
+      <div id="resourceGuide" class="resource-guide" aria-live="polite"></div>
       <div id="statusAlerts" class="status-alerts" aria-live="polite"></div>
       <h2>星系任务</h2>
       <div id="objective"></div>
