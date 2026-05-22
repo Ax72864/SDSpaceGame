@@ -6412,10 +6412,6 @@ window.__gameTest = {
   improveStationHp,
   syncCellStorableStatsAfterUpgrade,
   upgradeSelectedCell,
-  // v0.6.0：调试用手动生成 hostile-station（正式路径走 assault 任务 tick）
-  spawnHostileStation(level = 3) {
-    return spawnHostileStationNearStation(Math.random, level);
-  },
   damageHostileStationCell,
   isHostileStationDestroyed,
   tryDamageHostileStationCell,
