@@ -515,6 +515,26 @@ h2 {
   color: #7eb8d8;
 }
 
+.alert-escort {
+  color: #7ee8d0;
+}
+
+.alert-escort-critical {
+  color: #ff8a8a;
+  animation: escort-blink 1.5s step-start infinite;
+}
+
+.alert-escort-fail {
+  color: #ff9a9a;
+  font-weight: 600;
+}
+
+@keyframes escort-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .alert-bridge-hint {
   color: #9ef5c8;
 }

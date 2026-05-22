@@ -364,6 +364,20 @@ const WRECK_FACILITY_WEIGHTS = [
   ["armor", 0.15],
   ["repair", 0.05]
 ];
+const NPC_RADIUS = 20;
+const NPC_ARRIVE_RADIUS = 80;
+const NPC_AVOID_MARGIN = 60;
+const NPC_AVOID_WEIGHT = 2.2;
+const NPC_TURN_SPEED = 1.2;
+const NPC_COLLISION_COOLDOWN = 0.35;
+const NPC_HUD_SAMPLE_INTERVAL = 0.2;
+const ESCORT_JOURNEY_MIN = 1200;
+const ESCORT_JOURNEY_MAX = 1800;
+const ESCORT_START_OFFSET_MIN = 600;
+const ESCORT_START_OFFSET_MAX = 800;
+const ESCORT_TIMEOUT_SEC = 360;
+const SALVAGE_TIMEOUT_SEC = 480;
+const NPC_HP_BY_LEVEL = [0, 200, 200, 250, 300, 300];
 const BRIDGE_DISTANCE = CELL * 1.2;
 const BRIDGE_ANGLE = 0.436;
 const BRIDGE_PREVIEW_DISTANCE = CELL * 1.6;
@@ -441,7 +455,8 @@ const state = {
     guardianSpawnDelay: 0,
     endgameExplore: false,
     endgameActivityFraction: 0,
-    endgameActivityPoints: 0
+    endgameActivityPoints: 0,
+    escortLowHpAlerted: false
   },
   resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
   power: { available: 0, used: 0 },
@@ -459,6 +474,7 @@ const state = {
     weaponMod: 1
   },
   fragments: [],
+  npcs: [],
   stars: [],
   world: { bodies: [] },
   bodies: [],
@@ -487,6 +503,7 @@ const state = {
 };
 
 let fragmentIdSeed = 1;
+let npcIdSeed = 1;
 
 function loadMeta() {
   const base = {
@@ -1062,6 +1079,16 @@ function isObjectiveComplete() {
   return state.run.objectiveCompleteAt > 0;
 }
 
+function isObjectiveFailed() {
+  const objective = state.run.objective;
+  if (!objective) return false;
+  const objectiveType = OBJECTIVE_TYPES[objective.type];
+  if (typeof objectiveType?.isFailed === "function") {
+    return Boolean(objectiveType.isFailed(objective));
+  }
+  return objective.failed === true;
+}
+
 function resetObjectiveChoiceState() {
   state.run.awaitingObjectiveChoice = false;
   state.run.objectiveChoiceDismissed = false;
@@ -1119,9 +1146,9 @@ const OBJECTIVE_LEVEL_WEIGHTS = [
   { mine: 0.5, explore: 0.5 },
   { mine: 0.4, explore: 0.35, salvage: 0.25 },
   { mine: 0.3, explore: 0.3, battle: 0.2, salvage: 0.2 },
-  { battle: 0.3, survive: 0.2, salvage: 0.25 },
-  { battle: 0.3, survive: 0.2, salvage: 0.25 },
-  { battle: 0.4, survive: 0.3 }
+  { battle: 0.3, survive: 0.2, salvage: 0.25, escort: 0.25 },
+  { battle: 0.3, survive: 0.2, salvage: 0.25, escort: 0.25 },
+  { battle: 0.4, survive: 0.3, escort: 0.3 }
 ];
 
 const OBJECTIVE_TYPE_DEFAULTS = {
@@ -1276,19 +1303,88 @@ const OBJECTIVE_TYPES = {
         type: "salvage",
         text: `回收 ${actualTarget} 段古老残骸`,
         target: actualTarget,
-        progress: 0
+        progress: 0,
+        failed: false,
+        elapsed: 0
       };
+    },
+    tick(objective, dt) {
+      if (objective.failed) return;
+      objective.elapsed = (objective.elapsed || 0) + dt;
+      if (objective.elapsed >= SALVAGE_TIMEOUT_SEC) {
+        objective.failed = true;
+        showToast("残骸已散失，本关任务失败。");
+      }
+    },
+    isFailed(objective) {
+      return objective.failed === true;
     },
     onFragmentDocked(objective, fragment) {
       if (fragment.origin !== "wreck") return;
       objective.progress += 1;
     },
     getDetail(objective, displayProgress) {
+      if (objective.failed) return "拾荒失败";
       return `${displayProgress.current} / ${displayProgress.target} 段残骸`;
     },
     getHint(objective) {
       const remaining = Math.max(0, objective.target - objective.progress);
       return `在星系中寻找古老残骸，靠近并桥接 ${remaining} 段。`;
+    }
+  },
+  escort: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    rewardMultiplier: 1.6,
+    make(rng, level, galaxy) {
+      const npc = seedEscortNpc(galaxy, rng, level);
+      const escortTarget = { x: npc.target.x, y: npc.target.y };
+      return {
+        type: "escort",
+        text: "护送货船到达跃迁点",
+        target: 1,
+        progress: 0,
+        failed: false,
+        npcId: npc.id,
+        escortTarget,
+        elapsed: 0
+      };
+    },
+    tick(objective, dt) {
+      if (objective.failed || isObjectiveComplete()) return;
+      objective.elapsed = (objective.elapsed || 0) + dt;
+      if (objective.elapsed >= ESCORT_TIMEOUT_SEC) {
+        objective.failed = true;
+        showToast("护送超时，本关任务失败。");
+      }
+    },
+    isFailed(objective) {
+      return objective.failed === true;
+    },
+    onNpcArrived(objective, npc) {
+      if (npc.id !== objective.npcId || npc.kind !== "friendly-cargo") return;
+      objective.progress = 1;
+    },
+    onNpcDestroyed(objective, npc) {
+      if (npc.id !== objective.npcId) return;
+      objective.failed = true;
+      showToast("护送目标已被摧毁。本关任务失败。");
+    },
+    getDetail(objective, displayProgress) {
+      if (objective.failed) return "护送失败";
+      if (displayProgress.current >= displayProgress.target) return "已抵达";
+      const npc = state.npcs.find((entry) => entry.id === objective.npcId);
+      if (!npc) return "护送中";
+      return `护送中 · HP ${Math.floor((npc.hp / npc.maxHp) * 100)}%`;
+    },
+    getHint(objective) {
+      return objective.failed
+        ? "护送失败：本关无法跃迁，可重启或留在本关刷资源。"
+        : "保护货船到达跃迁点，优先清理追击的海盗与小行星。";
+    },
+    render(objective) {
+      const target = objective.escortTarget || getEscortJumpExit(state.galaxy);
+      renderer.ring(target, NPC_ARRIVE_RADIUS, 3, [0.95, 0.85, 0.35, 0.55], 48);
+      renderer.ring(target, NPC_ARRIVE_RADIUS + 28, 2, [0.95, 0.85, 0.35, 0.22], 56);
     }
   }
 };
@@ -1318,7 +1414,7 @@ function isObjectiveDefinitionComplete(objective, objectiveType) {
 
 function notifyObjective(event, payload) {
   const objective = state.run.objective;
-  if (!objective || isObjectiveComplete()) return;
+  if (!objective || isObjectiveComplete() || isObjectiveFailed()) return;
   const objectiveType = OBJECTIVE_TYPES[objective.type];
   if (!objectiveType) return;
   const handlerName = OBJECTIVE_EVENT_HANDLERS[event];
@@ -1326,7 +1422,7 @@ function notifyObjective(event, payload) {
   const handler = objectiveType[handlerName];
   if (typeof handler !== "function") return;
   handler(objective, payload);
-  if (!isObjectiveComplete() && isObjectiveDefinitionComplete(objective, objectiveType)) {
+  if (!isObjectiveComplete() && !isObjectiveFailed() && isObjectiveDefinitionComplete(objective, objectiveType)) {
     grantObjectiveReward();
   }
 }
@@ -1362,6 +1458,7 @@ function createObjective() {
   state.run.guardianSpawnDelay = 0;
   state.run.endgameExplore = false;
   state.run.settlementShown = false;
+  state.run.escortLowHpAlerted = false;
   resetObjectiveChoiceState();
 }
 
@@ -1370,8 +1467,9 @@ function grantObjectiveReward() {
   state.run.objectiveCompleteAt = Math.max(state.time, 1e-6);
   state.run.completedObjectives++;
   const rewardMultiplier = OBJECTIVE_TYPES[state.run.objective?.type]?.rewardMultiplier ?? 1.0;
-  const gained = Math.floor((2 + state.run.level) * rewardMultiplier);
-  state.run.totalObjectiveRewardBase += gained;
+  const base = 2 + state.run.level;
+  const gained = Math.floor(base * rewardMultiplier);
+  state.run.totalObjectiveRewardBase += base;
   state.meta.points += gained;
   saveMeta();
   if (state.run.level >= ENDGAME_LEVEL || state.run.objective?.type === "guardian") {
@@ -2179,6 +2277,185 @@ function seedSalvageFragments(galaxy, count, rng) {
   return spawned;
 }
 
+function getEscortJumpExit(galaxy = state.galaxy) {
+  const startPos = galaxy?.stationSpawn || state.station.pos;
+  return { x: -startPos.x, y: -startPos.y };
+}
+
+function getEscortNpcHp(level) {
+  const idx = levelIndex(level);
+  return NPC_HP_BY_LEVEL[idx] || 300;
+}
+
+function createEscortNpc(startPos, targetPos, rng, level) {
+  const toTarget = normalize({ x: targetPos.x - startPos.x, y: targetPos.y - startPos.y });
+  const maxHp = getEscortNpcHp(level);
+  return {
+    id: ++npcIdSeed,
+    kind: "friendly-cargo",
+    pos: { x: startPos.x, y: startPos.y },
+    vel: { x: 0, y: 0 },
+    angle: Math.atan2(toTarget.y, toTarget.x),
+    hp: maxHp,
+    maxHp,
+    target: { x: targetPos.x, y: targetPos.y },
+    radius: NPC_RADIUS,
+    hudColor: [0.35, 0.85, 0.78, 1],
+    speed: rngFloat(rng, 35, 45),
+    arrived: false,
+    destroyed: false,
+    collisionCooldown: 0,
+    spawnAt: state.time
+  };
+}
+
+function seedEscortNpc(galaxy, rng, level) {
+  const stationStart = galaxy?.stationSpawn || state.station.pos;
+  const jumpExit = getEscortJumpExit(galaxy);
+  const awayFromExit = normalize({ x: stationStart.x - jumpExit.x, y: stationStart.y - jumpExit.y });
+  const offset = rngFloat(rng, ESCORT_START_OFFSET_MIN, ESCORT_START_OFFSET_MAX);
+  let npcStart = {
+    x: stationStart.x + awayFromExit.x * offset,
+    y: stationStart.y + awayFromExit.y * offset
+  };
+  let journey = dist(npcStart, jumpExit);
+  if (journey < ESCORT_JOURNEY_MIN || journey > ESCORT_JOURNEY_MAX) {
+    const desired = rngFloat(rng, ESCORT_JOURNEY_MIN, ESCORT_JOURNEY_MAX);
+    const dirToExit = normalize({ x: jumpExit.x - npcStart.x, y: jumpExit.y - npcStart.y });
+    npcStart = {
+      x: jumpExit.x - dirToExit.x * desired,
+      y: jumpExit.y - dirToExit.y * desired
+    };
+  }
+  const npc = createEscortNpc(npcStart, jumpExit, rng, level);
+  state.npcs.push(npc);
+  return npc;
+}
+
+function damageNpc(npc, amount) {
+  if (!npc || npc.destroyed || npc.arrived) return;
+  npc.hp -= amount;
+  for (let i = 0; i < 3; i++) spawnParticle(npc, [0.5, 0.9, 1.0, 0.9]);
+  if (npc.hp <= 0) {
+    npc.hp = 0;
+    npc.destroyed = true;
+    notifyObjective("npcDestroyed", npc);
+    state.npcs = state.npcs.filter((entry) => entry.id !== npc.id);
+  }
+}
+
+function tickNpc(npc, dt) {
+  if (npc.arrived || npc.destroyed) return;
+  const toTarget = { x: npc.target.x - npc.pos.x, y: npc.target.y - npc.pos.y };
+  const remain = length(toTarget);
+  if (remain <= NPC_ARRIVE_RADIUS) {
+    npc.arrived = true;
+    npc.vel.x = 0;
+    npc.vel.y = 0;
+    notifyObjective("npcArrived", npc);
+    return;
+  }
+  let dir = normalize(toTarget);
+  for (const body of state.world.bodies) {
+    if (body.type !== "planet" && body.type !== "star") continue;
+    const toBody = { x: body.x - npc.pos.x, y: body.y - npc.pos.y };
+    const distBody = length(toBody);
+    const avoidR = body.r + NPC_AVOID_MARGIN;
+    if (distBody > avoidR || distBody < 1e-3) continue;
+    const tangent = normalize({ x: -toBody.y, y: toBody.x });
+    const blend = NPC_AVOID_WEIGHT * (1 - distBody / avoidR);
+    dir = normalize({ x: dir.x + tangent.x * blend, y: dir.y + tangent.y * blend });
+  }
+  const desiredAngle = Math.atan2(dir.y, dir.x);
+  let angleDiff = normalizeAngle(desiredAngle - npc.angle);
+  const maxTurn = NPC_TURN_SPEED * dt;
+  angleDiff = clamp(angleDiff, -maxTurn, maxTurn);
+  npc.angle += angleDiff;
+  const moveDir = { x: Math.cos(npc.angle), y: Math.sin(npc.angle) };
+  npc.vel.x = moveDir.x * npc.speed;
+  npc.vel.y = moveDir.y * npc.speed;
+  npc.pos.x += npc.vel.x * dt;
+  npc.pos.y += npc.vel.y * dt;
+  const toStation = { x: npc.pos.x - state.station.pos.x, y: npc.pos.y - state.station.pos.y };
+  const stationDist = length(toStation);
+  if (stationDist < npc.radius + CELL * 2 && stationDist > 1e-3) {
+    const push = normalize(toStation);
+    npc.pos.x += push.x * 48 * dt;
+    npc.pos.y += push.y * 48 * dt;
+  }
+}
+
+function collideNpcWithEnemies(npc, dt) {
+  if (npc.arrived || npc.destroyed) return;
+  npc.collisionCooldown = Math.max(0, (npc.collisionCooldown || 0) - dt);
+  if (npc.collisionCooldown > 0) return;
+  for (const enemy of state.enemies) {
+    if (enemy.hp <= 0) continue;
+    if (dist(npc.pos, enemy) >= npc.radius + enemy.r) continue;
+    damageNpc(npc, getCollisionDamage(enemy));
+    npc.collisionCooldown = NPC_COLLISION_COOLDOWN;
+    break;
+  }
+}
+
+function updateNpcs(dt) {
+  for (const npc of state.npcs) {
+    if (npc.destroyed) continue;
+    tickNpc(npc, dt);
+    collideNpcWithEnemies(npc, dt);
+  }
+  state.npcs = state.npcs.filter((npc) => !npc.destroyed);
+}
+
+function renderNpcs() {
+  for (const npc of state.npcs) {
+    if (npc.destroyed) continue;
+    const color = npc.hudColor || [0.35, 0.85, 0.78, 1];
+    const pulse = 0.55 + 0.25 * Math.sin(state.time * Math.PI * 2);
+    renderer.ring(npc.pos, npc.radius + 8, 2, [color[0], color[1], color[2], 0.25 + pulse * 0.15], 28);
+    renderer.circle(npc.pos, npc.radius, color, 24);
+    renderer.ring(npc.pos, npc.radius + 2, 2, [1, 1, 1, 0.85], 24);
+    const tip = {
+      x: npc.pos.x + Math.cos(npc.angle) * (npc.radius + 12),
+      y: npc.pos.y + Math.sin(npc.angle) * (npc.radius + 12)
+    };
+    const left = {
+      x: npc.pos.x + Math.cos(npc.angle + 2.4) * (npc.radius * 0.55),
+      y: npc.pos.y + Math.sin(npc.angle + 2.4) * (npc.radius * 0.55)
+    };
+    const right = {
+      x: npc.pos.x + Math.cos(npc.angle - 2.4) * (npc.radius * 0.55),
+      y: npc.pos.y + Math.sin(npc.angle - 2.4) * (npc.radius * 0.55)
+    };
+    renderer.line(left, tip, 3, [0.9, 1, 0.95, 0.95]);
+    renderer.line(right, tip, 3, [0.9, 1, 0.95, 0.95]);
+    renderer.line(npc.pos, npc.target, 1.5, [color[0], color[1], color[2], 0.18]);
+  }
+}
+
+function buildNpcHudAlerts() {
+  const objective = state.run.objective;
+  if (!objective || objective.type !== "escort" || isObjectiveComplete()) return [];
+  if (objective.failed) {
+    return [{ level: "danger", cssClass: "alert-escort-fail", text: "护送失败 · 本关无法跃迁" }];
+  }
+  const npc = state.npcs.find((entry) => entry.id === objective.npcId);
+  if (!npc) return [];
+  const hpPct = npc.maxHp > 0 ? npc.hp / npc.maxHp : 0;
+  if (hpPct < 0.1 && !state.run.escortLowHpAlerted) {
+    state.run.escortLowHpAlerted = true;
+    showToast("护送目标即将损毁！");
+  }
+  const angle = Math.atan2(npc.pos.y - state.station.pos.y, npc.pos.x - state.station.pos.x);
+  const direction = angleToDirectionArrow8(angle);
+  const distance = Math.round(dist(state.station.pos, npc.pos));
+  return [{
+    level: hpPct < 0.3 ? "danger" : "good",
+    cssClass: hpPct < 0.3 ? "alert-escort alert-escort-critical" : "alert-escort",
+    text: `护送目标 ${direction} ${distance} px · HP ${Math.floor(hpPct * 100)}%`
+  }];
+}
+
 function buildFragmentFromCells(componentCells) {
   if (!componentCells.length) return { fragment: null, trimmedCells: 0 };
   const centerGrid = componentCells.reduce(
@@ -2756,6 +3033,7 @@ function update(dt) {
   updateMouseAim(dt);
   updateStationPhysics(dt);
   updateFragments(dt);
+  updateNpcs(dt);
   updateMiningAndResearch(dt);
   updateEnemies(dt);
   updateProjectiles(dt);
@@ -3400,6 +3678,16 @@ function updateProjectiles(dt) {
           projectile.dead = true;
         }
       }
+      if (!projectile.dead) {
+        for (const npc of state.npcs) {
+          if (npc.destroyed || npc.arrived) continue;
+          if (dist(projectile, npc.pos) < npc.radius + projectile.r) {
+            damageNpc(npc, projectile.damage);
+            projectile.dead = true;
+            break;
+          }
+        }
+      }
     } else {
       for (const enemy of state.enemies) {
         if (dist(projectile, enemy) < enemy.r + projectile.r) {
@@ -3597,6 +3885,7 @@ function updateFragments(dt) {
 }
 
 function updateObjective(dt) {
+  if (isObjectiveComplete() || isObjectiveFailed()) return;
   notifyObjective("tick", dt);
 }
 
@@ -3622,6 +3911,7 @@ function nextLevel() {
   createObjective();
 
   state.fragments = [];
+  state.npcs = [];
   state.enemies = [];
   state.projectiles = [];
   state.repairDrones = [];
@@ -3693,6 +3983,7 @@ function render() {
   renderBodies();
   renderTargetAndObjective();
   renderFragments();
+  renderNpcs();
   renderStation();
   renderBridgePreview();
   renderMiningEffects();
@@ -4119,6 +4410,11 @@ function buildStatusAlerts() {
         text: "任务已完成，可随时跃迁；继续采集、扩建或战斗均可。"
       });
     }
+  } else if (isObjectiveFailed()) {
+    alerts.push({
+      level: "danger",
+      text: "任务已失败，本关无法跃迁；可重启本局或留在本关自由游玩。"
+    });
   }
   if (state.lastBuildError) {
     alerts.push({
@@ -4293,11 +4589,12 @@ function updateHud() {
   }
 
   const fragmentAlerts = buildFragmentHudAlerts();
+  const npcAlerts = buildNpcHudAlerts();
   const alerts = buildStatusAlerts();
   const miningAlerts = buildMiningAlerts();
   const allAlerts = isObjectiveComplete()
-    ? [...fragmentAlerts, ...alerts, ...miningAlerts]
-    : [...fragmentAlerts, ...miningAlerts, ...alerts];
+    ? [...fragmentAlerts, ...npcAlerts, ...alerts, ...miningAlerts]
+    : [...fragmentAlerts, ...npcAlerts, ...miningAlerts, ...alerts];
   const alertsHtml = allAlerts
     .map((a) => {
       const extraClass = a.cssClass ? ` ${a.cssClass}` : "";
@@ -4316,8 +4613,9 @@ function updateHud() {
     ? OBJECTIVE_TYPES[objective.type]?.getDetail?.(objective, displayProgress) || ""
     : "";
   const objectiveComplete = isObjectiveComplete();
+  const objectiveFailed = isObjectiveFailed();
   let objectiveHtml = objective
-    ? `${objective.text}<br><span class="${progress >= 1 || objectiveComplete ? "good" : ""}">进度 ${Math.floor(progress * 100)}%${progressDetail ? ` · ${progressDetail}` : ""}</span>`
+    ? `${objective.text}<br><span class="${objectiveFailed ? "bad" : progress >= 1 || objectiveComplete ? "good" : ""}">${objectiveFailed ? "任务失败" : `进度 ${Math.floor(progress * 100)}%`}${progressDetail ? ` · ${progressDetail}` : ""}</span>`
     : "无任务";
   if (objectiveComplete && objective) {
     const statusNote = state.run.endgame
@@ -4330,6 +4628,9 @@ function updateHud() {
         ? " · 请选择跃迁或停留"
         : " · 可随时跃迁";
     objectiveHtml += `<br><span class="good">任务已完成${statusNote}</span>`;
+  }
+  if (objectiveFailed) {
+    objectiveHtml += `<br><span class="bad">本关无法跃迁，可重启或留在本关。</span>`;
   }
   setHtmlIfChanged(objectiveEl, "objective", objectiveHtml);
   updateObjectiveChoiceUi();
@@ -4510,6 +4811,10 @@ window.gameActions = {
       showToast("终末星系没有下一跳；可留在当前星系自由游玩，或直接开始新局。");
       return;
     }
+    if (isObjectiveFailed()) {
+      showToast("任务失败，本关无法跃迁。请重启本局。");
+      return;
+    }
     if (!isObjectiveComplete()) return;
     nextLevel();
     updateHud();
@@ -4531,6 +4836,145 @@ window.gameActions = {
 };
 
 window.__gameState = state;
+
+window.__gameTest = {
+  resetRun(seed, level) {
+    ensureRunRuntimeState();
+    state.run.seed = seed;
+    state.run.level = levelIndex(level);
+    state.run.objectiveCompleteAt = 0;
+    state.run.awaitingObjectiveChoice = false;
+    state.run.objectiveChoiceDismissed = false;
+    state.run.completedObjectives = 0;
+    state.run.totalObjectiveRewardBase = 0;
+    state.run.escortLowHpAlerted = false;
+    state.meta.points = 0;
+    state.fragments = [];
+    state.npcs = [];
+    state.enemies = [];
+    state.projectiles = [];
+    state.repairDrones = [];
+    state.particles = [];
+    const lvl = levelIndex(level);
+    const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`);
+    applyGalaxy(galaxy);
+    createObjective();
+    state.run.fragmentHudCache = null;
+  },
+  getObjectiveType(seed, level) {
+    const lvl = levelIndex(level);
+    const objectiveSeed = (seed ^ 0x9e3779b9) + lvl * 0x85ebca6b;
+    const objectiveRng = mulberry32(objectiveSeed);
+    const weightTable = OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1];
+    return pickWeighted(objectiveRng, weightTable);
+  },
+  findEscortSeed(level = 3, startSeed = 1, maxTries = 5000) {
+    for (let seed = startSeed; seed < startSeed + maxTries; seed++) {
+      if (this.getObjectiveType(seed, level) === "escort") return seed;
+    }
+    return null;
+  },
+  advanceNpcToArrival() {
+    const npc = state.npcs[0];
+    if (!npc) return { ok: false, reason: "no npc" };
+    npc.pos.x = npc.target.x;
+    npc.pos.y = npc.target.y;
+    tickNpc(npc, 0);
+    return {
+      ok: true,
+      progress: state.run.objective?.progress,
+      complete: state.run.objectiveCompleteAt > 0,
+      awaiting: state.run.awaitingObjectiveChoice
+    };
+  },
+  advanceNpcs(steps = 120, dt = 0.05) {
+    const npc = state.npcs[0];
+    if (!npc) return { ok: false, reason: "no npc" };
+    const before = { x: npc.pos.x, y: npc.pos.y };
+    for (let i = 0; i < steps; i++) {
+      state.time += dt;
+      updateNpcs(dt);
+    }
+    const after = state.npcs[0];
+    return {
+      ok: true,
+      moved: after ? Math.hypot(after.pos.x - before.x, after.pos.y - before.y) : 0
+    };
+  },
+  damageEscortNpc(amount) {
+    const npc = state.npcs.find((entry) => entry.kind === "friendly-cargo");
+    if (!npc) return { ok: false, reason: "no npc" };
+    const hpBefore = npc.hp;
+    damageNpc(npc, amount);
+    return { ok: true, hpBefore, failed: state.run.objective?.failed === true };
+  },
+  fireEnemyProjectileAtNpc(damage = 20) {
+    const npc = state.npcs.find((entry) => entry.kind === "friendly-cargo");
+    if (!npc) return { ok: false, reason: "no npc" };
+    const hpBefore = npc.hp;
+    state.projectiles.push({
+      owner: "enemy", x: npc.pos.x, y: npc.pos.y, vx: 0, vy: 0, damage, life: 2, r: 4, dead: false
+    });
+    updateProjectiles(0.016);
+    return { ok: true, hpBefore, hpAfter: state.npcs[0]?.hp ?? 0 };
+  },
+  firePlayerProjectileAtNpc(damage = 50) {
+    const npc = state.npcs.find((entry) => entry.kind === "friendly-cargo");
+    if (!npc) return { ok: false, reason: "no npc" };
+    const hpBefore = npc.hp;
+    state.projectiles.push({
+      owner: "player", x: npc.pos.x, y: npc.pos.y, vx: 0, vy: 0, damage, life: 2, r: 3, dead: false
+    });
+    updateProjectiles(0.016);
+    return { ok: true, hpBefore, hpAfter: state.npcs[0]?.hp ?? hpBefore };
+  },
+  collideEnemyWithNpc() {
+    const npc = state.npcs.find((entry) => entry.kind === "friendly-cargo");
+    if (!npc) return { ok: false, reason: "no npc" };
+    const hpBefore = npc.hp;
+    spawnEnemy("pirate", npc.pos.x, npc.pos.y, { level: state.run.level });
+    updateEnemies(0.016);
+    updateNpcs(0.016);
+    return { ok: true, hpBefore, hpAfter: state.npcs[0]?.hp ?? hpBefore };
+  },
+  turretWouldLockNpc() {
+    return Boolean(nearestEnemy(cellWorldPosition({ x: 0, y: 0, detached: false }), 450));
+  },
+  completeCurrentObjective() {
+    const objective = state.run.objective;
+    if (!objective) return { ok: false };
+    const baseBefore = state.run.totalObjectiveRewardBase;
+    const pointsBefore = state.meta.points;
+    objective.progress = objective.target;
+    grantObjectiveReward();
+    return {
+      ok: true,
+      type: objective.type,
+      baseGain: state.run.totalObjectiveRewardBase - baseBefore,
+      pointsGain: state.meta.points - pointsBefore
+    };
+  },
+  snapshot() {
+    const wreck = state.fragments.filter((f) => f.origin === "wreck");
+    const startPos = state.galaxy?.stationSpawn || state.station.pos;
+    return {
+      objective: state.run.objective,
+      objectiveFailed: isObjectiveFailed(),
+      totalObjectiveRewardBase: state.run.totalObjectiveRewardBase,
+      metaPoints: state.meta.points,
+      level: state.run.level,
+      seed: state.run.seed,
+      npcs: state.npcs.map((npc) => ({
+        id: npc.id, kind: npc.kind, hp: npc.hp, maxHp: npc.maxHp, speed: npc.speed,
+        pos: { x: npc.pos.x, y: npc.pos.y }, target: { x: npc.target.x, y: npc.target.y }
+      })),
+      jumpExit: getEscortJumpExit(),
+      startPos: { x: startPos.x, y: startPos.y },
+      wreckCount: wreck.length,
+      playerCount: countPlayerFragments()
+    };
+  }
+};
 
 function loop(now) {
   const dt = Math.min(0.05, (now - state.lastTime) / 1000);
