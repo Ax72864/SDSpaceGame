@@ -346,6 +346,13 @@ const FRAGMENT_RENDER_DESATURATION = 0.7;
 const FRAGMENT_RENDER_OUTLINE_COLOR = [0.92, 0.6, 0.32, 0.8];
 const BRIDGE_DISTANCE = CELL * 1.2;
 const BRIDGE_ANGLE = 0.436;
+const BRIDGE_PREVIEW_DISTANCE = CELL * 1.6;
+const BRIDGE_PREVIEW_ANGLE_TOLERANT = 0.611;
+const FRAGMENT_PROJECTILE_HIT_RADIUS = CELL * 0.48;
+const FRAGMENT_HUD_WARN_COUNT = 4;
+const FRAGMENT_HUD_SAMPLE_INTERVAL = 0.2;
+const BRIDGE_PREVIEW_RING_READY = [0.4, 0.95, 0.6, 0.9];
+const BRIDGE_PREVIEW_RING_NEAR = [0.95, 0.85, 0.35, 0.85];
 
 const PIRATE_AI = {
   desiredDistance: 360,
@@ -452,6 +459,8 @@ const state = {
     controlMode: "screen"
   },
   lastBuildError: "",
+  buildHint: "",
+  bridgePreview: null,
   particles: [],
   fireCooldown: 0,
   spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER
@@ -502,11 +511,21 @@ function showToast(message, duration = 2.8) {
 
 function setBuildError(message) {
   state.lastBuildError = message;
+  state.buildHint = "";
   showToast(message, 4.2);
 }
 
 function clearBuildError() {
   state.lastBuildError = "";
+  state.buildHint = "";
+}
+
+function setBuildHint(message) {
+  state.buildHint = message || "";
+}
+
+function clearBuildHint() {
+  state.buildHint = "";
 }
 
 function isMoveKey(key) {
@@ -713,6 +732,9 @@ function ensureRunRuntimeState() {
   if (!Number.isFinite(state.run.endgameActivityFraction)) state.run.endgameActivityFraction = 0;
   if (!Number.isFinite(state.run.endgameActivityPoints)) state.run.endgameActivityPoints = 0;
   if (!Number.isFinite(state.run.guardianSpawnDelay)) state.run.guardianSpawnDelay = 0;
+  if (!state.run.fragmentHudCache || typeof state.run.fragmentHudCache !== "object") {
+    state.run.fragmentHudCache = null;
+  }
   state.run.endgame = Boolean(state.run.endgame);
   state.run.guardianSpawned = Boolean(state.run.guardianSpawned);
   state.run.guardianDefeated = Boolean(state.run.guardianDefeated);
@@ -1925,6 +1947,219 @@ function getBuildCost(facility) {
   );
 }
 
+function isValidFrameBuildGrid(x, y) {
+  if (state.station.cells.has(key(x, y))) return false;
+  return hasConnectedNeighbor(x, y);
+}
+
+function countFragmentFacilities(fragment) {
+  let count = 0;
+  for (const cell of fragment.cells.values()) {
+    if (cell.facility !== "frame" && cell.facility !== "core") count++;
+  }
+  return count;
+}
+
+function angleToDirectionArrow8(angleRad) {
+  const deg = ((angleRad * 180) / Math.PI + 360) % 360;
+  if (deg < 22.5 || deg >= 337.5) return "→";
+  if (deg < 67.5) return "↘";
+  if (deg < 112.5) return "↓";
+  if (deg < 157.5) return "↙";
+  if (deg < 202.5) return "←";
+  if (deg < 247.5) return "↖";
+  if (deg < 292.5) return "↑";
+  return "↗";
+}
+
+function getNearestFragmentHudData() {
+  if (!state.fragments.length) return null;
+  const cache = state.run.fragmentHudCache;
+  if (cache && state.time - cache.sampledAt < FRAGMENT_HUD_SAMPLE_INTERVAL) {
+    return cache.data;
+  }
+  let nearest = null;
+  for (const fragment of state.fragments) {
+    if (!fragment?.cells?.size) continue;
+    const distance = dist(state.station.pos, fragment.pos);
+    if (!nearest || distance < nearest.distance) {
+      nearest = { fragment, distance };
+    }
+  }
+  if (!nearest) {
+    state.run.fragmentHudCache = { sampledAt: state.time, data: null };
+    return null;
+  }
+  const angle = Math.atan2(
+    nearest.fragment.pos.y - state.station.pos.y,
+    nearest.fragment.pos.x - state.station.pos.x
+  );
+  const data = {
+    direction: angleToDirectionArrow8(angle),
+    distance: Math.round(nearest.distance),
+    distanceRounded: Math.round(nearest.distance / 50) * 50,
+    facilityCount: countFragmentFacilities(nearest.fragment),
+    fragmentCount: state.fragments.length
+  };
+  state.run.fragmentHudCache = { sampledAt: state.time, data };
+  return data;
+}
+
+function buildFragmentHudAlerts() {
+  if (!state.fragments.length) return [];
+  const alerts = [];
+  const count = state.fragments.length;
+  if (count >= FRAGMENT_HUD_WARN_COUNT) {
+    alerts.push({
+      level: "danger",
+      cssClass: "alert-fragment-warn",
+      text: "脱落较多，及时回收"
+    });
+  }
+  const hud = getNearestFragmentHudData();
+  if (!hud) return alerts;
+  let text = `最近残骸 ${hud.direction} · ${hud.distanceRounded} px · ${hud.facilityCount} 设施`;
+  if (count > 1) text = `残骸 ×${count} · ${text}`;
+  alerts.push({
+    level: count >= FRAGMENT_HUD_WARN_COUNT ? "warn" : "good",
+    cssClass: "alert-fragment",
+    text
+  });
+  return alerts;
+}
+
+function evaluateBridgePreviewAtGrid(gx, gy) {
+  if (!state.fragments.length || !isValidFrameBuildGrid(gx, gy)) return null;
+  const worldP = cellWorldPosition({ x: gx, y: gy, detached: false });
+  let bestReady = null;
+  let bestNear = null;
+
+  for (const fragment of state.fragments) {
+    if (!fragment?.cells?.size) continue;
+    const angleDiff = Math.abs(normalizeAngle(fragment.angle - state.station.angle));
+    const edgeKeys = fragment.edgeKeys && fragment.edgeKeys.size
+      ? fragment.edgeKeys
+      : computeFragmentEdgeKeys(fragment.cells);
+    let nearestDist = Infinity;
+    for (const edgeKey of edgeKeys) {
+      const edgeCell = fragment.cells.get(edgeKey);
+      if (!edgeCell) continue;
+      const edgeWorld = fragmentCellWorldPosition(fragment, edgeCell);
+      nearestDist = Math.min(nearestDist, dist(edgeWorld, worldP));
+    }
+    if (nearestDist > BRIDGE_PREVIEW_DISTANCE) continue;
+    if (angleDiff > BRIDGE_PREVIEW_ANGLE_TOLERANT) continue;
+
+    const entry = {
+      fragment,
+      distance: nearestDist,
+      angleDiff,
+      cellCount: fragment.cells.size,
+      facilityCount: countFragmentFacilities(fragment)
+    };
+
+    if (nearestDist <= BRIDGE_DISTANCE && angleDiff <= BRIDGE_ANGLE) {
+      if (
+        !bestReady
+        || entry.cellCount > bestReady.cellCount
+        || (entry.cellCount === bestReady.cellCount && entry.distance < bestReady.distance)
+      ) {
+        bestReady = entry;
+      }
+    } else if (!bestNear || entry.distance < bestNear.distance) {
+      bestNear = entry;
+    }
+  }
+
+  if (bestReady) {
+    return {
+      tier: "ready",
+      fragment: bestReady.fragment,
+      worldP,
+      message: `此处可桥接：${bestReady.cellCount} 个结构${bestReady.facilityCount ? ` / 含 ${bestReady.facilityCount} 设施` : ""}。`
+    };
+  }
+  if (bestNear) {
+    return {
+      tier: "near",
+      fragment: bestNear.fragment,
+      worldP,
+      message: "残骸接近，靠近 / 转向以桥接"
+    };
+  }
+  return null;
+}
+
+function updateBridgePreviewState() {
+  if (state.selectedBuild !== "frame" || !state.input.mouseWorld) {
+    state.bridgePreview = null;
+    clearBuildHint();
+    return;
+  }
+  const grid = worldToGrid(state.input.mouseWorld);
+  const preview = evaluateBridgePreviewAtGrid(grid.x, grid.y);
+  state.bridgePreview = preview;
+  if (preview) {
+    setBuildHint(preview.message);
+  } else {
+    clearBuildHint();
+  }
+}
+
+function removeFragmentCell(fragment, cell) {
+  const cellKey = key(cell.x, cell.y);
+  fragment.cells.delete(cellKey);
+  if (fragment.cells.size > 0) {
+    fragment.edgeKeys = computeFragmentEdgeKeys(fragment.cells);
+    fragment.bounds = computeFragmentBounds(fragment.cells);
+  }
+}
+
+function destroyFragmentIfEmpty(fragment, toastMessage = "残骸已被摧毁") {
+  if (fragment.cells.size > 0) return false;
+  const fragmentIndex = state.fragments.indexOf(fragment);
+  if (fragmentIndex >= 0) {
+    state.fragments.splice(fragmentIndex, 1);
+    showToast(toastMessage);
+    state.run.fragmentHudCache = null;
+    return true;
+  }
+  return false;
+}
+
+function damageFragmentCell(fragment, cell, damage) {
+  if (cell.facility !== "frame" && cell.facility !== "core") {
+    cell.hp -= damage;
+    if (cell.hp <= 0) {
+      const hitPos = fragmentCellWorldPosition(fragment, cell);
+      removeFragmentCell(fragment, cell);
+      spawnParticle(hitPos, [0.85, 0.88, 0.92, 0.9]);
+      destroyFragmentIfEmpty(fragment);
+    }
+    return;
+  }
+  cell.hp -= damage;
+  cell.frameHp -= damage;
+  if (cell.frameHp <= 0) {
+    const hitPos = fragmentCellWorldPosition(fragment, cell);
+    removeFragmentCell(fragment, cell);
+    spawnParticle(hitPos, [0.85, 0.88, 0.92, 0.9]);
+    destroyFragmentIfEmpty(fragment);
+  }
+}
+
+function getFragmentCellAtWorld(world) {
+  for (const fragment of state.fragments) {
+    for (const cell of fragment.cells.values()) {
+      const cellPos = fragmentCellWorldPosition(fragment, cell);
+      if (dist(world, cellPos) < FRAGMENT_PROJECTILE_HIT_RADIUS) {
+        return { fragment, cell };
+      }
+    }
+  }
+  return null;
+}
+
 function buildAt(x, y, facility) {
   const cellKey = key(x, y);
   const existing = state.station.cells.get(cellKey);
@@ -1944,7 +2179,6 @@ function buildAt(x, y, facility) {
     }
     pay(TYPES.frame.cost);
     state.station.cells.set(cellKey, createCell(x, y, "frame"));
-    reconnectDetached(x, y);
     clearBuildError();
     const merged = tryBridgeAt(x, y);
     if (!merged && !state.lastBuildError) {
@@ -1986,12 +2220,6 @@ function neighbors(x, y) {
     { x, y: y + 1 },
     { x, y: y - 1 }
   ];
-}
-
-function reconnectDetached(x, y) {
-  void x;
-  void y;
-  // v0.3.0 T3：保留兼容 wrapper，station.cells 已不再保存 detached cells，当前为 no-op。
 }
 
 function tryBridgeAt(x, y) {
@@ -2181,11 +2409,7 @@ function updateStationPhysics(dt) {
     }
     const pushLocal = { x: -nozzle.x, y: -nozzle.y };
     const pushWorld = rotate(pushLocal, station.angle);
-    const shouldFire = targetVector
-      ? dot(pushWorld, targetVector) > 0.12
-      : keyboardThrust
-        ? length(station.vel) > 3
-        : false;
+    const shouldFire = targetVector ? dot(pushWorld, targetVector) > 0.12 : false;
     if (!shouldFire) {
       cell.fire = 0;
       continue;
@@ -2754,6 +2978,12 @@ function updateProjectiles(dt) {
       if (hit && !hit.detached) {
         damageCell(hit, projectile.damage);
         projectile.dead = true;
+      } else if (!projectile.dead) {
+        const fragHit = getFragmentCellAtWorld(projectile);
+        if (fragHit) {
+          damageFragmentCell(fragHit.fragment, fragHit.cell, projectile.damage);
+          projectile.dead = true;
+        }
       }
     } else {
       for (const enemy of state.enemies) {
@@ -2951,11 +3181,6 @@ function updateFragments(dt) {
   }
 }
 
-function updateDetachedCells(dt) {
-  void dt;
-  // v0.3.0 T1/T2：detached cell 已抽离到 state.fragments，保留空壳给 T3+。
-}
-
 function updateObjective(dt) {
   const objective = state.run.objective;
   if (!objective) return;
@@ -3066,6 +3291,7 @@ function render() {
   renderTargetAndObjective();
   renderFragments();
   renderStation();
+  renderBridgePreview();
   renderMiningEffects();
   renderEnemies();
   renderProjectilesAndEffects();
@@ -3241,12 +3467,22 @@ function renderFragmentOutline(fragment) {
   );
 }
 
+function renderBridgePreview() {
+  updateBridgePreviewState();
+  const preview = state.bridgePreview;
+  if (!preview?.worldP) return;
+  const ringColor = preview.tier === "ready" ? BRIDGE_PREVIEW_RING_READY : BRIDGE_PREVIEW_RING_NEAR;
+  renderer.ring(preview.worldP, CELL * 0.55, 3.5, ringColor, 28);
+}
+
 function renderFragments() {
+  const highlightId = state.bridgePreview?.tier === "ready" ? state.bridgePreview.fragment?.id : null;
   for (const fragment of state.fragments) {
+    const highlighted = highlightId != null && fragment.id === highlightId;
     const alpha = clamp(
-      FRAGMENT_RENDER_ALPHA + Math.sin(state.time * Math.PI * 3 + fragment.id) * 0.06,
+      (highlighted ? 0.7 : FRAGMENT_RENDER_ALPHA) + Math.sin(state.time * Math.PI * 3 + fragment.id) * 0.06,
       0.42,
-      0.68
+      highlighted ? 0.78 : 0.68
     );
     const transform = {
       pos: fragment.pos,
@@ -3505,6 +3741,13 @@ function buildStatusAlerts() {
       text: state.lastBuildError
     });
   }
+  if (state.buildHint && !state.lastBuildError) {
+    alerts.push({
+      level: state.bridgePreview?.tier === "ready" ? "good" : "warn",
+      cssClass: "alert-bridge-hint",
+      text: state.buildHint
+    });
+  }
   if (state.selectedBuild) {
     alerts.push({
       level: "warn",
@@ -3664,11 +3907,17 @@ function updateHud() {
     nextStepEl.textContent = guide.next;
   }
 
+  const fragmentAlerts = buildFragmentHudAlerts();
   const alerts = buildStatusAlerts();
   const miningAlerts = buildMiningAlerts();
-  const allAlerts = isObjectiveComplete() ? [...alerts, ...miningAlerts] : [...miningAlerts, ...alerts];
+  const allAlerts = isObjectiveComplete()
+    ? [...fragmentAlerts, ...alerts, ...miningAlerts]
+    : [...fragmentAlerts, ...miningAlerts, ...alerts];
   const alertsHtml = allAlerts
-    .map((a) => `<div class="alert-item alert-${a.level}">${a.text}</div>`)
+    .map((a) => {
+      const extraClass = a.cssClass ? ` ${a.cssClass}` : "";
+      return `<div class="alert-item alert-${a.level}${extraClass}">${a.text}</div>`;
+    })
     .join("");
   setHtmlIfChanged(statusAlertsEl, "alerts", alertsHtml);
 

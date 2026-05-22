@@ -502,6 +502,19 @@ h2 {
   color: #8dffd2;
 }
 
+.alert-fragment {
+  color: #9ed4ff;
+}
+
+.alert-fragment-warn {
+  color: #ffb86a;
+  font-weight: 600;
+}
+
+.alert-bridge-hint {
+  color: #9ef5c8;
+}
+
 .power-low {
   background: rgba(255, 120, 90, 0.22);
 }
