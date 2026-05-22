@@ -1,0 +1,28 @@
+# Chrome headless / DevTools 自检临时数据
+.chrome-*/
+.chrome-t*-verify*/
+.chrome-profile/
+.chrome-user-data/
+
+# OS 元数据
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器临时
+*.tmp
+*.bak
+*.swp
+*~
+
+# 通用缓存与临时
+.tmp/
+tmp/
+.cache/
+*.log
+
+# Node（防御性，本项目暂未使用）
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
