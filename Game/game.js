@@ -496,6 +496,16 @@ const WRECK_FACILITY_WEIGHTS = [
   ["armor", 0.15],
   ["repair", 0.05]
 ];
+// v0.6.0 hostile-station 死亡 wreck 设施分布（数值方案 §7；与 salvage 用 WRECK_FACILITY_WEIGHTS 独立）
+const ENEMY_WRECK_FACILITY_WEIGHTS = [
+  ["turret", 0.50],
+  ["shield", 0.25],
+  ["armor", 0.15],
+  ["repair", 0.10]
+];
+const HOSTILE_STATION_WRECK_COUNT_BY_LEVEL = { 3: 6, 4: 9, 5: 12 };
+const HOSTILE_STATION_WRECK_SPAWN_RADIUS_MIN = 80;
+const HOSTILE_STATION_WRECK_SPAWN_RADIUS_MAX = 150;
 
 // v0.6.0 hostile-station：总 HP 池 + cells 布局（数值方案 §1+§2，ADR 拍板）
 const HOSTILE_STATION_LEVEL_HP = {
@@ -1833,6 +1843,7 @@ const OBJECTIVE_EVENT_HANDLERS = {
   mined: "onMined",
   enemyKilled: "onEnemyKilled",
   guardianKilled: "onGuardianKilled",
+  hostileStationKilled: "onHostileStationKilled",
   fragmentDocked: "onFragmentDocked",
   npcArrived: "onNpcArrived",
   npcDestroyed: "onNpcDestroyed"
@@ -2860,15 +2871,27 @@ function countWreckFragments() {
   return state.fragments.filter((fragment) => fragment.origin === "wreck").length;
 }
 
-function pickWreckFacility(rng) {
+function isWreckLikeOrigin(origin) {
+  return origin === "wreck" || origin === "enemy-wreck";
+}
+
+function pickWreckFacilityWithWeights(rng, weights) {
   let total = 0;
-  for (const [, weight] of WRECK_FACILITY_WEIGHTS) total += weight;
+  for (const [, weight] of weights) total += weight;
   let roll = rng() * total;
-  for (const [facility, weight] of WRECK_FACILITY_WEIGHTS) {
+  for (const [facility, weight] of weights) {
     roll -= weight;
     if (roll <= 0) return facility;
   }
-  return WRECK_FACILITY_WEIGHTS[0][0];
+  return weights[0][0];
+}
+
+function pickWreckFacility(rng) {
+  return pickWreckFacilityWithWeights(rng, WRECK_FACILITY_WEIGHTS);
+}
+
+function pickEnemyWreckFacility(rng) {
+  return pickWreckFacilityWithWeights(rng, ENEMY_WRECK_FACILITY_WEIGHTS);
 }
 
 function buildWreckShape(rng) {
@@ -2900,11 +2923,15 @@ function createWreckCell(x, y, facility, rng) {
   return cell;
 }
 
-function makeWreckFragment(pos, rng) {
+function makeWreckFragment(pos, rng, options = {}) {
+  const facilityWeights = options.weights || WRECK_FACILITY_WEIGHTS;
+  const pickFacility = options.weights === ENEMY_WRECK_FACILITY_WEIGHTS
+    ? pickEnemyWreckFacility
+    : (r) => pickWreckFacilityWithWeights(r, facilityWeights);
   const shape = buildWreckShape(rng);
   const cells = new Map();
   for (const slot of shape) {
-    const facility = pickWreckFacility(rng);
+    const facility = pickFacility(rng);
     cells.set(key(slot.x, slot.y), createWreckCell(slot.x, slot.y, facility, rng));
   }
   const centerGrid = shape.reduce(
@@ -2938,7 +2965,7 @@ function makeWreckFragment(pos, rng) {
     centerGrid,
     spawnAt: state.time,
     warnedNearBoundary: false,
-    origin: "wreck"
+    origin: options.origin || "wreck"
   };
 }
 
@@ -3667,6 +3694,119 @@ function tryDamageHostileStationCell(projectile, hostileStation) {
   return damageHostileStationCell(projectile, hostileStation, closestKey);
 }
 
+function findCellByFacility(cellsMap, facility) {
+  for (const cell of cellsMap.values()) {
+    if (cell.facility === facility) return cell;
+  }
+  return null;
+}
+
+function getShieldCellKey(hostileStation) {
+  if (hostileStation.shieldCellKey && hostileStation.cells.has(hostileStation.shieldCellKey)) {
+    const cell = hostileStation.cells.get(hostileStation.shieldCellKey);
+    if (cell && cell.facility === "shield") return hostileStation.shieldCellKey;
+  }
+  for (const [cellKey, cell] of hostileStation.cells.entries()) {
+    if (cell.facility === "shield") return cellKey;
+  }
+  return null;
+}
+
+function updateHostileStationWeapons(hostileStation, dt) {
+  const powerCell = findCellByFacility(hostileStation.cells, "power");
+  const powerAlive = powerCell && powerCell.hp > 0;
+  const reloadMultiplier = powerAlive ? 1.0 : 1.5;
+  const distToPlayer = dist(hostileStation, state.station.pos);
+  const stationRange = hostileStation.range || 480;
+
+  hostileStation.cells.forEach((cell, cellKey) => {
+    if (cell.facility !== "turret" || cell.hp <= 0) return;
+    cell.reload = (cell.reload || 0) - dt;
+    if (cell.reload > 0) return;
+    if (distToPlayer > stationRange) return;
+
+    const cellWorldPos = getHostileStationCellWorldPos(hostileStation, cellKey);
+    const dirX = state.station.pos.x - cellWorldPos.x;
+    const dirY = state.station.pos.y - cellWorldPos.y;
+    const cellDist = Math.sqrt(dirX * dirX + dirY * dirY);
+    if (cellDist === 0) return;
+
+    const damage = getCellStat(cell, "damage") || hostileStation.projectileDamage || 12;
+    const projectileSpeed = getCellStat(cell, "projectileSpeed") || 280;
+    fireProjectile(
+      cellWorldPos,
+      { x: dirX / cellDist, y: dirY / cellDist },
+      "enemy",
+      damage,
+      projectileSpeed
+    );
+    cell.fire = 1;
+    const baseReload = getCellStat(cell, "reload") || 1.6;
+    cell.reload = baseReload * reloadMultiplier;
+  });
+}
+
+function updateHostileStationSpawn(hostileStation, dt) {
+  if (!(hostileStation.spawnInterval > 0)) return;
+  hostileStation.spawn = (hostileStation.spawn || 0) - dt;
+  if (hostileStation.spawn > 0) return;
+
+  const currentMinions = state.enemies.filter((e) => e.hostileStationMinion && e.hp > 0).length;
+  const cap = hostileStation.spawnCap || 3;
+  if (currentMinions >= cap) {
+    hostileStation.spawn = 1.0;
+    return;
+  }
+
+  const angle = Math.random() * Math.PI * 2;
+  const spawnDist = 80 + Math.random() * 40;
+  const minion = spawnEnemy(
+    "pirate",
+    hostileStation.x + Math.cos(angle) * spawnDist,
+    hostileStation.y + Math.sin(angle) * spawnDist,
+    { level: hostileStation.level || hostileStation.spawnLevel || 3, hostileStationMinion: true }
+  );
+  if (minion) minion.hostileStationMinion = true;
+  hostileStation.spawn = hostileStation.spawnInterval || 8;
+}
+
+function spawnEnemyWrecks(hostileStation) {
+  const level = hostileStation.level || 3;
+  const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
+  const count = HOSTILE_STATION_WRECK_COUNT_BY_LEVEL[effectiveLevel] || 6;
+  const rng = mulberry32(hashSeed(`${state.run.seed}:hostile-wreck:${hostileStation.x}:${hostileStation.y}`));
+  for (let i = 0; i < count; i++) {
+    const angle = rng() * Math.PI * 2;
+    const radius = HOSTILE_STATION_WRECK_SPAWN_RADIUS_MIN
+      + rng() * (HOSTILE_STATION_WRECK_SPAWN_RADIUS_MAX - HOSTILE_STATION_WRECK_SPAWN_RADIUS_MIN);
+    const wx = hostileStation.x + Math.cos(angle) * radius;
+    const wy = hostileStation.y + Math.sin(angle) * radius;
+    const wreck = makeWreckFragment(
+      { x: wx, y: wy },
+      rng,
+      { weights: ENEMY_WRECK_FACILITY_WEIGHTS, origin: "enemy-wreck" }
+    );
+    if (wreck) state.fragments.push(wreck);
+  }
+}
+
+function triggerHostileStationDeath(enemy) {
+  if (enemy._deathHandled) return;
+  enemy._deathHandled = true;
+  triggerCameraShake(72, 1.3);
+  for (let i = 0; i < 48; i++) {
+    const ang = rand(0, Math.PI * 2);
+    const radius = rand(8, enemy.r + 36);
+    spawnParticle(
+      { x: enemy.x + Math.cos(ang) * radius, y: enemy.y + Math.sin(ang) * radius },
+      i % 3 === 0 ? [1, 0.86, 0.42, 1] : [1, 0.32, 0.18, 1]
+    );
+  }
+  spawnEnemyWrecks(enemy);
+  notifyObjective("hostileStationKilled", { enemy });
+  showToast("敌方空间站已摧毁——拾取残骸强化 build。");
+}
+
 function buildAt(x, y, facility) {
   const cellKey = key(x, y);
   const existing = state.station.cells.get(cellKey);
@@ -4080,7 +4220,7 @@ function getWaveCountByLevel(level) {
 }
 
 function enemyUsesStationAi(enemy) {
-  return enemy.kind === "station" || enemy.kind === "guardian";
+  return enemy.kind === "station" || enemy.kind === "guardian" || enemy.kind === "hostile-station";
 }
 
 function getEnemyData(kind, level) {
@@ -4246,14 +4386,31 @@ function updateEnemies(dt) {
   for (const enemy of state.enemies) {
     enemy.reload -= dt;
 
-    // v0.6.0 T1 hostile-station：缓慢自转 + 聚合 hp（AI / 武器 / 召唤 minion 留 T2 实现）
+    // v0.6.0 T2 hostile-station：470 悬停 AI + 缓慢自转 + 武器 / 召唤
     if (enemy.kind === "hostile-station") {
-      if (Number.isFinite(enemy.angularVel)) {
-        enemy.angle += enemy.angularVel * dt;
+      const toStation = { x: state.station.pos.x - enemy.x, y: state.station.pos.y - enemy.y };
+      const dir = normalize(toStation);
+      const distToStation = length(toStation);
+      const desiredDistance = 470;
+      if (distToStation > desiredDistance) {
+        enemy.vx += dir.x * enemy.accel * dt;
+        enemy.vy += dir.y * enemy.accel * dt;
       }
+      enemy.vx *= 1 - Math.min(enemy.drag * dt, 0.3);
+      enemy.vy *= 1 - Math.min(enemy.drag * dt, 0.3);
+      enemy.x += enemy.vx * dt;
+      enemy.y += enemy.vy * dt;
+
+      enemy.angle = (enemy.angle || 0) + (enemy.angularVel || 0.15) * dt;
+      if (enemy.angle > Math.PI * 2) enemy.angle -= Math.PI * 2;
+      if (enemy.angle < 0) enemy.angle += Math.PI * 2;
+
+      updateHostileStationWeapons(enemy, dt);
+      updateHostileStationSpawn(enemy, dt);
       if (enemy.hp > 0) {
         enemy.hp = sumCellsHp(enemy.cells);
       }
+      collideEnemyWithStation(enemy);
       continue;
     }
 
@@ -4346,11 +4503,7 @@ function updateEnemies(dt) {
       triggerGuardianDeathEffect(enemy);
       notifyObjective("guardianKilled", enemy);
     } else if (enemy.kind === "hostile-station") {
-      // v0.6.0 T1：core HP=0 即移除；wreck 爆出 / 震屏 / hostileStationKilled 事件留 T3 阶段
-      if (!enemy._deathHandled) {
-        enemy._deathHandled = true;
-        for (let i = 0; i < 18; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
-      }
+      triggerHostileStationDeath(enemy);
     } else {
       notifyObjective("enemyKilled", enemy);
       for (let i = 0; i < 12; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
@@ -4416,6 +4569,7 @@ function spawnEnemy(kind, x, y, options = {}) {
     spawnLevel,
     maxHp: data.hp,
     guardianMinion: Boolean(options.guardianMinion),
+    hostileStationMinion: Boolean(options.hostileStationMinion),
     ...data
   };
   if (kind === "hostile-station") {
@@ -4425,6 +4579,7 @@ function spawnEnemy(kind, x, y, options = {}) {
     enemy.weaponCellKeys = [];
     enemy.cells.forEach((cell, cellKey) => {
       if (cell.facility === "turret") enemy.weaponCellKeys.push(cellKey);
+      if (cell.facility === "shield") enemy.shieldCellKey = cellKey;
     });
     enemy.cellsHpMax = sumCellsMaxHp(enemy.cells);
     enemy.hp = sumCellsHp(enemy.cells);
@@ -4601,9 +4756,21 @@ function updateProjectiles(dt) {
       }
     } else {
       for (const enemy of state.enemies) {
-        // v0.6.0 hostile-station：cell 粒度命中（不走 enemy.r 整体球；命中后 enemy.hp 通过聚合更新）
-        if (enemy.kind === "hostile-station") {
-          if (dist(projectile, enemy) < enemy.r + projectile.r + CELL * 0.6) {
+        // v0.6.0 hostile-station：shield 拦截优先，再走 cell 粒度命中
+        if (enemy.kind === "hostile-station" && enemy.hp > 0) {
+          const shieldCellKey = getShieldCellKey(enemy);
+          const shieldCell = shieldCellKey ? enemy.cells.get(shieldCellKey) : null;
+          if (shieldCell && shieldCell.hp > 0) {
+            const shieldWorldPos = getHostileStationCellWorldPos(enemy, shieldCellKey);
+            const shieldRange = getCellStat(shieldCell, "range") || 110;
+            if (dist(projectile, shieldWorldPos) < shieldRange) {
+              for (let i = 0; i < 5; i++) spawnParticle(projectile, [0.35, 1, 0.94, 1]);
+              shieldCell.fire = 1;
+              projectile.dead = true;
+              break;
+            }
+          }
+          if (!projectile.dead && dist(projectile, enemy) < enemy.r + projectile.r + CELL * 0.6) {
             if (tryDamageHostileStationCell(projectile, enemy)) {
               projectile.dead = true;
               break;
@@ -5064,7 +5231,7 @@ function renderDashedRing(center, radius, width, color, segments = 30) {
 }
 
 function renderFragmentOutline(fragment) {
-  const isWreck = fragment.origin === "wreck";
+  const isWreck = isWreckLikeOrigin(fragment.origin);
   const outlineColor = isWreck ? WRECK_RENDER_OUTLINE_COLOR : FRAGMENT_RENDER_OUTLINE_COLOR;
   const spanX = Math.max(1, fragment.bounds.maxX - fragment.bounds.minX + 1) * CELL;
   const spanY = Math.max(1, fragment.bounds.maxY - fragment.bounds.minY + 1) * CELL;
@@ -5094,7 +5261,7 @@ function renderBridgePreview() {
 function renderFragments() {
   const highlightId = state.bridgePreview?.tier === "ready" ? state.bridgePreview.fragment?.id : null;
   for (const fragment of state.fragments) {
-    const isWreck = fragment.origin === "wreck";
+    const isWreck = isWreckLikeOrigin(fragment.origin);
     const highlighted = highlightId != null && fragment.id === highlightId;
     const alpha = clamp(
       (highlighted ? 0.7 : FRAGMENT_RENDER_ALPHA) + Math.sin(state.time * Math.PI * 3 + fragment.id) * 0.06,
