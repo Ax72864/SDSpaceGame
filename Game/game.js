@@ -318,8 +318,11 @@ const PLAYER_PHYSICS = {
   keyboardThrust: 108,
   thrusterThrust: 110,
   massPerCell: 0.2,
-  linearDamping: 0.18,
-  angularDamping: 0.55
+  linearDamping: 0.27,
+  angularDamping: 0.62,
+  coastDampingMult: 3.2,
+  coastHighSpeedDamping: 0.32,
+  coastHighSpeedThreshold: 60
 };
 
 const PIRATE_AI = {
@@ -555,9 +558,12 @@ function updateMouseAim(dt) {
   let delta = desired - state.station.angle;
   while (delta > Math.PI) delta -= Math.PI * 2;
   while (delta < -Math.PI) delta += Math.PI * 2;
-  const turnRate = 7.5;
-  state.station.angle += delta * clamp(dt * turnRate, 0, 1);
-  state.station.angularVel *= 1 - clamp(dt * 4, 0, 0.85);
+  const absDelta = Math.abs(delta);
+  const largeTurnBoost = 1 + clamp(absDelta / (Math.PI * 0.5), 0, 0.85);
+  const turnRate = 9.5 * largeTurnBoost;
+  const step = clamp(dt * turnRate, 0, absDelta > 0.08 ? 0.92 : 0.75);
+  state.station.angle += delta * step;
+  state.station.angularVel *= 1 - clamp(dt * 7.5, 0, 0.92);
 }
 
 function key(x, y) {
@@ -1801,6 +1807,12 @@ function updatePowerAndFacilities(dt) {
   state.power.used = used;
 }
 
+function applyLinearDamping(vel, damping, dt) {
+  const factor = 1 - Math.min(damping * dt, damping);
+  vel.x *= factor;
+  vel.y *= factor;
+}
+
 function updateStationPhysics(dt) {
   const station = state.station;
   let force = { x: 0, y: 0 };
@@ -1824,7 +1836,11 @@ function updateStationPhysics(dt) {
     }
     const pushLocal = { x: -nozzle.x, y: -nozzle.y };
     const pushWorld = rotate(pushLocal, station.angle);
-    const shouldFire = targetVector ? dot(pushWorld, targetVector) > 0.12 : length(station.vel) > 3;
+    const shouldFire = targetVector
+      ? dot(pushWorld, targetVector) > 0.12
+      : keyboardThrust
+        ? length(station.vel) > 3
+        : false;
     if (!shouldFire) {
       cell.fire = 0;
       continue;
@@ -1856,8 +1872,21 @@ function updateStationPhysics(dt) {
   }
   station.vel.x += force.x / mass * dt;
   station.vel.y += force.y / mass * dt;
-  station.vel.x *= 1 - Math.min(PLAYER_PHYSICS.linearDamping * dt, PLAYER_PHYSICS.linearDamping);
-  station.vel.y *= 1 - Math.min(PLAYER_PHYSICS.linearDamping * dt, PLAYER_PHYSICS.linearDamping);
+  applyLinearDamping(station.vel, PLAYER_PHYSICS.linearDamping, dt);
+  if (!keyboardThrust) {
+    const speed = length(station.vel);
+    let coastDamp =
+      PLAYER_PHYSICS.linearDamping * PLAYER_PHYSICS.coastDampingMult;
+    if (speed > PLAYER_PHYSICS.coastHighSpeedThreshold) {
+      const t = clamp(
+        (speed - PLAYER_PHYSICS.coastHighSpeedThreshold) / 180,
+        0,
+        1
+      );
+      coastDamp += PLAYER_PHYSICS.coastHighSpeedDamping * t;
+    }
+    applyLinearDamping(station.vel, coastDamp, dt);
+  }
   station.pos.x += station.vel.x * dt;
   station.pos.y += station.vel.y * dt;
   station.angularVel += torque * dt;
