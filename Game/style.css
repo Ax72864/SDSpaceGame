@@ -80,6 +80,64 @@ button:disabled {
   color: #9db6d8;
 }
 
+.run-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-header #runInfo {
+  margin-left: 0;
+}
+
+.run-pill {
+  margin-left: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.run-progress {
+  margin-left: 0 !important;
+  color: #b6d8ff;
+  font-size: 12px;
+}
+
+.danger-safe {
+  color: #7effca !important;
+  border-color: rgba(126, 255, 202, 0.35);
+  background: rgba(58, 133, 106, 0.25);
+}
+
+.danger-alert {
+  color: #ffe598 !important;
+  border-color: rgba(255, 229, 152, 0.35);
+  background: rgba(131, 111, 52, 0.24);
+}
+
+.danger-high {
+  color: #ffbc8f !important;
+  border-color: rgba(255, 188, 143, 0.35);
+  background: rgba(136, 72, 44, 0.25);
+}
+
+.danger-deadly {
+  color: #ff8f8f !important;
+  border-color: rgba(255, 143, 143, 0.35);
+  background: rgba(123, 41, 41, 0.25);
+}
+
+.danger-endgame {
+  color: #ff84cb !important;
+  border-color: rgba(255, 132, 203, 0.35);
+  background: rgba(93, 35, 78, 0.28);
+}
+
 #resources {
   display: flex;
   flex-wrap: wrap;
@@ -164,6 +222,32 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.run-settlement-panel {
+  border-color: rgba(255, 138, 128, 0.45);
+  background: rgba(76, 22, 30, 0.38);
+  box-shadow: 0 0 22px rgba(255, 96, 96, 0.14);
+}
+
+.run-settlement-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #ffd5cd;
+  margin: 8px 0 10px;
+}
+
+#summaryRestartBtn,
+.danger-restart-btn {
+  border-color: rgba(255, 118, 118, 0.55);
+  background: rgba(143, 45, 45, 0.88);
+}
+
+#summaryStayBtn {
+  border-color: rgba(255, 183, 138, 0.4);
+  background: rgba(96, 56, 35, 0.82);
 }
 
 .objective-deferred-actions.hidden {
@@ -479,6 +563,10 @@ h2 {
   flex: 1;
 }
 
+.danger-restart-btn {
+  width: 100%;
+}
+
 .toast {
   position: absolute;
   left: 50%;
@@ -516,6 +604,15 @@ h2 {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .run-header {
+    width: 100%;
+  }
+
+  .run-pill,
+  .run-progress {
+    font-size: 10px;
   }
 
   .status-panel {

@@ -12,9 +12,11 @@
 
   <div id="hud">
     <section class="panel topbar">
-      <div>
+      <div class="run-header">
         <strong>星环工站</strong>
         <span id="runInfo">准备中</span>
+        <span id="runDanger" class="run-pill danger-safe">危险度：安全</span>
+        <span id="runProgress" class="run-progress">第 1 关 / 共 7 关</span>
       </div>
       <div id="resources"></div>
       <button id="pauseBtn" type="button">暂停</button>
@@ -53,6 +55,15 @@
           <button id="objectiveJumpDeferredBtn" type="button">跃迁下一星系</button>
         </div>
       </div>
+      <div id="runSettlementPanel" class="objective-choice-panel run-settlement-panel hidden" aria-live="polite">
+        <p class="objective-choice-title">本局结算</p>
+        <p class="objective-choice-hint">守护者已击毁，是否开始新局？</p>
+        <div id="runSettlementStats" class="run-settlement-stats"></div>
+        <div class="objective-choice-actions row">
+          <button id="summaryRestartBtn" type="button">开始新局</button>
+          <button id="summaryStayBtn" type="button">留在终结星系自由游玩</button>
+        </div>
+      </div>
 
       <details id="moreStatusPanel" class="more-status">
         <summary class="more-status-summary">更多状态</summary>
@@ -78,6 +89,9 @@
           <div class="row">
             <button id="rotateLeftBtn" type="button">左旋</button>
             <button id="rotateRightBtn" type="button">右旋</button>
+          </div>
+          <div class="row">
+            <button id="quickRestartBtn" class="hidden danger-restart-btn" type="button">再次开始新局</button>
           </div>
           <h2>局外天赋</h2>
           <div id="meta">
