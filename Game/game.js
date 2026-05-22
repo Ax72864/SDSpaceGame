@@ -152,6 +152,29 @@ const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 
 const MINING_RANGE_OFFSET = 130;
 
+const PLAYER_PHYSICS = {
+  keyboardThrust: 108,
+  thrusterThrust: 110,
+  massPerCell: 0.2,
+  linearDamping: 0.18,
+  angularDamping: 0.55
+};
+
+const PIRATE_AI = {
+  desiredDistance: 360,
+  separationAccel: 34
+};
+
+const SPAWN_ASTEROID_CHANCE_EARLY = 0.22;
+const SPAWN_ASTEROID_CHANCE_LATE = 0.38;
+const SPAWN_ASTEROID_RAMP_SEC = 300;
+
+const COLLISION_FEEL = {
+  asteroidCellDamage: 18,
+  pirateCellDamage: 8,
+  enemyBounce: 130
+};
+
 const RESOURCE_VISUAL = {
   ore: { ring: [0.95, 0.62, 0.22, 1], label: "矿石", css: "ore" },
   metal: { ring: [0.72, 0.78, 0.88, 1], label: "金属", css: "metal" },
@@ -1097,7 +1120,7 @@ function updateStationPhysics(dt) {
   if (keyboardThrust) {
     state.target = null;
   }
-  const mass = 1 + state.station.cells.size * 0.28;
+  const mass = 1 + state.station.cells.size * PLAYER_PHYSICS.massPerCell;
   for (const cell of state.station.cells.values()) {
     if (cell.facility !== "thruster" || !cell.active || cell.detached) continue;
     const nozzle = thrusterNozzle(cell);
@@ -1112,7 +1135,10 @@ function updateStationPhysics(dt) {
       cell.fire = 0;
       continue;
     }
-    const thrust = 82 * (1 + state.station.techLevel * 0.08) * (1 + state.meta.weapons * 0.03);
+    const thrust =
+      PLAYER_PHYSICS.thrusterThrust *
+      (1 + state.station.techLevel * 0.08) *
+      (1 + state.meta.weapons * 0.03);
     force.x += pushWorld.x * thrust;
     force.y += pushWorld.y * thrust;
     const r = rotate({ x: cell.x * CELL, y: cell.y * CELL }, station.angle);
@@ -1127,18 +1153,22 @@ function updateStationPhysics(dt) {
     );
   }
   if (keyboardThrust) {
-    const directThrust = 78 * (1 + state.station.techLevel * 0.06) * state.station.thrustMod;
+    const directThrust =
+      PLAYER_PHYSICS.keyboardThrust *
+      (1 + state.station.techLevel * 0.06) *
+      state.station.thrustMod;
     force.x += keyboardThrust.x * directThrust;
     force.y += keyboardThrust.y * directThrust;
   }
   station.vel.x += force.x / mass * dt;
   station.vel.y += force.y / mass * dt;
-  station.vel.x *= 1 - Math.min(0.08 * dt, 0.08);
-  station.vel.y *= 1 - Math.min(0.08 * dt, 0.08);
+  station.vel.x *= 1 - Math.min(PLAYER_PHYSICS.linearDamping * dt, PLAYER_PHYSICS.linearDamping);
+  station.vel.y *= 1 - Math.min(PLAYER_PHYSICS.linearDamping * dt, PLAYER_PHYSICS.linearDamping);
   station.pos.x += station.vel.x * dt;
   station.pos.y += station.vel.y * dt;
   station.angularVel += torque * dt;
-  station.angularVel *= 1 - Math.min(0.32 * dt, 0.28);
+  station.angularVel *=
+    1 - Math.min(PLAYER_PHYSICS.angularDamping * dt, PLAYER_PHYSICS.angularDamping);
   station.angle += station.angularVel * dt;
   if (state.target && dist(station.pos, state.target) < 45) {
     state.target = null;
@@ -1216,8 +1246,20 @@ function updateEnemies(dt) {
     enemy.reload -= dt;
     const toStation = { x: state.station.pos.x - enemy.x, y: state.station.pos.y - enemy.y };
     const dir = normalize(toStation);
-    const desiredDistance = enemy.kind === "station" ? 470 : enemy.kind === "pirate" ? 360 : 0;
-    if (length(toStation) > desiredDistance) {
+    const distToStation = length(toStation);
+    const desiredDistance =
+      enemy.kind === "station" ? 470 : enemy.kind === "pirate" ? PIRATE_AI.desiredDistance : 0;
+    if (enemy.kind === "pirate") {
+      if (distToStation > desiredDistance) {
+        enemy.vx += dir.x * enemy.accel * dt;
+        enemy.vy += dir.y * enemy.accel * dt;
+      } else if (distToStation > 0) {
+        const closeness = 1 - distToStation / desiredDistance;
+        const sep = PIRATE_AI.separationAccel * closeness;
+        enemy.vx -= dir.x * sep * dt;
+        enemy.vy -= dir.y * sep * dt;
+      }
+    } else if (distToStation > desiredDistance) {
       enemy.vx += dir.x * enemy.accel * dt;
       enemy.vy += dir.y * enemy.accel * dt;
     }
@@ -1258,6 +1300,11 @@ function updateEnemies(dt) {
   });
 }
 
+function getAsteroidSpawnChance() {
+  const t = clamp(state.time / SPAWN_ASTEROID_RAMP_SEC, 0, 1);
+  return SPAWN_ASTEROID_CHANCE_EARLY + (SPAWN_ASTEROID_CHANCE_LATE - SPAWN_ASTEROID_CHANCE_EARLY) * t;
+}
+
 function spawnWave() {
   const count = Math.ceil(state.run.playerCount * rand(0.6, 2));
   for (let i = 0; i < count; i++) {
@@ -1266,7 +1313,7 @@ function spawnWave() {
     const r = rand(800, 1150);
     const x = state.station.pos.x + Math.cos(a) * r;
     const y = state.station.pos.y + Math.sin(a) * r;
-    if (roll < 0.38) spawnEnemy("asteroid", x, y);
+    if (roll < getAsteroidSpawnChance()) spawnEnemy("asteroid", x, y);
     else if (roll < 0.82) spawnEnemy("pirate", x, y);
     else if (state.asyncEnabled) spawnEnemy("station", x, y);
     else spawnEnemy("pirate", x, y);
@@ -1277,7 +1324,7 @@ function spawnWave() {
 function spawnEnemy(kind, x, y) {
   const data = {
     asteroid: { hp: 26, r: 11, accel: 42, drag: 0.01, range: 0, reward: 4, spin: rand(-2, 2) },
-    pirate: { hp: 68, r: 20, accel: 52, drag: 0.16, range: 360, reward: 10, spin: rand(-1, 1) },
+    pirate: { hp: 68, r: 20, accel: 44, drag: 0.18, range: 360, reward: 10, spin: rand(-1, 1) },
     station: { hp: 260, r: 48, accel: 20, drag: 0.2, range: 520, reward: 38, spin: 0.2 }
   }[kind];
   state.enemies.push({
@@ -1438,11 +1485,16 @@ function collideEnemyWithStation(enemy) {
     if (cell.detached) continue;
     const p = cellWorldPosition(cell);
     if (dist(enemy, p) < enemy.r + CELL * 0.48) {
-      damageCell(cell, enemy.kind === "asteroid" ? 28 : 12);
+      damageCell(
+        cell,
+        enemy.kind === "asteroid"
+          ? COLLISION_FEEL.asteroidCellDamage
+          : COLLISION_FEEL.pirateCellDamage
+      );
       enemy.hp -= enemy.kind === "asteroid" ? 35 : 8;
       const away = normalize({ x: enemy.x - p.x, y: enemy.y - p.y });
-      enemy.vx += away.x * 80;
-      enemy.vy += away.y * 80;
+      enemy.vx += away.x * COLLISION_FEEL.enemyBounce;
+      enemy.vy += away.y * COLLISION_FEEL.enemyBounce;
       return;
     }
   }
