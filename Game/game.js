@@ -496,6 +496,24 @@ const WRECK_FACILITY_WEIGHTS = [
   ["armor", 0.15],
   ["repair", 0.05]
 ];
+
+// v0.6.0 hostile-station：总 HP 池 + cells 布局（数值方案 §1+§2，ADR 拍板）
+const HOSTILE_STATION_LEVEL_HP = {
+  3: 1500,
+  4: 2200,
+  5: 3000
+};
+const HOSTILE_STATION_LAYOUT_LEVEL3 = [
+  { key: "0,0",  facility: "core",   baseHp: 160 },
+  { key: "0,-1", facility: "power",  baseHp: 150 },
+  { key: "1,0",  facility: "turret", baseHp: 300 },
+  { key: "-1,0", facility: "turret", baseHp: 280 },
+  { key: "0,1",  facility: "shield", baseHp: 130 },
+  { key: "1,1",  facility: "armor",  baseHp: 320 },
+  { key: "-1,1", facility: "frame",  baseHp: 160 }
+];
+const HOSTILE_STATION_CORE_KEY = "0,0";
+const HOSTILE_STATION_HIT_RADIUS = CELL * 0.55;
 const NPC_RADIUS = 20;
 const NPC_ARRIVE_RADIUS = 80;
 const NPC_AVOID_MARGIN = 60;
@@ -1338,8 +1356,14 @@ function getCellStat(cell, key) {
     }
   }
 
-  const techFactor = getTechLevelFactor(cell.facility, key, state.station.techLevel || 0);
-  const globalFactor = getGlobalModFactor(cell.facility, key, state.station);
+  // v0.6.0 owner 隔离：敌方 cell（cell.owner === "enemy"）不享受玩家 techLevel / hullMod / weaponMod 加成
+  const isPlayerOwned = !cell.owner || cell.owner === "player";
+  const techFactor = isPlayerOwned
+    ? getTechLevelFactor(cell.facility, key, state.station.techLevel || 0)
+    : 1;
+  const globalFactor = isPlayerOwned
+    ? getGlobalModFactor(cell.facility, key, state.station)
+    : 1;
 
   let result;
   if (key === "reload") {
@@ -3539,6 +3563,110 @@ function getFragmentCellAtWorld(world) {
   return null;
 }
 
+// v0.6.0 hostile-station T1：cells 工厂、命中、死亡判定（数据结构复用 fragment.cells；T2/T3 实现 AI / 武器 / 死亡 wreck）
+function createHostileStationCells(level) {
+  const scale = level === 4 ? 1.47 : level === 5 ? 2.0 : 1.0;
+  const cells = new Map();
+  for (const entry of HOSTILE_STATION_LAYOUT_LEVEL3) {
+    const [gx, gy] = entry.key.split(",").map(Number);
+    const cell = createCell(gx, gy, entry.facility);
+    cell.owner = "enemy";
+    cell.tier = 0;
+    cell.mod = null;
+    cell.upgradePath = null;
+    const scaledHp = Math.floor(entry.baseHp * scale);
+    cell.maxHp = scaledHp;
+    cell.hp = scaledHp;
+    cell.baseMaxHp = scaledHp;
+    if (cell.facility === "frame" || cell.facility === "core") {
+      cell.maxFrameHp = scaledHp;
+      cell.frameHp = scaledHp;
+      cell.baseMaxFrameHp = scaledHp;
+    }
+    cell.active = true;
+    cell.enabled = true;
+    cell.detached = false;
+    cells.set(entry.key, cell);
+  }
+  return cells;
+}
+
+function sumCellsHp(cells) {
+  let sum = 0;
+  cells.forEach((c) => { sum += Math.max(0, c.hp || 0); });
+  return sum;
+}
+
+function sumCellsMaxHp(cells) {
+  let sum = 0;
+  cells.forEach((c) => { sum += c.maxHp || 0; });
+  return sum;
+}
+
+function getHostileStationCellWorldPos(hostileStation, cellKey) {
+  const [gx, gy] = cellKey.split(",").map(Number);
+  const angle = hostileStation.angle || 0;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const lx = gx * CELL;
+  const ly = gy * CELL;
+  return {
+    x: hostileStation.x + lx * cos - ly * sin,
+    y: hostileStation.y + lx * sin + ly * cos
+  };
+}
+
+function isHostileStationDestroyed(enemy) {
+  if (!enemy || enemy.kind !== "hostile-station") return false;
+  if (!enemy.cells || !enemy.cells.size) return true;
+  const coreKey = enemy.coreCellKey || HOSTILE_STATION_CORE_KEY;
+  const core = enemy.cells.get(coreKey);
+  if (core && core.hp > 0) return false;
+  return true;
+}
+
+function damageHostileStationCell(projectile, hostileStation, cellKey) {
+  const cell = hostileStation.cells.get(cellKey);
+  if (!cell || cell.hp <= 0) return false;
+  const damage = Math.max(0, projectile.damage || 0);
+  cell.hp -= damage;
+  if (cell.facility === "frame" || cell.facility === "core") {
+    cell.frameHp = (cell.frameHp != null ? cell.frameHp : cell.maxHp) - damage;
+  }
+  const hitPos = getHostileStationCellWorldPos(hostileStation, cellKey);
+  spawnParticle(hitPos, [1, 0.42, 0.32, 0.9]);
+  if (cell.hp <= 0) {
+    cell.hp = 0;
+    // T1：不立刻 delete cell（保留位置便于渲染破损 + 后续 T3 wreck 爆出按位置散布）
+    if (cell.facility === "core") {
+      // core 破坏即死：让 updateEnemies filter 走死亡分支（T1 不爆 wreck，T3 实现）
+      hostileStation.hp = 0;
+    }
+  }
+  // 聚合 hp / maxHp 用于 HUD HP bar 和 enemy.hp > 0 过滤（ADR §1.3 风险 #3）
+  if (hostileStation.hp > 0) {
+    hostileStation.hp = sumCellsHp(hostileStation.cells);
+  }
+  return true;
+}
+
+function tryDamageHostileStationCell(projectile, hostileStation) {
+  if (!hostileStation.cells || !hostileStation.cells.size) return false;
+  let closestKey = null;
+  let closestDist = Infinity;
+  hostileStation.cells.forEach((cell, cellKey) => {
+    if (cell.hp <= 0) return;
+    const cellPos = getHostileStationCellWorldPos(hostileStation, cellKey);
+    const d = dist(projectile, cellPos);
+    if (d < HOSTILE_STATION_HIT_RADIUS && d < closestDist) {
+      closestKey = cellKey;
+      closestDist = d;
+    }
+  });
+  if (closestKey == null) return false;
+  return damageHostileStationCell(projectile, hostileStation, closestKey);
+}
+
 function buildAt(x, y, facility) {
   const cellKey = key(x, y);
   const existing = state.station.cells.get(cellKey);
@@ -4027,6 +4155,26 @@ function getEnemyData(kind, level) {
       collisionDamage: ENEMY_LEVEL_STATS.pirate.collision[idx]
     };
   }
+  if (kind === "hostile-station") {
+    // v0.6.0 T1：仅给基础 enemy 字段；cells 子结构在 spawnEnemy 内补全
+    const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
+    const scale = effectiveLevel === 4 ? 1.47 : effectiveLevel === 5 ? 2.0 : 1.0;
+    return {
+      hp: Math.floor(1500 * scale),
+      r: 90,
+      accel: 4,
+      drag: 0.5,
+      range: effectiveLevel === 3 ? 480 : effectiveLevel === 4 ? 515 : 550,
+      reward: 0,
+      spin: 0,
+      angularVel: 0.15 + Math.random() * 0.05,
+      projectileDamage: effectiveLevel === 3 ? 12 : effectiveLevel === 4 ? 14 : 15,
+      reloadTime: 1.6,
+      spawnInterval: effectiveLevel === 3 ? 10 : effectiveLevel === 4 ? 8.5 : 7,
+      spawnCap: effectiveLevel === 3 ? 3 : effectiveLevel === 4 ? 4 : 5,
+      collisionDamage: 8
+    };
+  }
   return null;
 }
 
@@ -4070,6 +4218,17 @@ function spawnGuardianNearStation() {
   showToast("终末守护者已出现：击毁它即可进入本局结算。");
 }
 
+// v0.6.0 hostile-station 远距生成（仿 spawnGuardianNearStation；T1 阶段仅供 __gameTest 手动调用）
+function spawnHostileStationNearStation(rng, level) {
+  const r = typeof rng === "function" ? rng : Math.random;
+  const angle = r() * Math.PI * 2;
+  const radius = 1000 + r() * 300;
+  const x = state.station.pos.x + Math.cos(angle) * radius;
+  const y = state.station.pos.y + Math.sin(angle) * radius;
+  const useLevel = Number.isFinite(level) ? level : (state.run.level || 3);
+  return spawnEnemy("hostile-station", x, y, { level: useLevel });
+}
+
 function updateEnemies(dt) {
   if (state.run.endgame && !state.run.guardianDefeated && !state.run.guardianSpawned) {
     state.run.guardianSpawnDelay -= dt;
@@ -4086,6 +4245,18 @@ function updateEnemies(dt) {
 
   for (const enemy of state.enemies) {
     enemy.reload -= dt;
+
+    // v0.6.0 T1 hostile-station：缓慢自转 + 聚合 hp（AI / 武器 / 召唤 minion 留 T2 实现）
+    if (enemy.kind === "hostile-station") {
+      if (Number.isFinite(enemy.angularVel)) {
+        enemy.angle += enemy.angularVel * dt;
+      }
+      if (enemy.hp > 0) {
+        enemy.hp = sumCellsHp(enemy.cells);
+      }
+      continue;
+    }
+
     const toStation = { x: state.station.pos.x - enemy.x, y: state.station.pos.y - enemy.y };
     const dir = normalize(toStation);
     const distToStation = length(toStation);
@@ -4161,6 +4332,9 @@ function updateEnemies(dt) {
   }
 
   state.enemies = state.enemies.filter((enemy) => {
+    if (enemy.kind === "hostile-station" && !isHostileStationDestroyed(enemy)) {
+      return true;
+    }
     if (enemy.hp > 0) return true;
     state.resources.metal += enemy.reward;
     state.resources.gas += enemy.reward * 0.15;
@@ -4171,6 +4345,12 @@ function updateEnemies(dt) {
       state.run.endgame = true;
       triggerGuardianDeathEffect(enemy);
       notifyObjective("guardianKilled", enemy);
+    } else if (enemy.kind === "hostile-station") {
+      // v0.6.0 T1：core HP=0 即移除；wreck 爆出 / 震屏 / hostileStationKilled 事件留 T3 阶段
+      if (!enemy._deathHandled) {
+        enemy._deathHandled = true;
+        for (let i = 0; i < 18; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
+      }
     } else {
       notifyObjective("enemyKilled", enemy);
       for (let i = 0; i < 12; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
@@ -4203,15 +4383,19 @@ function spawnWave() {
     const r = rand(800, 1150);
     const x = state.station.pos.x + Math.cos(a) * r;
     const y = state.station.pos.y + Math.sin(a) * r;
+    let kind;
     if (roll < asteroidChance) {
-      spawnEnemy("asteroid", x, y, { level });
+      kind = "asteroid";
     } else if (roll < pirateCutoff) {
-      spawnEnemy("pirate", x, y, { level });
+      kind = "pirate";
     } else if (state.asyncEnabled && stationWeight > 0) {
-      spawnEnemy("station", x, y, { level });
+      kind = "station";
     } else {
-      spawnEnemy("pirate", x, y, { level });
+      kind = "pirate";
     }
+    // v0.6.0 防御：hostile-station 仅由 assault 任务主动 spawn，不进入随机波（即使 LEVEL_SPAWN_RATIO 未来误配置也保护）
+    if (kind === "hostile-station") continue;
+    spawnEnemy(kind, x, y, { level });
   }
   showToast("雷达发现敌对目标。");
 }
@@ -4234,6 +4418,24 @@ function spawnEnemy(kind, x, y, options = {}) {
     guardianMinion: Boolean(options.guardianMinion),
     ...data
   };
+  if (kind === "hostile-station") {
+    // v0.6.0 T1：cells 子结构 + 聚合 hp / maxHp（T2 实现 AI 与武器、T3 实现死亡 wreck）
+    enemy.cells = createHostileStationCells(spawnLevel);
+    enemy.coreCellKey = HOSTILE_STATION_CORE_KEY;
+    enemy.weaponCellKeys = [];
+    enemy.cells.forEach((cell, cellKey) => {
+      if (cell.facility === "turret") enemy.weaponCellKeys.push(cellKey);
+    });
+    enemy.cellsHpMax = sumCellsMaxHp(enemy.cells);
+    enemy.hp = sumCellsHp(enemy.cells);
+    enemy.maxHp = enemy.cellsHpMax;
+    enemy.owner = "enemy";
+    enemy.vx = 0;
+    enemy.vy = 0;
+    enemy._deathHandled = false;
+    enemy.level = spawnLevel;
+    enemy.spin = 0;
+  }
   state.enemies.push(enemy);
   return enemy;
 }
@@ -4399,6 +4601,16 @@ function updateProjectiles(dt) {
       }
     } else {
       for (const enemy of state.enemies) {
+        // v0.6.0 hostile-station：cell 粒度命中（不走 enemy.r 整体球；命中后 enemy.hp 通过聚合更新）
+        if (enemy.kind === "hostile-station") {
+          if (dist(projectile, enemy) < enemy.r + projectile.r + CELL * 0.6) {
+            if (tryDamageHostileStationCell(projectile, enemy)) {
+              projectile.dead = true;
+              break;
+            }
+          }
+          continue;
+        }
         if (dist(projectile, enemy) < enemy.r + projectile.r) {
           enemy.hp -= projectile.damage;
           projectile.dead = true;
@@ -4932,7 +5144,9 @@ function shieldDirection(cell, origin = cellWorldPosition(cell), angle = state.s
 
 function renderEnemies() {
   for (const enemy of state.enemies) {
-    if (enemy.kind === "asteroid") {
+    if (enemy.kind === "hostile-station") {
+      renderHostileStation(enemy);
+    } else if (enemy.kind === "asteroid") {
       renderer.rect(enemy, enemy.r * 1.8, enemy.r * 1.5, enemy.angle, [0.65, 0.56, 0.48, 1]);
     } else if (enemy.kind === "pirate") {
       renderer.rect(enemy, enemy.r * 2.0, enemy.r * 1.1, enemy.angle, [0.95, 0.25, 0.22, 1]);
@@ -4954,9 +5168,79 @@ function renderEnemies() {
       { x: enemy.x - enemy.r, y: enemy.y - enemy.r - 10 },
       { x: enemy.x - enemy.r + enemy.r * 2 * hp, y: enemy.y - enemy.r - 10 },
       4,
-      enemy.kind === "guardian" ? [1, 0.45, 0.35, 0.9] : [1, 0.18, 0.18, 0.8]
+      enemy.kind === "guardian" ? [1, 0.45, 0.35, 0.9]
+        : enemy.kind === "hostile-station" ? [1, 0.32, 0.18, 0.9]
+        : [1, 0.18, 0.18, 0.8]
     );
   }
+}
+
+// v0.6.0 hostile-station 渲染：遍历 cells 走 cellWorldPositionByTransform，敌方红色色调
+function renderHostileStation(enemy) {
+  if (!enemy.cells || !enemy.cells.size) return;
+  const transform = {
+    pos: { x: enemy.x, y: enemy.y },
+    angle: enemy.angle || 0,
+    origin: { x: 0, y: 0 }
+  };
+  const pulse = 0.5 + 0.5 * Math.sin(state.time * 2.0);
+  enemy.cells.forEach((cell, cellKey) => {
+    const p = cellWorldPositionByTransform(cell, transform);
+    const isDead = cell.hp <= 0;
+    if (isDead) {
+      // 破损残骸：深灰深红 + 半透明
+      renderer.rect(p, CELL * 0.78, CELL * 0.78, transform.angle, [0.25, 0.12, 0.1, 0.55]);
+      renderer.rect(p, CELL * 0.92, 2, transform.angle, [0.55, 0.18, 0.14, 0.6]);
+      renderer.rect(p, 2, CELL * 0.92, transform.angle, [0.55, 0.18, 0.14, 0.6]);
+      return;
+    }
+    let bodyColor;
+    let edgeColor = [0.18, 0.04, 0.04, 0.95];
+    if (cell.facility === "core") {
+      bodyColor = [0.78, 0.18, 0.18, 1];
+    } else if (cell.facility === "power") {
+      bodyColor = [0.62, 0.22, 0.05, 1];
+    } else if (cell.facility === "turret") {
+      bodyColor = [0.85, 0.32, 0.22, 1];
+    } else if (cell.facility === "shield") {
+      bodyColor = [0.55, 0.2, 0.32, 1];
+    } else if (cell.facility === "armor") {
+      bodyColor = [0.5, 0.18, 0.18, 1];
+    } else {
+      // frame / 兜底
+      bodyColor = [0.42, 0.18, 0.18, 1];
+    }
+    renderer.rect(p, CELL * 0.88, CELL * 0.88, transform.angle, bodyColor);
+    renderer.rect(p, CELL * 0.96, 2, transform.angle, edgeColor);
+    renderer.rect(p, 2, CELL * 0.96, transform.angle, edgeColor);
+    if (cell.facility === "core") {
+      // 核心红色脉冲圈（仿 guardian aura，提示玩家"这里是关键目标"）
+      renderer.circle(p, CELL * 0.32, [0.18, 0.02, 0.04, 1], 16);
+      renderer.ring(p, CELL * 0.56, 3, [1, 0.28, 0.2, 0.35 + pulse * 0.35], 28);
+    } else if (cell.facility === "turret") {
+      // 炮口指示：朝远离 station 的方向延伸（让玩家直觉判断武器朝向）
+      const cellAngle = Math.atan2(cell.y, cell.x);
+      const barrelAngle = (enemy.angle || 0) + cellAngle;
+      const barrelLen = CELL * 0.5;
+      const bx = p.x + Math.cos(barrelAngle) * barrelLen;
+      const by = p.y + Math.sin(barrelAngle) * barrelLen;
+      renderer.line(p, { x: bx, y: by }, 4, [0.95, 0.45, 0.3, 0.95]);
+    } else if (cell.facility === "shield") {
+      // 护盾发生器：小光晕
+      renderer.ring(p, CELL * 0.42, 2, [0.95, 0.55, 0.7, 0.55], 20);
+    }
+    // 单 cell HP bar（hp < 95% 时显示）
+    const hpRate = clamp(cell.hp / Math.max(1, cell.maxHp), 0, 1);
+    if (hpRate < 0.95) {
+      const barCenter = cellWorldPositionByTransform(cell, transform, { x: 0, y: CELL * 0.54 });
+      const a = { x: barCenter.x - CELL * 0.35, y: barCenter.y };
+      const b = { x: a.x + CELL * 0.7 * hpRate, y: a.y };
+      renderer.line(a, b, 3, [1, 0.32, 0.22, 0.9]);
+    }
+  });
+  // 外层红色危险光晕（hostile-station 整体识别标记）
+  const outerPulse = 0.4 + 0.6 * Math.sin(state.time * 1.6);
+  renderer.ring(enemy, enemy.r + 14, 3, [1, 0.25, 0.2, 0.18 + outerPulse * 0.12], 48);
 }
 
 function renderProjectilesAndEffects() {
@@ -5744,6 +6028,13 @@ window.__gameTest = {
   improveStationHp,
   syncCellStorableStatsAfterUpgrade,
   upgradeSelectedCell,
+  // v0.6.0 T1：手动生成 hostile-station（assault 任务尚未接入；T4 才走 OBJECTIVE_TYPES.assault.make）
+  spawnHostileStation(level = 3) {
+    return spawnHostileStationNearStation(Math.random, level);
+  },
+  damageHostileStationCell,
+  isHostileStationDestroyed,
+  tryDamageHostileStationCell,
   snapshot() {
     const wreck = state.fragments.filter((f) => f.origin === "wreck");
     const startPos = state.galaxy?.stationSpawn || state.station.pos;
