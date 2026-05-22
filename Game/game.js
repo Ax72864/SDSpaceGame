@@ -344,6 +344,8 @@ const FRAGMENT_BOUNDARY_REMOVE_MARGIN = 200;
 const FRAGMENT_RENDER_ALPHA = 0.55;
 const FRAGMENT_RENDER_DESATURATION = 0.7;
 const FRAGMENT_RENDER_OUTLINE_COLOR = [0.92, 0.6, 0.32, 0.8];
+const BRIDGE_DISTANCE = CELL * 1.2;
+const BRIDGE_ANGLE = 0.436;
 
 const PIRATE_AI = {
   desiredDistance: 360,
@@ -600,6 +602,13 @@ function parseKey(cellKey) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeAngle(angle) {
+  let normalized = angle % (Math.PI * 2);
+  if (normalized > Math.PI) normalized -= Math.PI * 2;
+  if (normalized < -Math.PI) normalized += Math.PI * 2;
+  return normalized;
 }
 
 function length(v) {
@@ -1937,7 +1946,10 @@ function buildAt(x, y, facility) {
     state.station.cells.set(cellKey, createCell(x, y, "frame"));
     reconnectDetached(x, y);
     clearBuildError();
-    showToast("框架已扩展。");
+    const merged = tryBridgeAt(x, y);
+    if (!merged && !state.lastBuildError) {
+      showToast("框架已扩展。");
+    }
     return true;
   }
 
@@ -1979,7 +1991,110 @@ function neighbors(x, y) {
 function reconnectDetached(x, y) {
   void x;
   void y;
-  // v0.3.0 T1/T2：旧的 grid 邻接重连路径先保留调用、内部停用，T3 再接管 fragment 桥接。
+  // v0.3.0 T3：保留兼容 wrapper，station.cells 已不再保存 detached cells，当前为 no-op。
+}
+
+function tryBridgeAt(x, y) {
+  if (!state.fragments.length) return false;
+  const frameLocal = rotate({ x: x * CELL, y: y * CELL }, state.station.angle);
+  const newFrame = { x, y };
+  const newFrameWorld = {
+    x: state.station.pos.x + frameLocal.x,
+    y: state.station.pos.y + frameLocal.y
+  };
+  const candidates = [];
+  let hasAngleMismatchNearCandidate = false;
+
+  for (const fragment of state.fragments) {
+    if (!fragment?.cells?.size) continue;
+    const angleDiff = Math.abs(normalizeAngle(fragment.angle - state.station.angle));
+    const edgeKeys = fragment.edgeKeys && fragment.edgeKeys.size
+      ? fragment.edgeKeys
+      : computeFragmentEdgeKeys(fragment.cells);
+    let nearestAnchor = null;
+    let nearestDistance = Infinity;
+
+    for (const edgeKey of edgeKeys) {
+      const edgeCell = fragment.cells.get(edgeKey);
+      if (!edgeCell) continue;
+      const edgeWorld = fragmentCellWorldPosition(fragment, edgeCell);
+      const distance = dist(edgeWorld, newFrameWorld);
+      if (distance > BRIDGE_DISTANCE) continue;
+      if (angleDiff > BRIDGE_ANGLE) {
+        hasAngleMismatchNearCandidate = true;
+        continue;
+      }
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestAnchor = edgeCell;
+      }
+    }
+
+    if (!nearestAnchor) continue;
+    candidates.push({
+      fragment,
+      anchorCell: nearestAnchor,
+      distance: nearestDistance,
+      cellCount: fragment.cells.size
+    });
+  }
+
+  if (!candidates.length) {
+    if (hasAngleMismatchNearCandidate) {
+      setBuildError("残骸角度未对齐，请等待残骸自转或换位置。");
+    }
+    return false;
+  }
+
+  candidates.sort((a, b) => {
+    if (b.cellCount !== a.cellCount) return b.cellCount - a.cellCount;
+    return a.distance - b.distance;
+  });
+  const best = candidates[0];
+  return mergeFragmentToStation(best.fragment, best.anchorCell, newFrame);
+}
+
+function mergeFragmentToStation(fragment, anchorCell, newFrame) {
+  if (!fragment || !anchorCell) return false;
+  const projectedCells = [];
+  const newFrameKey = key(newFrame.x, newFrame.y);
+
+  for (const cell of fragment.cells.values()) {
+    const relX = cell.x - anchorCell.x;
+    const relY = cell.y - anchorCell.y;
+    const targetX = newFrame.x + relX;
+    const targetY = newFrame.y + relY;
+    const targetKey = key(targetX, targetY);
+    const occupied = state.station.cells.get(targetKey);
+    if (occupied && targetKey !== newFrameKey) {
+      setBuildError("脱落部件无法对接：位置冲突。");
+      return false;
+    }
+    projectedCells.push({ cell, targetX, targetY, targetKey });
+  }
+
+  let facilityCount = 0;
+  for (const item of projectedCells) {
+    item.cell.x = item.targetX;
+    item.cell.y = item.targetY;
+    item.cell.detached = false;
+    item.cell.drift = null;
+    item.cell.reload = 0;
+    item.cell.fire = 0;
+    if (item.cell.facility !== "frame" && item.cell.facility !== "core") {
+      facilityCount++;
+    }
+    state.station.cells.set(item.targetKey, item.cell);
+  }
+
+  const fragmentIndex = state.fragments.indexOf(fragment);
+  if (fragmentIndex >= 0) {
+    state.fragments.splice(fragmentIndex, 1);
+  }
+
+  checkConnectivity();
+  showToast(`重新接入 ${projectedCells.length} 个结构 / 含 ${facilityCount} 个设施。`);
+  return true;
 }
 
 function update(dt) {
