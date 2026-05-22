@@ -511,6 +511,10 @@ h2 {
   font-weight: 600;
 }
 
+.alert-wreck {
+  color: #7eb8d8;
+}
+
 .alert-bridge-hint {
   color: #9ef5c8;
 }

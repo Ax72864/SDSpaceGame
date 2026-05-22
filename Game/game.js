@@ -344,6 +344,26 @@ const FRAGMENT_BOUNDARY_REMOVE_MARGIN = 200;
 const FRAGMENT_RENDER_ALPHA = 0.55;
 const FRAGMENT_RENDER_DESATURATION = 0.7;
 const FRAGMENT_RENDER_OUTLINE_COLOR = [0.92, 0.6, 0.32, 0.8];
+const WRECK_FRAGMENT_MAX_COUNT = 6;
+const WRECK_LAUNCH_SPEED_MIN = 7;
+const WRECK_LAUNCH_SPEED_MAX = 14;
+const WRECK_LAUNCH_JITTER = 4;
+const WRECK_ANGULAR_VEL_MIN = -0.3;
+const WRECK_ANGULAR_VEL_MAX = 0.3;
+const WRECK_ANGULAR_JITTER = 0.08;
+const WRECK_SPAWN_DIST_MIN = 200;
+const WRECK_SPAWN_DIST_MAX = 600;
+const WRECK_PLANET_BUFFER = 50;
+const WRECK_ASTEROID_BUFFER = 30;
+const WRECK_MIN_SEPARATION = 100;
+const WRECK_RENDER_OUTLINE_COLOR = [0.55, 0.72, 0.88, 0.85];
+const WRECK_RENDER_DESATURATION = 0.45;
+const WRECK_FACILITY_WEIGHTS = [
+  ["turret", 0.6],
+  ["shield", 0.2],
+  ["armor", 0.15],
+  ["repair", 0.05]
+];
 const BRIDGE_DISTANCE = CELL * 1.2;
 const BRIDGE_ANGLE = 0.436;
 const BRIDGE_PREVIEW_DISTANCE = CELL * 1.6;
@@ -982,7 +1002,11 @@ function applyGalaxy(galaxy, { placeStation = true } = {}) {
     type: galaxy.type,
     seed: galaxy.seed,
     palette: galaxy.palette,
-    paletteKey: galaxy.paletteKey
+    paletteKey: galaxy.paletteKey,
+    stationSpawn: galaxy.stationSpawn
+      ? { x: galaxy.stationSpawn.x, y: galaxy.stationSpawn.y }
+      : { x: state.station.pos.x, y: state.station.pos.y },
+    bounds: GALAXY_WORLD_BOUNDS
   };
   state.stars = galaxy.stars;
   setWorldBodies(galaxy.bodies);
@@ -1093,10 +1117,10 @@ const OBJECTIVE_EVENT_HANDLERS = {
 
 const OBJECTIVE_LEVEL_WEIGHTS = [
   { mine: 0.5, explore: 0.5 },
-  { mine: 0.4, explore: 0.35 },
-  { mine: 0.3, explore: 0.3, battle: 0.2 },
-  { battle: 0.3, survive: 0.2 },
-  { battle: 0.3, survive: 0.2 },
+  { mine: 0.4, explore: 0.35, salvage: 0.25 },
+  { mine: 0.3, explore: 0.3, battle: 0.2, salvage: 0.2 },
+  { battle: 0.3, survive: 0.2, salvage: 0.25 },
+  { battle: 0.3, survive: 0.2, salvage: 0.25 },
   { battle: 0.4, survive: 0.3 }
 ];
 
@@ -1237,6 +1261,34 @@ const OBJECTIVE_TYPES = {
       if (!guardian) return;
       renderer.ring(guardian, guardian.r + 36, 4, [1, 0.25, 0.2, 0.45], 52);
       renderer.ring(guardian, guardian.r + 70, 2, [1, 0.25, 0.2, 0.2], 52);
+    }
+  },
+  salvage: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    rewardMultiplier: 1.5,
+    make(rng, level, galaxy) {
+      const target = level <= 2 ? 2 : 3;
+      const plannedCount = level <= 2 ? 3 : 4;
+      seedSalvageFragments(galaxy, plannedCount, rng);
+      const wreckCount = countWreckFragments();
+      const actualTarget = Math.min(target, wreckCount);
+      return {
+        type: "salvage",
+        text: `回收 ${actualTarget} 段古老残骸`,
+        target: actualTarget,
+        progress: 0
+      };
+    },
+    onFragmentDocked(objective, fragment) {
+      if (fragment.origin !== "wreck") return;
+      objective.progress += 1;
+    },
+    getDetail(objective, displayProgress) {
+      return `${displayProgress.current} / ${displayProgress.target} 段残骸`;
+    },
+    getHint(objective) {
+      const remaining = Math.max(0, objective.target - objective.progress);
+      return `在星系中寻找古老残骸，靠近并桥接 ${remaining} 段。`;
     }
   }
 };
@@ -1991,6 +2043,142 @@ function countFragmentCells() {
   return total;
 }
 
+function countPlayerFragments() {
+  return state.fragments.filter((fragment) => fragment.origin !== "wreck").length;
+}
+
+function countWreckFragments() {
+  return state.fragments.filter((fragment) => fragment.origin === "wreck").length;
+}
+
+function pickWreckFacility(rng) {
+  let total = 0;
+  for (const [, weight] of WRECK_FACILITY_WEIGHTS) total += weight;
+  let roll = rng() * total;
+  for (const [facility, weight] of WRECK_FACILITY_WEIGHTS) {
+    roll -= weight;
+    if (roll <= 0) return facility;
+  }
+  return WRECK_FACILITY_WEIGHTS[0][0];
+}
+
+function buildWreckShape(rng) {
+  const cellCount = rngInt(rng, 2, 5);
+  const cells = [{ x: 0, y: 0 }];
+  const occupied = new Set(["0,0"]);
+  const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+  while (cells.length < cellCount) {
+    const base = cells[rngInt(rng, 0, cells.length - 1)];
+    const dir = dirs[rngInt(rng, 0, dirs.length - 1)];
+    const next = { x: base.x + dir.x, y: base.y + dir.y };
+    const nextKey = `${next.x},${next.y}`;
+    if (occupied.has(nextKey)) continue;
+    occupied.add(nextKey);
+    cells.push(next);
+  }
+  return cells;
+}
+
+function createWreckCell(x, y, facility, rng) {
+  const cell = createCell(x, y, facility);
+  cell.hp = cell.maxHp * rngFloat(rng, 0.65, 0.9);
+  cell.frameHp = 70 * (1 + state.meta.hull * 0.1) * rngFloat(rng, 0.8, 1.0);
+  cell.reload = 0;
+  cell.fire = 0;
+  cell.enabled = true;
+  cell.active = facility === "armor";
+  return cell;
+}
+
+function makeWreckFragment(pos, rng) {
+  const shape = buildWreckShape(rng);
+  const cells = new Map();
+  for (const slot of shape) {
+    const facility = pickWreckFacility(rng);
+    cells.set(key(slot.x, slot.y), createWreckCell(slot.x, slot.y, facility, rng));
+  }
+  const centerGrid = shape.reduce(
+    (acc, slot) => ({ x: acc.x + slot.x, y: acc.y + slot.y }),
+    { x: 0, y: 0 }
+  );
+  centerGrid.x /= shape.length;
+  centerGrid.y /= shape.length;
+  const launchSpeed = rngFloat(rng, WRECK_LAUNCH_SPEED_MIN, WRECK_LAUNCH_SPEED_MAX);
+  const launchAngle = rngFloat(rng, 0, Math.PI * 2);
+  const vel = {
+    x: Math.cos(launchAngle) * launchSpeed + rngFloat(rng, -WRECK_LAUNCH_JITTER, WRECK_LAUNCH_JITTER),
+    y: Math.sin(launchAngle) * launchSpeed + rngFloat(rng, -WRECK_LAUNCH_JITTER, WRECK_LAUNCH_JITTER)
+  };
+  clampVectorLength(vel, FRAGMENT_MAX_LINEAR_SPEED);
+  const angularVel = clamp(
+    rngFloat(rng, WRECK_ANGULAR_VEL_MIN, WRECK_ANGULAR_VEL_MAX)
+      + rngFloat(rng, -WRECK_ANGULAR_JITTER, WRECK_ANGULAR_JITTER),
+    WRECK_ANGULAR_VEL_MIN,
+    WRECK_ANGULAR_VEL_MAX
+  );
+  return {
+    id: fragmentIdSeed++,
+    pos: { x: pos.x, y: pos.y },
+    vel,
+    angle: rngFloat(rng, -Math.PI, Math.PI),
+    angularVel,
+    cells,
+    edgeKeys: computeFragmentEdgeKeys(cells),
+    bounds: computeFragmentBounds(cells),
+    centerGrid,
+    spawnAt: state.time,
+    warnedNearBoundary: false,
+    origin: "wreck"
+  };
+}
+
+function isWreckSpawnPositionValid(candidate, startPos, placed, bodies) {
+  const distFromStart = dist(candidate, startPos);
+  if (distFromStart < WRECK_SPAWN_DIST_MIN || distFromStart > WRECK_SPAWN_DIST_MAX) return false;
+  for (const existing of placed) {
+    if (dist(candidate, existing) < WRECK_MIN_SEPARATION) return false;
+  }
+  for (const body of bodies) {
+    if (body.type === "planet" || body.type === "star") {
+      if (dist(candidate, body) < body.r + WRECK_PLANET_BUFFER) return false;
+    } else if (body.type === "asteroid") {
+      if (dist(candidate, body) < body.r + WRECK_ASTEROID_BUFFER) return false;
+    }
+  }
+  return true;
+}
+
+function seedSalvageFragments(galaxy, count, rng) {
+  if (!count || count <= 0) return 0;
+  const bounds = galaxy?.bounds || GALAXY_WORLD_BOUNDS;
+  const startPos = galaxy?.stationSpawn || state.station.pos;
+  const bodies = state.world?.bodies || [];
+  const placed = [];
+  let spawned = 0;
+  for (let i = 0; i < count; i++) {
+    if (countWreckFragments() >= WRECK_FRAGMENT_MAX_COUNT) break;
+    let pos = null;
+    for (let tries = 0; tries < 5; tries++) {
+      const angle = rngFloat(rng, 0, Math.PI * 2);
+      const radius = rngFloat(rng, WRECK_SPAWN_DIST_MIN, WRECK_SPAWN_DIST_MAX);
+      const candidate = {
+        x: startPos.x + Math.cos(angle) * radius,
+        y: startPos.y + Math.sin(angle) * radius
+      };
+      if (candidate.x < bounds.minX + 80 || candidate.x > bounds.maxX - 80) continue;
+      if (candidate.y < bounds.minY + 80 || candidate.y > bounds.maxY - 80) continue;
+      if (!isWreckSpawnPositionValid(candidate, startPos, placed, bodies)) continue;
+      pos = candidate;
+      break;
+    }
+    if (!pos) continue;
+    placed.push(pos);
+    state.fragments.push(makeWreckFragment(pos, rng));
+    spawned++;
+  }
+  return spawned;
+}
+
 function buildFragmentFromCells(componentCells) {
   if (!componentCells.length) return { fragment: null, trimmedCells: 0 };
   const centerGrid = componentCells.reduce(
@@ -2060,7 +2248,8 @@ function buildFragmentFromCells(componentCells) {
     bounds,
     centerGrid,
     spawnAt: state.time,
-    warnedNearBoundary: false
+    warnedNearBoundary: false,
+    origin: "player"
   };
   return { fragment, trimmedCells };
 }
@@ -2114,7 +2303,7 @@ function splitDisconnectedIntoFragments(disconnectedKeys) {
       continue;
     }
 
-    if (state.fragments.length + newFragments.length >= FRAGMENT_MAX_COUNT) {
+    if (countPlayerFragments() + newFragments.length >= FRAGMENT_MAX_COUNT) {
       droppedCells += fragment.cells.size;
       continue;
     }
@@ -2212,7 +2401,10 @@ function getNearestFragmentHudData() {
     distance: Math.round(nearest.distance),
     distanceRounded: Math.round(nearest.distance / 50) * 50,
     facilityCount: countFragmentFacilities(nearest.fragment),
-    fragmentCount: state.fragments.length
+    fragmentCount: state.fragments.length,
+    origin: nearest.fragment.origin === "wreck" ? "wreck" : "player",
+    playerCount: countPlayerFragments(),
+    wreckCount: countWreckFragments()
   };
   state.run.fragmentHudCache = { sampledAt: state.time, data };
   return data;
@@ -2221,8 +2413,9 @@ function getNearestFragmentHudData() {
 function buildFragmentHudAlerts() {
   if (!state.fragments.length) return [];
   const alerts = [];
-  const count = state.fragments.length;
-  if (count >= FRAGMENT_HUD_WARN_COUNT) {
+  const playerCount = countPlayerFragments();
+  const wreckCount = countWreckFragments();
+  if (playerCount >= FRAGMENT_HUD_WARN_COUNT) {
     alerts.push({
       level: "danger",
       cssClass: "alert-fragment-warn",
@@ -2231,11 +2424,18 @@ function buildFragmentHudAlerts() {
   }
   const hud = getNearestFragmentHudData();
   if (!hud) return alerts;
-  let text = `最近残骸 ${hud.direction} · ${hud.distanceRounded} px · ${hud.facilityCount} 设施`;
-  if (count > 1) text = `残骸 ×${count} · ${text}`;
+  const originLabel = hud.origin === "wreck" ? "古老残骸" : "我方残骸";
+  let text = `最近${originLabel} ${hud.direction} · ${hud.distanceRounded} px · ${hud.facilityCount} 设施`;
+  if (wreckCount > 0 && playerCount > 0) {
+    text = `古老残骸 ${wreckCount} 段 · 我方 ${playerCount} 段 · ${text}`;
+  } else if (wreckCount > 1) {
+    text = `古老残骸 ×${wreckCount} · ${text}`;
+  } else if (playerCount > 1) {
+    text = `我方残骸 ×${playerCount} · ${text}`;
+  }
   alerts.push({
-    level: count >= FRAGMENT_HUD_WARN_COUNT ? "warn" : "good",
-    cssClass: "alert-fragment",
+    level: hud.origin === "wreck" ? "good" : playerCount >= FRAGMENT_HUD_WARN_COUNT ? "warn" : "good",
+    cssClass: hud.origin === "wreck" ? "alert-wreck" : "alert-fragment",
     text
   });
   return alerts;
@@ -2539,6 +2739,7 @@ function mergeFragmentToStation(fragment, anchorCell, newFrame) {
     state.fragments.splice(fragmentIndex, 1);
   }
 
+  notifyObjective("fragmentDocked", fragment);
   checkConnectivity();
   showToast(`重新接入 ${projectedCells.length} 个结构 / 含 ${facilityCount} 个设施。`);
   return true;
@@ -3646,6 +3847,8 @@ function renderDashedRing(center, radius, width, color, segments = 30) {
 }
 
 function renderFragmentOutline(fragment) {
+  const isWreck = fragment.origin === "wreck";
+  const outlineColor = isWreck ? WRECK_RENDER_OUTLINE_COLOR : FRAGMENT_RENDER_OUTLINE_COLOR;
   const spanX = Math.max(1, fragment.bounds.maxX - fragment.bounds.minX + 1) * CELL;
   const spanY = Math.max(1, fragment.bounds.maxY - fragment.bounds.minY + 1) * CELL;
   const radius = Math.max(spanX, spanY) * 0.62;
@@ -3655,10 +3858,10 @@ function renderFragmentOutline(fragment) {
     radius,
     2,
     [
-      FRAGMENT_RENDER_OUTLINE_COLOR[0],
-      FRAGMENT_RENDER_OUTLINE_COLOR[1],
-      FRAGMENT_RENDER_OUTLINE_COLOR[2],
-      FRAGMENT_RENDER_OUTLINE_COLOR[3] * pulse
+      outlineColor[0],
+      outlineColor[1],
+      outlineColor[2],
+      outlineColor[3] * pulse
     ]
   );
 }
@@ -3674,6 +3877,7 @@ function renderBridgePreview() {
 function renderFragments() {
   const highlightId = state.bridgePreview?.tier === "ready" ? state.bridgePreview.fragment?.id : null;
   for (const fragment of state.fragments) {
+    const isWreck = fragment.origin === "wreck";
     const highlighted = highlightId != null && fragment.id === highlightId;
     const alpha = clamp(
       (highlighted ? 0.7 : FRAGMENT_RENDER_ALPHA) + Math.sin(state.time * Math.PI * 3 + fragment.id) * 0.06,
@@ -3688,7 +3892,7 @@ function renderFragments() {
     for (const cell of fragment.cells.values()) {
       renderCellAt(cell, transform, {
         alpha,
-        desaturation: FRAGMENT_RENDER_DESATURATION,
+        desaturation: isWreck ? WRECK_RENDER_DESATURATION : FRAGMENT_RENDER_DESATURATION,
         drawHpBar: false,
         drawEffects: false,
         forceInactive: true
@@ -4325,6 +4529,8 @@ window.gameActions = {
     updateHud();
   }
 };
+
+window.__gameState = state;
 
 function loop(now) {
   const dt = Math.min(0.05, (now - state.lastTime) / 1000);
