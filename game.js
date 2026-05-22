@@ -356,12 +356,39 @@ class Renderer {
     if (!this.gl) {
       throw new Error("当前浏览器不支持 WebGL。");
     }
-    this.program = this.createProgram();
-    this.buffer = this.gl.createBuffer();
+    this.contextLost = false;
+    this.initGlResources();
     this.vertices = [];
     this.maxFloats = 120000;
     this.resize();
     window.addEventListener("resize", () => this.resize());
+    targetCanvas.addEventListener("webglcontextlost", (event) => {
+      event.preventDefault();
+      this.contextLost = true;
+      this.resumeAfterContextRestore = !state.paused;
+      state.paused = true;
+      document.getElementById("pauseBtn").textContent = "继续";
+      showToast("WebGL 上下文已丢失，等待浏览器恢复。");
+      state.toastTimer = 999;
+    });
+    targetCanvas.addEventListener("webglcontextrestored", () => {
+      this.gl = targetCanvas.getContext("webgl", { antialias: true, alpha: false });
+      this.contextLost = false;
+      this.initGlResources();
+      this.resize();
+      if (this.resumeAfterContextRestore) {
+        state.paused = false;
+        document.getElementById("pauseBtn").textContent = "暂停";
+      }
+      showToast("WebGL 已恢复。");
+    });
+  }
+
+  initGlResources() {
+    this.program = this.createProgram();
+    this.buffer = this.gl.createBuffer();
+    this.positionLocation = this.gl.getAttribLocation(this.program, "aPosition");
+    this.colorLocation = this.gl.getAttribLocation(this.program, "aColor");
   }
 
   createProgram() {
@@ -416,11 +443,13 @@ class Renderer {
     this.width = width;
     this.height = height;
     this.dpr = dpr;
+    if (this.contextLost) return;
     this.gl.viewport(0, 0, width, height);
   }
 
   begin() {
     this.vertices.length = 0;
+    if (this.contextLost) return;
     const gl = this.gl;
     gl.clearColor(0.012, 0.022, 0.048, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -505,18 +534,16 @@ class Renderer {
 
   flush() {
     const gl = this.gl;
-    if (!this.vertices.length) return;
+    if (this.contextLost || !this.vertices.length) return;
     const data = new Float32Array(this.vertices);
     gl.useProgram(this.program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
     const stride = 6 * 4;
-    const pos = gl.getAttribLocation(this.program, "aPosition");
-    const col = gl.getAttribLocation(this.program, "aColor");
-    gl.enableVertexAttribArray(pos);
-    gl.enableVertexAttribArray(col);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, stride, 0);
-    gl.vertexAttribPointer(col, 4, gl.FLOAT, false, stride, 2 * 4);
+    gl.enableVertexAttribArray(this.positionLocation);
+    gl.enableVertexAttribArray(this.colorLocation);
+    gl.vertexAttribPointer(this.positionLocation, 2, gl.FLOAT, false, stride, 0);
+    gl.vertexAttribPointer(this.colorLocation, 4, gl.FLOAT, false, stride, 2 * 4);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, data.length / 6);
@@ -701,6 +728,7 @@ function handleWorldClick(world) {
   const cell = state.station.cells.get(key(grid.x, grid.y));
   if (state.selectedBuild) {
     if (buildAt(grid.x, grid.y, state.selectedBuild)) {
+      updateHud();
       return;
     }
   }
@@ -708,10 +736,12 @@ function handleWorldClick(world) {
     state.selectedCell = key(grid.x, grid.y);
     state.selectedBuild = null;
     updateBuildButtons();
+    updateHud();
     return;
   }
   state.target = world;
   showToast("航行目标已设定，推进器将按结构自动出力。");
+  updateHud();
 }
 
 function worldToGrid(world) {
@@ -821,10 +851,10 @@ function reconnectDetached(x, y) {
 }
 
 function update(dt) {
-  if (state.paused) return;
-  state.time += dt;
   state.toastTimer -= dt;
   if (state.toastTimer <= 0) toastEl.classList.remove("show");
+  if (state.paused) return;
+  state.time += dt;
 
   updatePowerAndFacilities(dt);
   updateStationPhysics(dt);
@@ -1415,6 +1445,7 @@ function updateParticles(dt) {
 }
 
 function render() {
+  if (renderer.contextLost) return;
   renderer.begin();
   renderBackground();
   renderBodies();
@@ -1595,6 +1626,8 @@ function updateSelectedCellPanel(cell) {
   }
   const name = cell.facility === "core" ? "核心" : TYPES[cell.facility].name;
   const html = `已选：${name} ${cell.enabled ? "<span class='good'>启用</span>" : "<span class='danger'>关闭</span>"} / 优先级 ${cell.priority}`;
+  document.getElementById("toggleSelectedBtn").disabled = cell.facility === "core";
+  document.getElementById("prioritySelectedBtn").disabled = cell.facility === "core";
   if (state.hud.selected !== html) {
     state.hud.selected = html;
     selectedCellPanelEl.classList.remove("hidden");
@@ -1607,6 +1640,11 @@ function updateMetaUi() {
     点数：${state.meta.points}
     <br>局外加成：采集 +${state.meta.mining * 12}% / 结构 +${state.meta.hull * 10}% / 武器 +${state.meta.weapons * 10}%
   `);
+  document.getElementById("talentMiningBtn").disabled = state.meta.points < 1;
+  document.getElementById("talentHullBtn").disabled = state.meta.points < 1;
+  document.getElementById("talentWeaponsBtn").disabled = state.meta.points < 1;
+  document.getElementById("unlockCoreBtn").disabled = state.meta.points < 3 || state.meta.unlocks.efficientCore;
+  document.getElementById("unlockWeaponFrameBtn").disabled = state.meta.points < 3 || state.meta.unlocks.weaponFrame;
 }
 
 window.gameActions = {
@@ -1616,6 +1654,7 @@ window.gameActions = {
     if (!cell || cell.facility === "core") return;
     cell.enabled = !cell.enabled;
     showToast(`${TYPES[cell.facility].name}${cell.enabled ? "已启用" : "已关闭"}`);
+    updateHud();
   },
   prioritySelected() {
     if (!state.selectedCell) return;
@@ -1623,10 +1662,12 @@ window.gameActions = {
     if (!cell) return;
     cell.priority = (cell.priority + 10) % 110;
     showToast(`资源运输优先级调整为 ${cell.priority}`);
+    updateHud();
   },
   buyTalent(type) {
     if (state.meta.points < 1) {
       showToast("局外点数不足。");
+      updateHud();
       return;
     }
     state.meta.points--;
@@ -1634,14 +1675,17 @@ window.gameActions = {
     saveMeta();
     if (type === "hull") improveStationHp(1.06);
     showToast("天赋已保存，会持续影响之后的局。");
+    updateHud();
   },
   buyUnlock(type) {
     if (state.meta.unlocks[type]) {
       showToast("该改造已经解锁。");
+      updateHud();
       return;
     }
     if (state.meta.points < 3) {
       showToast("解锁需要 3 点局外点数。");
+      updateHud();
       return;
     }
     state.meta.points -= 3;
@@ -1649,6 +1693,7 @@ window.gameActions = {
     saveMeta();
     createBuildUi();
     showToast("局外改造已解锁。");
+    updateHud();
   },
   setPlayers() {
     state.run.playerCount = state.run.playerCount % 4 + 1;
@@ -1658,6 +1703,7 @@ window.gameActions = {
       showToast("浏览器阻止了人数设置保存，本局已临时生效。");
     }
     showToast(`联机合作缩放人数：${state.run.playerCount}。敌人与资源会按人数调整。`);
+    updateHud();
   }
 };
 
@@ -1668,7 +1714,7 @@ function loop(now) {
   render();
   state.hud.timer -= dt;
   if (state.hud.timer <= 0) {
-    state.hud.timer = 0.12;
+    state.hud.timer = state.paused ? 1 : 0.12;
     updateHud();
   }
   requestAnimationFrame(loop);
