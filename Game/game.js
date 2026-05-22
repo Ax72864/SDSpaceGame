@@ -482,15 +482,25 @@ function createObjective() {
   state.run.objectiveCompleteAt = 0;
 }
 
+const MORE_STATUS_DESKTOP_MQ = "(min-width: 761px)";
+
+function syncMoreStatusPanel() {
+  const panel = document.getElementById("moreStatusPanel");
+  if (!panel) return;
+  panel.open = window.matchMedia(MORE_STATUS_DESKTOP_MQ).matches;
+}
+
 function initGame() {
   initStation();
   initWorld();
   createObjective();
   createBuildUi();
   bindInput();
+  syncMoreStatusPanel();
+  window.addEventListener("resize", syncMoreStatusPanel);
   updateControlModeUi();
   updateHud();
-  showToast("核心已上线。默认「屏幕方向」移动（W=上）；点右侧「移动模式」可切换为朝向前方。鼠标指向决定朝向。");
+  showToast("核心已上线。默认「屏幕方向」移动（W=上）；展开右侧「更多状态」可切换移动模式。鼠标指向决定朝向。");
 }
 
 class Renderer {
@@ -1963,7 +1973,7 @@ function buildGuideText() {
     if (thrusterCount === 0) {
       return {
         goal: "学习移动空间站",
-        next: "在框架上建造「推进器」；默认屏幕方向移动，点「移动模式」可切换为朝向前方；鼠标决定朝向。"
+        next: "在框架上建造「推进器」；默认屏幕方向移动，展开「更多状态」可切换移动模式；鼠标决定朝向。"
       };
     }
     if (!state.target && !hasKeyboardThrust() && length(state.station.vel) < 3) {

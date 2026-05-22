@@ -39,40 +39,46 @@
       <div id="statusAlerts" class="status-alerts" aria-live="polite"></div>
       <h2>星系任务</h2>
       <div id="objective"></div>
-      <h2>状态</h2>
-      <div id="stationStatus">
-        <div id="stationData"></div>
-        <div id="selectedCellPanel" class="selected-panel hidden">
-          <div id="selectedCellInfo"></div>
+
+      <details id="moreStatusPanel" class="more-status">
+        <summary class="more-status-summary">更多状态</summary>
+        <div class="more-status-body">
+          <h2>状态</h2>
+          <div id="stationStatus">
+            <div id="stationData"></div>
+            <div id="selectedCellPanel" class="selected-panel hidden">
+              <div id="selectedCellInfo"></div>
+              <div class="row">
+                <button id="toggleSelectedBtn" type="button">开关设施</button>
+                <button id="prioritySelectedBtn" type="button">优先级+10</button>
+              </div>
+            </div>
+          </div>
           <div class="row">
-            <button id="toggleSelectedBtn" type="button">开关设施</button>
-            <button id="prioritySelectedBtn" type="button">优先级+10</button>
+            <button id="missileBtn" type="button">导弹齐射</button>
+            <button id="toggleAsyncBtn" type="button">异步敌站: 开</button>
+          </div>
+          <div class="row">
+            <button id="toggleControlModeBtn" type="button" data-mode="screen">移动: 屏幕方向</button>
+          </div>
+          <div class="row">
+            <button id="rotateLeftBtn" type="button">左旋</button>
+            <button id="rotateRightBtn" type="button">右旋</button>
+          </div>
+          <h2>局外天赋</h2>
+          <div id="meta">
+            <div id="metaStats"></div>
+            <div class="meta-actions">
+              <button id="talentMiningBtn" type="button">采集升级 1点</button>
+              <button id="talentHullBtn" type="button">结构升级 1点</button>
+              <button id="talentWeaponsBtn" type="button">武器升级 1点</button>
+              <button id="unlockCoreBtn" type="button">改造: 高效核心 3点</button>
+              <button id="unlockWeaponFrameBtn" type="button">解锁: 武器框架 3点</button>
+              <button id="playersBtn" type="button">联机人数缩放</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="row">
-        <button id="missileBtn" type="button">导弹齐射</button>
-        <button id="toggleAsyncBtn" type="button">异步敌站: 开</button>
-      </div>
-      <div class="row">
-        <button id="toggleControlModeBtn" type="button" data-mode="screen">移动: 屏幕方向</button>
-      </div>
-      <div class="row">
-        <button id="rotateLeftBtn" type="button">左旋</button>
-        <button id="rotateRightBtn" type="button">右旋</button>
-      </div>
-      <h2>局外天赋</h2>
-      <div id="meta">
-        <div id="metaStats"></div>
-        <div class="meta-actions">
-          <button id="talentMiningBtn" type="button">采集升级 1点</button>
-          <button id="talentHullBtn" type="button">结构升级 1点</button>
-          <button id="talentWeaponsBtn" type="button">武器升级 1点</button>
-          <button id="unlockCoreBtn" type="button">改造: 高效核心 3点</button>
-          <button id="unlockWeaponFrameBtn" type="button">解锁: 武器框架 3点</button>
-          <button id="playersBtn" type="button">联机人数缩放</button>
-        </div>
-      </div>
+      </details>
     </section>
 
     <section id="toast" class="toast"></section>
