@@ -606,6 +606,139 @@ h2 {
   color: #ffc878;
 }
 
+.cell-modification-panel {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 180, 90, 0.22);
+}
+
+.cell-modification-panel.hidden {
+  display: none;
+}
+
+.modification-status {
+  font-size: 12px;
+  color: #b8d4ea;
+  margin-bottom: 8px;
+}
+
+.modification-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modification-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  min-height: 42px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.modification-btn small {
+  font-size: 11px;
+  opacity: 0.82;
+  margin-top: 2px;
+}
+
+#researchTreeBtn {
+  margin-right: 8px;
+}
+
+.research-tree-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.research-tree-panel.hidden {
+  display: none;
+}
+
+.research-tree-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 22, 0.72);
+}
+
+.research-tree-content {
+  position: relative;
+  z-index: 1;
+  width: min(60vw, 520px);
+  max-height: 70vh;
+  overflow: auto;
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(117, 245, 255, 0.28);
+  background: rgba(8, 18, 36, 0.94);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.research-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.research-tree-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.research-tree-close {
+  width: 32px;
+  height: 32px;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+}
+
+.research-tree-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.research-tree-node {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(117, 245, 255, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.research-tree-node.active {
+  border-color: rgba(90, 230, 140, 0.45);
+}
+
+.research-tree-node-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.research-tree-node-desc {
+  font-size: 12px;
+  color: #b8d4ea;
+  margin-bottom: 8px;
+}
+
+.research-tree-node-status.good {
+  color: #7dffb0;
+  font-size: 12px;
+}
+
+.research-tree-unlock-btn {
+  width: 100%;
+  min-height: 36px;
+  font-size: 12px;
+}
+
 .meta-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

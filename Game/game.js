@@ -182,6 +182,7 @@ const ENDGAME_ACTIVITY_POINTS = {
   }
 };
 
+// v0.5.0 引入 baseStats / upgrades / modifications 字段（13 种设施数据字典）
 const TYPES = {
   core: {
     name: "核心",
@@ -384,6 +385,23 @@ TYPES.armor.upgrades = [{ label: "装甲", tiers: [{ maxHp: 0.30 }, { maxHp: 0.6
 TYPES.frame.upgrades = [{ label: "骨架", tiers: [{ maxFrameHp: 0.20 }, { maxFrameHp: 0.40 }, { maxFrameHp: 0.60 }] }];
 TYPES.thruster.upgrades = [{ label: "推力", tiers: [{ thrust: 0.15 }, { thrust: 0.30 }, { thrust: 0.45 }] }];
 
+TYPES.turret.modifications = [
+  { label: "高速点射", desc: "reload 速度 +50% / 伤害 -25%", reload: 0.50, damage: -0.25 },
+  { label: "重型炮", desc: "reload 速度 -30% / 伤害 +60%", reload: -0.30, damage: 0.60 }
+];
+TYPES.missile.modifications = [
+  { label: "导弹蜂群", desc: "弹数 ×2 / 伤害 -35%", projectileCount: 1.0, damage: -0.35 },
+  { label: "穿甲弹", desc: "伤害 +55% / reload 速度 +15%", damage: 0.55, reload: 0.15 }
+];
+TYPES.shield.modifications = [
+  { label: "全向场", desc: "范围 +80% / 回复 -40%", range: 0.80, regen: -0.40 },
+  { label: "强化场", desc: "护盾值 +60% / 范围 -25%", maxShield: 0.60, range: -0.25 }
+];
+TYPES.thruster.modifications = [
+  { label: "加速器", desc: "推力 +30% / 质量 +20%", thrust: 0.30 },
+  { label: "稳定器", desc: "角阻尼 +50% / 推力 -10%", thrust: -0.10 }
+];
+
 const FACILITY_ORDER = [
   "frame",
   "power",
@@ -406,6 +424,11 @@ const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "ma
 const MINING_RANGE_OFFSET = 130;
 
 const TIER_UPGRADE_COSTS = [5, 10, 20];
+const MODIFICATION_COST = 30;
+const HULL_MOD_COST = 50;
+const WEAPON_MOD_COST = 50;
+const GLOBAL_RESEARCH_UNLOCK_VALUE = 1.05;
+const MODIFIABLE_FACILITIES = new Set(["turret", "missile", "shield", "thruster"]);
 
 const UPGRADE_STAT_LABELS = {
   damage: "伤害",
@@ -1148,7 +1171,7 @@ function applyGalaxy(galaxy, { placeStation = true } = {}) {
 }
 
 function shouldClamp(key) {
-  return false && CLAMPED_STAT_KEYS.has(key);
+  return CLAMPED_STAT_KEYS.has(key);
 }
 
 function getTechLevelFactor(facility, key, techLevel) {
@@ -1176,15 +1199,17 @@ function getTechLevelFactor(facility, key, techLevel) {
 
 function getGlobalModFactor(facility, key, station) {
   if (!station) return 1;
-  if (key === "maxHp") {
-    return Number.isFinite(station.hullMod) ? station.hullMod : 1;
+  let factor = 1;
+  if (key === "maxHp" && station.hullMod && station.hullMod > 1.0) {
+    factor *= station.hullMod;
   }
-  if (key === "damage" && GLOBAL_WEAPON_MOD_TYPES.has(facility)) {
-    return Number.isFinite(station.weaponMod) ? station.weaponMod : 1;
+  if (key === "damage" && GLOBAL_WEAPON_MOD_TYPES.has(facility) && station.weaponMod && station.weaponMod > 1.0) {
+    factor *= station.weaponMod;
   }
-  return 1;
+  return factor;
 }
 
+// v0.5.0 集中 stat 查询：baseStats → tier → mod → techLevel → globalMod → clamp
 function getCellStat(cell, key) {
   if (!cell || !cell.facility) return 0;
   const type = TYPES[cell.facility];
@@ -1204,31 +1229,39 @@ function getCellStat(cell, key) {
   if (tier > 0 && type.upgrades && type.upgrades[pathKey] && type.upgrades[pathKey].tiers) {
     const tierData = type.upgrades[pathKey].tiers[tier - 1];
     if (tierData) {
-      // reload 存射速加成正值；getCellStat 对 reload 取倒数使冷却时间缩短
       if (key === "reload" && Number.isFinite(tierData.reload)) {
-        reloadSpeedBonus = tierData.reload;
+        reloadSpeedBonus += tierData.reload;
       } else if (Number.isFinite(tierData[key])) {
         tierBonus = tierData[key];
       }
     }
   }
 
-  const modBonus = type.modifications
-    && cell.mod != null
-    && type.modifications[cell.mod]
-    && Number.isFinite(type.modifications[cell.mod][key])
-      ? type.modifications[cell.mod][key]
-      : 0;
+  let modBonus = 0;
+  if (type.modifications && cell.mod != null && type.modifications[cell.mod]) {
+    const modData = type.modifications[cell.mod];
+    if (key === "reload" && Number.isFinite(modData.reload)) {
+      reloadSpeedBonus += modData.reload;
+    } else if (Number.isFinite(modData[key])) {
+      modBonus = modData[key];
+    }
+  }
 
   const techFactor = getTechLevelFactor(cell.facility, key, state.station.techLevel || 0);
   const globalFactor = getGlobalModFactor(cell.facility, key, state.station);
 
-  let result = base * (1 + tierBonus + modBonus) * techFactor * globalFactor;
-  if (key === "reload" && reloadSpeedBonus > 0) {
-    result /= 1 + reloadSpeedBonus;
-  }
-  if (shouldClamp(key)) {
-    result = Math.min(result, 2.5 * base);
+  let result;
+  if (key === "reload") {
+    const speedMul = Math.max(0.01, 1 + reloadSpeedBonus);
+    result = (base / speedMul) * techFactor * globalFactor;
+    if (shouldClamp(key)) {
+      result = Math.max(result, base / 2.5);
+    }
+  } else {
+    result = base * (1 + tierBonus + modBonus) * techFactor * globalFactor;
+    if (shouldClamp(key)) {
+      result = Math.min(result, 2.5 * base);
+    }
   }
   return result;
 }
@@ -1311,7 +1344,48 @@ function upgradeSelectedCell(path) {
   return true;
 }
 
+function applyModification(cell, modIndex) {
+  if (!cell || cell.mod != null) return false;
+  const type = TYPES[cell.facility];
+  if (!type || !type.modifications) return false;
+  if (modIndex < 0 || modIndex >= type.modifications.length) return false;
+  const cost = MODIFICATION_COST;
+  if ((state.resources.research || 0) < cost) return false;
+  state.resources.research -= cost;
+  cell.mod = modIndex;
+  const modDef = type.modifications[modIndex];
+  showToast(`${type.name} 已改造：${modDef.label}`);
+  updateHud();
+  return true;
+}
+
+function unlockGlobalResearch(modKey) {
+  const station = state.station;
+  if (modKey === "hullMod") {
+    if (station.hullMod > 1.0) return false;
+    if ((state.resources.research || 0) < HULL_MOD_COST) return false;
+    state.resources.research -= HULL_MOD_COST;
+    station.hullMod = GLOBAL_RESEARCH_UNLOCK_VALUE;
+    showToast("船体强化已激活，全 station HP +5%。");
+    updateHud();
+    return true;
+  }
+  if (modKey === "weaponMod") {
+    if (station.weaponMod > 1.0) return false;
+    if ((state.resources.research || 0) < WEAPON_MOD_COST) return false;
+    state.resources.research -= WEAPON_MOD_COST;
+    station.weaponMod = GLOBAL_RESEARCH_UNLOCK_VALUE;
+    showToast("武器强化已激活，炮塔与导弹井 damage +5%。");
+    updateHud();
+    return true;
+  }
+  return false;
+}
+
 let selectedCellUpgradeEl = null;
+let selectedCellModificationEl = null;
+let researchTreePanelEl = null;
+let researchTreeBtnEl = null;
 
 function ensureSelectedCellUpgradeUi() {
   if (selectedCellUpgradeEl) return;
@@ -1321,6 +1395,15 @@ function ensureSelectedCellUpgradeUi() {
   selectedCellPanelEl.appendChild(selectedCellUpgradeEl);
 }
 
+function ensureSelectedCellModificationUi() {
+  if (selectedCellModificationEl) return;
+  selectedCellModificationEl = document.createElement("div");
+  selectedCellModificationEl.id = "selectedCellModification";
+  selectedCellModificationEl.className = "cell-modification-panel hidden";
+  selectedCellPanelEl.appendChild(selectedCellModificationEl);
+}
+
+// v0.5.0 选中设施升级面板（tier / 路径锁定）
 function renderSelectedCellUpgradePanel(cell) {
   ensureSelectedCellUpgradeUi();
   if (!cell || cell.detached) {
@@ -1365,8 +1448,10 @@ function renderSelectedCellUpgradePanel(cell) {
     type.upgrades.forEach((pathDef, pathIndex) => {
       const preview = getUpgradePreviewStat(cell, pathIndex, 1);
       const disabled = canAfford ? "" : " disabled";
-      const title = canAfford ? "" : ' title="研发点不足"';
-      html += `<button type="button" class="upgrade-path-btn"${disabled}${title} onclick="window.gameActions.upgradeSelectedCell(${pathIndex})">${pathDef.label}<small>${preview} · ${cost} 研发</small></button>`;
+      const titleAttr = canAfford
+        ? ` title="升级到 tier 1 · 消耗 ${cost} research · 效果：${preview}"`
+        : ' title="研发点不足"';
+      html += `<button type="button" class="upgrade-path-btn"${disabled}${titleAttr} onclick="window.gameActions.upgradeSelectedCell(${pathIndex})">${pathDef.label}<small>${preview} · ${cost} 研发</small></button>`;
     });
     html += `</div>`;
     if (!canAfford) html += `<div class="upgrade-hint warn">研发点不足（需要 ${cost}）</div>`;
@@ -1377,13 +1462,134 @@ function renderSelectedCellUpgradePanel(cell) {
     const preview = getUpgradePreviewStat(cell, pathIndex, nextTier);
     const canAfford = research >= cost;
     const disabled = canAfford ? "" : " disabled";
-    const title = canAfford ? "" : ' title="研发点不足"';
-    html += `<div class="upgrade-actions"><button type="button" class="upgrade-tier-btn"${disabled}${title} onclick="window.gameActions.upgradeSelectedCell(${pathIndex})">升级到 tier ${nextTier}<small>${preview} · ${cost} 研发</small></button></div>`;
+    const titleAttr = canAfford
+      ? ` title="升级到 tier ${nextTier} · 消耗 ${cost} research · 效果：${preview}"`
+      : ' title="研发点不足"';
+    html += `<div class="upgrade-actions"><button type="button" class="upgrade-tier-btn"${disabled}${titleAttr} onclick="window.gameActions.upgradeSelectedCell(${pathIndex})">升级到 tier ${nextTier}<small>${preview} · ${cost} 研发</small></button></div>`;
     if (!canAfford) html += `<div class="upgrade-hint warn">研发点不足（需要 ${cost}）</div>`;
   }
 
   selectedCellUpgradeEl.innerHTML = html;
   selectedCellUpgradeEl.classList.remove("hidden");
+}
+
+// v0.5.0 选中设施改造面板（4 核心设施，不可逆）
+function renderSelectedCellModificationPanel(cell) {
+  ensureSelectedCellModificationUi();
+  if (!cell || cell.detached || !MODIFIABLE_FACILITIES.has(cell.facility)) {
+    selectedCellModificationEl.innerHTML = "";
+    selectedCellModificationEl.classList.add("hidden");
+    state.hud.selectedModificationKey = "";
+    return;
+  }
+  const type = TYPES[cell.facility];
+  if (!type?.modifications?.length) {
+    selectedCellModificationEl.innerHTML = "";
+    selectedCellModificationEl.classList.add("hidden");
+    state.hud.selectedModificationKey = "";
+    return;
+  }
+  ensureCellUpgradeFields(cell);
+  const research = state.resources.research || 0;
+  const modCacheKey = `${cell.facility}:${cell.mod}:${Math.floor(research)}`;
+  if (state.hud.selectedModificationKey === modCacheKey) {
+    selectedCellModificationEl.classList.remove("hidden");
+    return;
+  }
+  state.hud.selectedModificationKey = modCacheKey;
+
+  let html = "";
+  if (cell.mod != null) {
+    const modDef = type.modifications[cell.mod];
+    html += `<div class="modification-status">已改造：${modDef?.label || "未知"}</div>`;
+  } else {
+    html += `<div class="modification-status">改造为：</div>`;
+    const canAfford = research >= MODIFICATION_COST;
+    html += `<div class="modification-actions">`;
+    type.modifications.forEach((modDef, modIndex) => {
+      const disabled = canAfford ? "" : " disabled";
+      const titleAttr = canAfford
+        ? ` title="${modDef.label} · ${modDef.desc} · 消耗 ${MODIFICATION_COST} research"`
+        : ' title="研发点不足"';
+      html += `<button type="button" class="modification-btn"${disabled}${titleAttr} onclick="window.gameActions.applyModificationToSelected(${modIndex})">${modDef.label}<small>${modDef.desc} · ${MODIFICATION_COST} 研发</small></button>`;
+    });
+    html += `</div>`;
+    if (!canAfford) html += `<div class="upgrade-hint warn">研发点不足（需要 ${MODIFICATION_COST}）</div>`;
+  }
+
+  selectedCellModificationEl.innerHTML = html;
+  selectedCellModificationEl.classList.remove("hidden");
+}
+
+// v0.5.0 全局研发树面板（hullMod / weaponMod 节点）
+function ensureResearchTreeUi() {
+  if (researchTreePanelEl) return;
+  const topbar = document.querySelector("#hud .topbar");
+  if (topbar) {
+    researchTreeBtnEl = document.createElement("button");
+    researchTreeBtnEl.type = "button";
+    researchTreeBtnEl.id = "researchTreeBtn";
+    researchTreeBtnEl.textContent = "研发树";
+    const pauseBtn = document.getElementById("pauseBtn");
+    topbar.insertBefore(researchTreeBtnEl, pauseBtn);
+    researchTreeBtnEl.addEventListener("click", () => toggleResearchTree(true));
+  }
+
+  researchTreePanelEl = document.createElement("div");
+  researchTreePanelEl.id = "researchTreePanel";
+  researchTreePanelEl.className = "research-tree-panel hidden";
+  researchTreePanelEl.innerHTML = `
+    <div class="research-tree-backdrop"></div>
+    <div class="research-tree-content">
+      <div class="research-tree-header">
+        <h2>研发树</h2>
+        <button type="button" class="research-tree-close" aria-label="关闭">×</button>
+      </div>
+      <div id="researchTreeNodes" class="research-tree-nodes"></div>
+    </div>
+  `;
+  document.body.appendChild(researchTreePanelEl);
+  researchTreePanelEl.querySelector(".research-tree-close").addEventListener("click", () => toggleResearchTree(false));
+  researchTreePanelEl.querySelector(".research-tree-backdrop").addEventListener("click", () => toggleResearchTree(false));
+}
+
+function renderResearchTreePanel() {
+  ensureResearchTreeUi();
+  const nodesEl = researchTreePanelEl.querySelector("#researchTreeNodes");
+  if (!nodesEl) return;
+  const research = state.resources.research || 0;
+  const nodes = [
+    {
+      key: "hullMod",
+      label: "船体强化",
+      desc: "所有设施 maxHp ×1.05",
+      cost: HULL_MOD_COST,
+      active: state.station.hullMod > 1.0
+    },
+    {
+      key: "weaponMod",
+      label: "武器强化",
+      desc: "炮塔与导弹井 damage ×1.05",
+      cost: WEAPON_MOD_COST,
+      active: state.station.weaponMod > 1.0
+    }
+  ];
+  nodesEl.innerHTML = nodes.map((node) => {
+    if (node.active) {
+      return `<div class="research-tree-node active"><div class="research-tree-node-title">${node.label}</div><div class="research-tree-node-desc">${node.desc}</div><div class="research-tree-node-status good">已激活</div></div>`;
+    }
+    const canAfford = research >= node.cost;
+    const disabled = canAfford ? "" : " disabled";
+    const titleAttr = ` title="${node.desc} · 消耗 ${node.cost} research"`;
+    return `<div class="research-tree-node"><div class="research-tree-node-title">${node.label}</div><div class="research-tree-node-desc">${node.desc}</div><button type="button" class="research-tree-unlock-btn"${disabled}${titleAttr} onclick="window.gameActions.unlockGlobalResearch('${node.key}')">解锁 · ${node.cost} 研发</button>${canAfford ? "" : `<div class="upgrade-hint warn">研发点不足（需要 ${node.cost}）</div>`}</div>`;
+  }).join("");
+}
+
+function toggleResearchTree(open) {
+  ensureResearchTreeUi();
+  state.hud.researchTreeOpen = open;
+  if (open) renderResearchTreePanel();
+  researchTreePanelEl.classList.toggle("hidden", !open);
 }
 
 function createCell(x, y, facility) {
@@ -1949,6 +2155,7 @@ function initGame() {
   initWorld();
   createObjective();
   createBuildUi();
+  ensureResearchTreeUi();
   bindInput();
   syncMoreStatusPanel();
   window.addEventListener("resize", syncMoreStatusPanel);
@@ -4303,10 +4510,6 @@ function nextLevel() {
   const galaxy = generateGalaxy(state.run.level, `${state.run.seed}:${state.run.level}`);
   applyGalaxy(galaxy);
 
-  for (const cell of state.station.cells.values()) {
-    resetCellUpgradeState(cell);
-  }
-
   state.fragments = [];
   state.npcs = [];
   state.enemies = [];
@@ -4965,14 +5168,18 @@ function updateHud() {
   const powerTight = state.power.used >= state.power.available - 0.25;
   const researchRate = getResearchRatePerSec();
   const researchRateText = researchRate >= 0.05 ? ` (+${researchRate.toFixed(1)}r/s)` : "";
+  const researchTitle = researchRate >= 0.05
+    ? ` title="近 30 秒研发来源：任务奖励 + 研发设施产出，约 ${researchRate.toFixed(1)} 点/秒"`
+    : "";
   const resourceSpans = [
     `金属 ${Math.floor(r.metal)}`,
     `矿物 ${Math.floor(r.ore)}`,
     `气体 ${Math.floor(r.gas)}`,
     `等离子 ${Math.floor(r.plasma)}`,
-    `科研 ${Math.floor(r.research)}${researchRateText}`,
+    `<span${researchTitle}>科研 ${Math.floor(r.research)}${researchRateText}</span>`,
     `电力 ${Math.floor(state.power.used)}/${Math.floor(state.power.available)}`
   ].map((text, index) => {
+    if (index === 4) return text;
     const powerClass = index === 5 && powerTight ? ' class="power-low"' : "";
     return `<span${powerClass}>${text}</span>`;
   });
@@ -5091,6 +5298,11 @@ function updateSelectedCellPanel(cell) {
         selectedCellUpgradeEl.innerHTML = "";
         selectedCellUpgradeEl.classList.add("hidden");
       }
+      if (selectedCellModificationEl) {
+        selectedCellModificationEl.innerHTML = "";
+        selectedCellModificationEl.classList.add("hidden");
+      }
+      state.hud.selectedModificationKey = "";
     }
     return;
   }
@@ -5137,6 +5349,7 @@ function updateSelectedCellPanel(cell) {
     selectedCellInfoEl.innerHTML = html;
   }
   renderSelectedCellUpgradePanel(cell);
+  renderSelectedCellModificationPanel(cell);
 }
 
 function updateMetaUi() {
@@ -5180,7 +5393,37 @@ window.gameActions = {
     if (!upgradeSelectedCell(path)) {
       showToast("无法升级该设施。");
       updateHud();
+    } else {
+      state.hud.selectedUpgradeKey = "";
+      state.hud.selectedModificationKey = "";
     }
+  },
+  applyModificationToSelected(modIndex) {
+    const cell = state.selectedCell ? state.station.cells.get(state.selectedCell) : null;
+    if (!cell) return;
+    if ((state.resources.research || 0) < MODIFICATION_COST) {
+      showToast("研发点不足。");
+      updateHud();
+      return;
+    }
+    if (!applyModification(cell, modIndex)) {
+      showToast("无法改造该设施。");
+      updateHud();
+    } else {
+      state.hud.selectedUpgradeKey = "";
+      state.hud.selectedModificationKey = "";
+    }
+  },
+  unlockGlobalResearch(modKey) {
+    if (!unlockGlobalResearch(modKey)) {
+      showToast("研发点不足或已激活。");
+      updateHud();
+      return;
+    }
+    renderResearchTreePanel();
+  },
+  toggleResearchTree(open) {
+    toggleResearchTree(open);
   },
   buyTalent(type) {
     if (state.meta.points < 1) {
@@ -5269,6 +5512,9 @@ window.__gameTest = {
     state.run.totalObjectiveRewardBase = 0;
     state.run.escortLowHpAlerted = false;
     state.meta.points = 0;
+    state.resources.research = 0;
+    state.station.hullMod = 1;
+    state.station.weaponMod = 1;
     state.fragments = [];
     state.npcs = [];
     state.enemies = [];
@@ -5377,6 +5623,10 @@ window.__gameTest = {
       pointsGain: state.meta.points - pointsBefore
     };
   },
+  getCellStat,
+  applyModification,
+  unlockGlobalResearch,
+  resetCellUpgradeState,
   snapshot() {
     const wreck = state.fragments.filter((f) => f.origin === "wreck");
     const startPos = state.galaxy?.stationSpawn || state.station.pos;
