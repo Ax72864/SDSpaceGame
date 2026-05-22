@@ -187,6 +187,10 @@ const TYPES = {
     name: "核心",
     cost: {},
     hp: 280,
+    baseStats: {
+      maxHp: 280,
+      maxFrameHp: 260
+    },
     color: [0.82, 0.94, 1.0, 1],
     desc: "默认产出"
   },
@@ -194,6 +198,10 @@ const TYPES = {
     name: "框架",
     cost: { metal: 8 },
     hp: 70,
+    baseStats: {
+      maxHp: 70,
+      maxFrameHp: 70
+    },
     color: [0.25, 0.52, 0.72, 0.95],
     desc: "扩展结构"
   },
@@ -202,6 +210,9 @@ const TYPES = {
     cost: { metal: 22, ore: 8 },
     hp: 105,
     powerOut: 10,
+    baseStats: {
+      powerOut: 10
+    },
     color: [1.0, 0.78, 0.22, 1],
     desc: "+10 电力"
   },
@@ -211,6 +222,9 @@ const TYPES = {
     hp: 90,
     powerUse: 2,
     priority: 80,
+    baseStats: {
+      thrust: 110
+    },
     color: [0.3, 0.8, 1.0, 1],
     desc: "按位置施力"
   },
@@ -220,6 +234,9 @@ const TYPES = {
     hp: 95,
     powerUse: 3,
     priority: 60,
+    baseStats: {
+      mineRate: 6.5
+    },
     color: [0.68, 0.9, 0.55, 1],
     desc: "近天体采集"
   },
@@ -229,6 +246,10 @@ const TYPES = {
     hp: 90,
     powerUse: 2,
     priority: 45,
+    baseStats: {
+      produceRate: 4,
+      produceRatio: 0.72
+    },
     color: [0.76, 0.72, 0.64, 1],
     desc: "矿石转金属"
   },
@@ -238,6 +259,11 @@ const TYPES = {
     hp: 92,
     powerUse: 3,
     priority: 48,
+    baseStats: {
+      produceRate: 2.7,
+      produceRatio: 0.38,
+      bonusPowerOut: 2
+    },
     color: [0.8, 0.35, 1.0, 1],
     desc: "气体转等离子"
   },
@@ -247,6 +273,10 @@ const TYPES = {
     hp: 85,
     powerUse: 4,
     priority: 35,
+    baseStats: {
+      produceRate: 0.8,
+      produceRatio: 2.4
+    },
     color: [0.55, 0.68, 1.0, 1],
     desc: "解锁升级"
   },
@@ -256,6 +286,13 @@ const TYPES = {
     hp: 85,
     powerUse: 3,
     priority: 70,
+    baseStats: {
+      damage: 14,
+      reload: 0.6,
+      minReload: 0.28,
+      range: 450,
+      projectileSpeed: 620
+    },
     color: [1.0, 0.42, 0.35, 1],
     desc: "自动射击"
   },
@@ -265,6 +302,19 @@ const TYPES = {
     hp: 100,
     powerUse: 1,
     priority: 65,
+    baseStats: {
+      damage: 42,
+      reload: 5.8,
+      range: 780,
+      projectileSpeed: 420,
+      projectileAccel: 360,
+      projectileCount: 1,
+      life: 5.5,
+      radius: 5,
+      gasCost: 3,
+      metalCost: 1,
+      launchJitter: 12
+    },
     color: [1.0, 0.58, 0.22, 1],
     desc: "手动齐射"
   },
@@ -274,6 +324,11 @@ const TYPES = {
     hp: 105,
     powerUse: 5,
     priority: 75,
+    baseStats: {
+      maxShield: 0,
+      regen: 0,
+      range: 92
+    },
     color: [0.34, 1.0, 0.94, 1],
     desc: "定向拦截"
   },
@@ -281,6 +336,9 @@ const TYPES = {
     name: "装甲",
     cost: { metal: 20 },
     hp: 220,
+    baseStats: {
+      maxHp: 220
+    },
     color: [0.58, 0.65, 0.74, 1],
     desc: "高耐久"
   },
@@ -290,6 +348,12 @@ const TYPES = {
     hp: 92,
     powerUse: 4,
     priority: 55,
+    baseStats: {
+      repairRate: 18,
+      frameRepairRate: 12,
+      cooldown: 1.25,
+      droneSpeed: 125
+    },
     color: [0.3, 1.0, 0.55, 1],
     desc: "释放无人机"
   }
@@ -311,6 +375,8 @@ const FACILITY_ORDER = [
 ];
 
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
+const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
+const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
 
 const MINING_RANGE_OFFSET = 130;
 
@@ -1036,13 +1102,104 @@ function applyGalaxy(galaxy, { placeStation = true } = {}) {
   }
 }
 
+function shouldClamp(key) {
+  return false && CLAMPED_STAT_KEYS.has(key);
+}
+
+function getTechLevelFactor(facility, key, techLevel) {
+  const level = Number.isFinite(techLevel) ? techLevel : 0;
+  if (level <= 0) return 1;
+  if (facility === "turret" && key === "reload") {
+    const baseReload = TYPES.turret.baseStats.reload;
+    const minReload = TYPES.turret.baseStats.minReload;
+    return Math.max(minReload, baseReload - level * 0.03) / baseReload;
+  }
+  if (facility === "thruster" && key === "thrust") {
+    return 1 + level * 0.08;
+  }
+  if (facility === "thruster" && key === "keyboardThrust") {
+    return 1 + level * 0.06;
+  }
+  if (facility === "power" && key === "baseAvailable") {
+    return (6 + level * 1.5) / 6;
+  }
+  if (facility === "core" && key === "hpPerLevel") {
+    return Math.pow(1.08, level);
+  }
+  return 1;
+}
+
+function getGlobalModFactor(facility, key, station) {
+  if (!station) return 1;
+  if (key === "maxHp") {
+    return Number.isFinite(station.hullMod) ? station.hullMod : 1;
+  }
+  if (key === "damage" && GLOBAL_WEAPON_MOD_TYPES.has(facility)) {
+    return Number.isFinite(station.weaponMod) ? station.weaponMod : 1;
+  }
+  return 1;
+}
+
+function getCellStat(cell, key) {
+  if (!cell || !cell.facility) return 0;
+  const type = TYPES[cell.facility];
+  if (!type || !type.baseStats) return 0;
+  ensureCellUpgradeFields(cell);
+
+  const base = type.baseStats[key];
+  if (base == null) {
+    if (cell[key] != null) return cell[key];
+    return 0;
+  }
+
+  const tier = Number.isFinite(cell.tier) ? cell.tier : 0;
+  const pathKey = cell.upgradePath || 0;
+  const tierBonus = type.upgrades
+    && type.upgrades[pathKey]
+    && type.upgrades[pathKey].tiers
+    && type.upgrades[pathKey].tiers[tier]
+    && Number.isFinite(type.upgrades[pathKey].tiers[tier][key])
+      ? type.upgrades[pathKey].tiers[tier][key]
+      : 0;
+
+  const modBonus = type.modifications
+    && cell.mod != null
+    && type.modifications[cell.mod]
+    && Number.isFinite(type.modifications[cell.mod][key])
+      ? type.modifications[cell.mod][key]
+      : 0;
+
+  const techFactor = getTechLevelFactor(cell.facility, key, state.station.techLevel || 0);
+  const globalFactor = getGlobalModFactor(cell.facility, key, state.station);
+
+  let result = base * (1 + tierBonus + modBonus) * techFactor * globalFactor;
+  if (shouldClamp(key)) {
+    result = Math.min(result, 2.5 * base);
+  }
+  return result;
+}
+
+function resetCellUpgradeState(cell) {
+  if (!cell) return;
+  cell.tier = 0;
+  cell.upgradePath = null;
+  cell.mod = null;
+}
+
+function ensureCellUpgradeFields(cell) {
+  if (!cell) return;
+  if (!Number.isFinite(cell.tier)) cell.tier = 0;
+  if (cell.upgradePath === undefined) cell.upgradePath = null;
+  if (cell.mod === undefined) cell.mod = null;
+}
+
 function createCell(x, y, facility) {
   const def = TYPES[facility] || TYPES.frame;
   return {
     x,
     y,
     facility,
-    frameHp: 70 * (1 + state.meta.hull * 0.1),
+    frameHp: TYPES.frame.baseStats.maxFrameHp * (1 + state.meta.hull * 0.1),
     hp: def.hp * (1 + state.meta.hull * 0.1),
     maxHp: def.hp * (1 + state.meta.hull * 0.1),
     enabled: true,
@@ -1051,7 +1208,10 @@ function createCell(x, y, facility) {
     drift: null,
     priority: def.priority || 10,
     reload: 0,
-    fire: 0
+    fire: 0,
+    tier: 0,
+    upgradePath: null,
+    mod: null
   };
 }
 
@@ -1060,7 +1220,7 @@ function initStation() {
   const core = createCell(0, 0, "core");
   core.hp = 280 * (1 + state.meta.hull * 0.1);
   core.maxHp = core.hp;
-  core.frameHp = 260;
+  core.frameHp = TYPES.core.baseStats.maxFrameHp;
   cells.set(key(0, 0), core);
   cells.set(key(1, 0), createCell(1, 0, "frame"));
   cells.set(key(-1, 0), createCell(-1, 0, "frame"));
@@ -2179,8 +2339,9 @@ function buildWreckShape(rng) {
 
 function createWreckCell(x, y, facility, rng) {
   const cell = createCell(x, y, facility);
+  ensureCellUpgradeFields(cell);
   cell.hp = cell.maxHp * rngFloat(rng, 0.65, 0.9);
-  cell.frameHp = 70 * (1 + state.meta.hull * 0.1) * rngFloat(rng, 0.8, 1.0);
+  cell.frameHp = TYPES.frame.baseStats.maxFrameHp * (1 + state.meta.hull * 0.1) * rngFloat(rng, 0.8, 1.0);
   cell.reload = 0;
   cell.fire = 0;
   cell.enabled = true;
@@ -2499,6 +2660,7 @@ function buildFragmentFromCells(componentCells) {
 
   const cells = new Map();
   for (const cell of keptCells) {
+    ensureCellUpgradeFields(cell);
     cell.detached = false;
     cell.drift = null;
     cell.reload = 0;
@@ -3049,15 +3211,15 @@ function updatePowerAndFacilities(dt) {
   state.resources.gas += 0.12 * dt;
   state.resources.plasma += 0.025 * dt;
 
-  let available = 6 + state.station.techLevel * 1.5;
+  let available = 6 * getTechLevelFactor("power", "baseAvailable", state.station.techLevel);
   const candidates = [];
   for (const cell of state.station.cells.values()) {
     cell.fire = 0;
     cell.active = cell.facility === "core" || cell.facility === "frame" || cell.facility === "armor";
     if (cell.detached || !cell.enabled) continue;
-    if (cell.facility === "power") available += TYPES.power.powerOut;
+    if (cell.facility === "power") available += getCellStat(cell, "powerOut");
     if (cell.facility === "plasma" && state.resources.gas > 0.8) {
-      available += 2;
+      available += TYPES.plasma.baseStats.bonusPowerOut;
     }
     const use = TYPES[cell.facility]?.powerUse || 0;
     if (use > 0) candidates.push(cell);
@@ -3112,10 +3274,7 @@ function updateStationPhysics(dt) {
       cell.fire = 0;
       continue;
     }
-    const thrust =
-      PLAYER_PHYSICS.thrusterThrust *
-      (1 + state.station.techLevel * 0.08) *
-      (1 + state.meta.weapons * 0.03);
+    const thrust = getCellStat(cell, "thrust") * (1 + state.meta.weapons * 0.03);
     force.x += pushWorld.x * thrust;
     force.y += pushWorld.y * thrust;
     const r = rotate({ x: cell.x * CELL, y: cell.y * CELL }, station.angle);
@@ -3132,7 +3291,7 @@ function updateStationPhysics(dt) {
   if (keyboardThrust) {
     const directThrust =
       PLAYER_PHYSICS.keyboardThrust *
-      (1 + state.station.techLevel * 0.06) *
+      getTechLevelFactor("thruster", "keyboardThrust", state.station.techLevel) *
       state.station.thrustMod;
     force.x += keyboardThrust.x * directThrust;
     force.y += keyboardThrust.y * directThrust;
@@ -3182,7 +3341,7 @@ function updateMiningAndResearch(dt) {
       const p = cellWorldPosition(cell);
       const body = state.world.bodies.find((b) => b.amount > 0 && dist(p, b) < b.r + MINING_RANGE_OFFSET);
       if (body) {
-        const amount = Math.min(body.amount, 6.5 * miningBonus * dt);
+        const amount = Math.min(body.amount, getCellStat(cell, "mineRate") * miningBonus * dt);
         body.amount -= amount;
         state.resources[body.resource] = (state.resources[body.resource] || 0) + amount;
         mined += amount;
@@ -3191,19 +3350,19 @@ function updateMiningAndResearch(dt) {
       }
     }
     if (cell.facility === "processor" && state.resources.ore > 1.2) {
-      const amount = Math.min(state.resources.ore, 4 * dt);
+      const amount = Math.min(state.resources.ore, getCellStat(cell, "produceRate") * dt);
       state.resources.ore -= amount;
-      state.resources.metal += amount * 0.72;
+      state.resources.metal += amount * TYPES.processor.baseStats.produceRatio;
     }
     if (cell.facility === "plasma" && state.resources.gas > 1.0) {
-      const amount = Math.min(state.resources.gas, 2.7 * dt);
+      const amount = Math.min(state.resources.gas, getCellStat(cell, "produceRate") * dt);
       state.resources.gas -= amount;
-      state.resources.plasma += amount * 0.38;
+      state.resources.plasma += amount * TYPES.plasma.baseStats.produceRatio;
     }
     if (cell.facility === "research" && state.resources.plasma > 0.18) {
-      const amount = Math.min(state.resources.plasma, 0.8 * dt);
+      const amount = Math.min(state.resources.plasma, getCellStat(cell, "produceRate") * dt);
       state.resources.plasma -= amount;
-      state.resources.research += amount * 2.4;
+      state.resources.research += amount * TYPES.research.baseStats.produceRatio;
     }
   }
   if (mined > 0) {
@@ -3213,7 +3372,7 @@ function updateMiningAndResearch(dt) {
   if (state.resources.research >= 35 + state.station.techLevel * 22) {
     state.resources.research -= 35 + state.station.techLevel * 22;
     state.station.techLevel++;
-    improveStationHp(1.08);
+    improveStationHp(getTechLevelFactor("core", "hpPerLevel", 1));
     showToast(`研发完成：全站数值提升，当前科技等级 ${state.station.techLevel}`);
   }
 }
@@ -3553,11 +3712,17 @@ function spawnEnemy(kind, x, y, options = {}) {
 function updateTurret(cell, dt) {
   if (cell.reload > 0) return;
   const origin = cellWorldPosition(cell);
-  const enemy = nearestEnemy(origin, 450);
+  const enemy = nearestEnemy(origin, getCellStat(cell, "range"));
   if (!enemy || !hasLineOfSight(origin, enemy)) return;
   const dir = normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
-  cell.reload = Math.max(0.28, 0.60 - state.station.techLevel * 0.03);
-  fireProjectile(origin, dir, "player", 14 * (1 + state.meta.weapons * 0.1), 620);
+  cell.reload = getCellStat(cell, "reload");
+  fireProjectile(
+    origin,
+    dir,
+    "player",
+    getCellStat(cell, "damage") * (1 + state.meta.weapons * 0.1),
+    getCellStat(cell, "projectileSpeed")
+  );
 }
 
 function hasLineOfSight(origin, target) {
@@ -3582,10 +3747,11 @@ function hasLineOfSight(origin, target) {
 function updateShield(cell) {
   const origin = cellWorldPosition(cell);
   const outward = shieldDirection(cell);
+  const range = getCellStat(cell, "range");
   for (const projectile of state.projectiles) {
     if (projectile.owner !== "enemy") continue;
     const toProjectile = { x: projectile.x - origin.x, y: projectile.y - origin.y };
-    if (length(toProjectile) < 92 && dot(normalize(toProjectile), outward) > -0.1) {
+    if (length(toProjectile) < range && dot(normalize(toProjectile), outward) > -0.1) {
       projectile.dead = true;
       cell.fire = 1;
       for (let i = 0; i < 5; i++) spawnParticle(projectile, [0.35, 1, 0.94, 1]);
@@ -3597,28 +3763,40 @@ function fireMissiles() {
   let fired = 0;
   for (const cell of state.station.cells.values()) {
     if (cell.facility !== "missile" || !cell.active || cell.reload > 0 || cell.detached) continue;
-    const enemy = nearestEnemy(cellWorldPosition(cell), 780);
+    const enemy = nearestEnemy(cellWorldPosition(cell), getCellStat(cell, "range"));
     if (!enemy) continue;
-    if (state.resources.gas < 3 || state.resources.metal < 1) {
+    const gasCost = TYPES.missile.baseStats.gasCost;
+    const metalCost = TYPES.missile.baseStats.metalCost;
+    if (state.resources.gas < gasCost || state.resources.metal < metalCost) {
       showToast("导弹装填资源不足，需要气体和金属。");
       return;
     }
-    state.resources.gas -= 3;
-    state.resources.metal -= 1;
+    state.resources.gas -= gasCost;
+    state.resources.metal -= metalCost;
     const origin = cellWorldPosition(cell);
-    state.projectiles.push({
-      owner: "missile",
-      target: enemy,
-      x: origin.x,
-      y: origin.y,
-      vx: rand(-12, 12),
-      vy: rand(-12, 12),
-      damage: 42 * (1 + state.meta.weapons * 0.12),
-      life: 5.5,
-      r: 5
-    });
-    cell.reload = 5.8;
-    fired++;
+    const projectileCount = Math.max(1, Math.floor(getCellStat(cell, "projectileCount")));
+    const projectileSpeed = getCellStat(cell, "projectileSpeed");
+    const baseProjectileSpeed = TYPES.missile.baseStats.projectileSpeed;
+    const projectileAccel = TYPES.missile.baseStats.projectileAccel * (projectileSpeed / baseProjectileSpeed);
+    const launchJitter = TYPES.missile.baseStats.launchJitter;
+    const damage = getCellStat(cell, "damage") * (1 + state.meta.weapons * 0.12);
+    for (let i = 0; i < projectileCount; i++) {
+      state.projectiles.push({
+        owner: "missile",
+        target: enemy,
+        x: origin.x,
+        y: origin.y,
+        vx: rand(-launchJitter, launchJitter),
+        vy: rand(-launchJitter, launchJitter),
+        damage,
+        life: TYPES.missile.baseStats.life,
+        r: TYPES.missile.baseStats.radius,
+        maxSpeed: projectileSpeed,
+        accel: projectileAccel
+      });
+    }
+    cell.reload = getCellStat(cell, "reload");
+    fired += projectileCount;
   }
   showToast(fired ? `导弹齐射：${fired} 枚` : "没有可发射的导弹井或目标。");
 }
@@ -3654,12 +3832,14 @@ function updateProjectiles(dt) {
     projectile.life -= dt;
     if (projectile.owner === "missile" && projectile.target && projectile.target.hp > 0) {
       const dir = normalize({ x: projectile.target.x - projectile.x, y: projectile.target.y - projectile.y });
-      projectile.vx += dir.x * 360 * dt;
-      projectile.vy += dir.y * 360 * dt;
+      const accel = Number.isFinite(projectile.accel) ? projectile.accel : TYPES.missile.baseStats.projectileAccel;
+      const maxSpeed = Number.isFinite(projectile.maxSpeed) ? projectile.maxSpeed : TYPES.missile.baseStats.projectileSpeed;
+      projectile.vx += dir.x * accel * dt;
+      projectile.vy += dir.y * accel * dt;
       const speed = length({ x: projectile.vx, y: projectile.vy });
-      if (speed > 420) {
-        projectile.vx = projectile.vx / speed * 420;
-        projectile.vy = projectile.vy / speed * 420;
+      if (speed > maxSpeed) {
+        projectile.vx = projectile.vx / speed * maxSpeed;
+        projectile.vy = projectile.vy / speed * maxSpeed;
       }
     }
     projectile.x += projectile.vx * dt;
@@ -3786,10 +3966,10 @@ function updateRepair(dt) {
     if (repairer.repairCooldown > 0) continue;
     const origin = cellWorldPosition(repairer);
     const target = [...state.station.cells.values()]
-      .filter((cell) => !cell.detached && (cell.hp < cell.maxHp || cell.frameHp < 70))
+      .filter((cell) => !cell.detached && (cell.hp < cell.maxHp || cell.frameHp < TYPES.frame.baseStats.maxFrameHp))
       .sort((a, b) => dist(origin, cellWorldPosition(a)) - dist(origin, cellWorldPosition(b)))[0];
     if (!target) continue;
-    repairer.repairCooldown = 1.25;
+    repairer.repairCooldown = getCellStat(repairer, "cooldown");
     state.repairDrones.push({
       x: origin.x,
       y: origin.y,
@@ -3811,13 +3991,18 @@ function updateRepair(dt) {
     const destination = cellWorldPosition(destinationCell);
     const toDestination = { x: destination.x - drone.x, y: destination.y - drone.y };
     const distance = length(toDestination);
-    const speed = 125;
+    const speed = TYPES.repair.baseStats.droneSpeed;
     if (distance < speed * dt + 4) {
       drone.x = destination.x;
       drone.y = destination.y;
       if (!drone.returning && target && !target.detached) {
-        target.hp = Math.min(target.maxHp, target.hp + 18);
-        target.frameHp = Math.min(70 * (1 + state.meta.hull * 0.1), target.frameHp + 12);
+        const repairRate = repairer ? getCellStat(repairer, "repairRate") : TYPES.repair.baseStats.repairRate;
+        const frameRepairRate = repairer ? getCellStat(repairer, "frameRepairRate") : TYPES.repair.baseStats.frameRepairRate;
+        target.hp = Math.min(target.maxHp, target.hp + repairRate);
+        target.frameHp = Math.min(
+          TYPES.frame.baseStats.maxFrameHp * (1 + state.meta.hull * 0.1),
+          target.frameHp + frameRepairRate
+        );
         drone.returning = true;
       } else {
         drone.life = 0;
@@ -3908,6 +4093,10 @@ function nextLevel() {
 
   const galaxy = generateGalaxy(state.run.level, `${state.run.seed}:${state.run.level}`);
   applyGalaxy(galaxy);
+
+  for (const cell of state.station.cells.values()) {
+    resetCellUpgradeState(cell);
+  }
 
   state.fragments = [];
   state.npcs = [];
@@ -4858,6 +5047,9 @@ window.__gameTest = {
     const lvl = levelIndex(level);
     const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`);
     applyGalaxy(galaxy);
+    for (const cell of state.station.cells.values()) {
+      resetCellUpgradeState(cell);
+    }
     createObjective();
     state.run.fragmentHudCache = null;
   },
