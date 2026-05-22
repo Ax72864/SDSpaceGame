@@ -524,6 +524,22 @@ const HOSTILE_STATION_LAYOUT_LEVEL3 = [
 ];
 const HOSTILE_STATION_CORE_KEY = "0,0";
 const HOSTILE_STATION_HIT_RADIUS = CELL * 0.55;
+const HOSTILE_STATION_WEAPON_STATS = {
+  3: {
+    turret: { damage: 12, reload: 1.6, range: 480, projectileSpeed: 280 },
+    shield: { range: 110, maxShield: 200, regen: 8 }
+  },
+  4: {
+    turret: { damage: 14, reload: 1.6, range: 515, projectileSpeed: 300 },
+    shield: { range: 130, maxShield: 280, regen: 10 }
+  },
+  5: {
+    turret: { damage: 15, reload: 1.6, range: 550, projectileSpeed: 320 },
+    shield: { range: 150, maxShield: 360, regen: 12 }
+  }
+};
+const ASSAULT_METAL_BASE_BY_LEVEL = { 3: 35, 4: 40, 5: 45 };
+const ASSAULT_RESEARCH_REWARD_BY_LEVEL = { 3: 9, 4: 9, 5: 10 };
 const NPC_RADIUS = 20;
 const NPC_ARRIVE_RADIUS = 80;
 const NPC_AVOID_MARGIN = 60;
@@ -617,7 +633,9 @@ const state = {
     endgameExplore: false,
     endgameActivityFraction: 0,
     endgameActivityPoints: 0,
-    escortLowHpAlerted: false
+    escortLowHpAlerted: false,
+    hostileStationSpawnedThisGalaxy: false,
+    hostileStationAlerted: false
   },
   resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
   power: { available: 0, used: 0 },
@@ -705,6 +723,18 @@ function showToast(message, duration = 2.8) {
   toastEl.textContent = message;
   toastEl.classList.add("show");
   state.toastTimer = duration;
+}
+
+function showHostileStationAlert(message, durationMs = 3000, isSuccess = false) {
+  const el = document.createElement("div");
+  el.className = isSuccess ? "hud-alert success" : "hud-alert";
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = "opacity 0.5s";
+    el.style.opacity = "0";
+    setTimeout(() => el.remove(), 500);
+  }, durationMs);
 }
 
 function setBuildError(message) {
@@ -950,6 +980,8 @@ function ensureRunRuntimeState() {
   state.run.endgameExplore = Boolean(state.run.endgameExplore);
   state.run.settlementShown = Boolean(state.run.settlementShown);
   state.run.settlementBonusGranted = Boolean(state.run.settlementBonusGranted);
+  state.run.hostileStationSpawnedThisGalaxy = Boolean(state.run.hostileStationSpawnedThisGalaxy);
+  state.run.hostileStationAlerted = Boolean(state.run.hostileStationAlerted);
   if (!state.world || !Array.isArray(state.world.bodies)) {
     state.world = { bodies: [] };
   }
@@ -1851,11 +1883,12 @@ const OBJECTIVE_EVENT_HANDLERS = {
 
 const OBJECTIVE_LEVEL_WEIGHTS = [
   { mine: 0.5, explore: 0.5 },
-  { mine: 0.4, explore: 0.35, salvage: 0.25 },
-  { mine: 0.3, explore: 0.3, battle: 0.2, salvage: 0.2 },
-  { battle: 0.3, survive: 0.2, salvage: 0.25, escort: 0.25 },
-  { battle: 0.3, survive: 0.2, salvage: 0.25, escort: 0.25 },
-  { battle: 0.4, survive: 0.3, escort: 0.3 }
+  { mine: 0.4, explore: 0.3, battle: 0.3 },
+  { mine: 0.3, explore: 0.3, battle: 0.2, survive: 0.2 },
+  { mine: 0.2, explore: 0.2, battle: 0.2, survive: 0.1, salvage: 0.1, assault: 0.20 },
+  { mine: 0.15, explore: 0.15, battle: 0.15, survive: 0.1, salvage: 0.1, escort: 0.05, assault: 0.30 },
+  { mine: 0.1, explore: 0.1, battle: 0.1, survive: 0.1, salvage: 0.1, escort: 0.05, assault: 0.35 },
+  { guardian: 1.0 }
 ];
 
 const OBJECTIVE_TYPE_DEFAULTS = {
@@ -1863,6 +1896,7 @@ const OBJECTIVE_TYPE_DEFAULTS = {
   onMined: null,
   onEnemyKilled: null,
   onGuardianKilled: null,
+  onHostileStationKilled: null,
   onFragmentDocked: null,
   onNpcArrived: null,
   onNpcDestroyed: null,
@@ -2101,6 +2135,85 @@ const OBJECTIVE_TYPES = {
       renderer.ring(target, NPC_ARRIVE_RADIUS, 3, [0.95, 0.85, 0.35, 0.55], 48);
       renderer.ring(target, NPC_ARRIVE_RADIUS + 28, 2, [0.95, 0.85, 0.35, 0.22], 56);
     }
+  },
+  // v0.6.0 引入 assault：摧毁敌方空间站（level 3-5，单星系冷却 1 次）
+  assault: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    researchReward: 9,
+    rewardMultiplier(level) {
+      return level === 3 ? 1.4 : level === 4 ? 1.5 : 1.6;
+    },
+    make(rng, level) {
+      if (state.run.hostileStationSpawnedThisGalaxy) {
+        return null;
+      }
+      state.run.hostileStationSpawnedThisGalaxy = true;
+      state.run.hostileStationAlerted = false;
+      showHostileStationAlert("⚠ 敌方空间站接近", 3000);
+      const objective = {
+        type: "assault",
+        text: "突击：摧毁敌方空间站",
+        target: 1,
+        progress: 0,
+        level,
+        timeLimit: level === 3 ? 480 : level === 4 ? 420 : 360,
+        elapsed: 0,
+        enemyId: null,
+        spawnPending: true,
+        spawnDelay: 2.5,
+        _rng: rng
+      };
+      return objective;
+    },
+    tick(objective, dt) {
+      objective.elapsed = (objective.elapsed || 0) + dt;
+      if (!objective.spawnPending) return;
+      objective.spawnDelay = (objective.spawnDelay || 0) - dt;
+      if (objective.spawnDelay > 0) return;
+      const enemy = spawnHostileStationNearStation(objective._rng, objective.level || state.run.level);
+      objective.spawnPending = false;
+      if (enemy) {
+        objective.enemyId = enemy.id || `hs-${Date.now()}`;
+        enemy.objectiveId = objective.enemyId;
+      }
+    },
+    onHostileStationKilled(objective) {
+      objective.progress = objective.target;
+    },
+    isComplete(objective) {
+      return objective.progress >= objective.target;
+    },
+    isFailed(objective) {
+      return (objective.elapsed || 0) >= (objective.timeLimit || 0);
+    },
+    getDetail(objective, displayProgress) {
+      if (objective.spawnPending) return "扫描中…";
+      if (displayProgress.current >= displayProgress.target) return "已摧毁";
+      const target = state.enemies.find((enemy) => enemy.kind === "hostile-station" && enemy.hp > 0);
+      if (!target) return "追踪中…";
+      const hpPercent = target.cellsHpMax > 0
+        ? Math.round((target.hp / target.cellsHpMax) * 100)
+        : Math.round((target.hp / Math.max(1, target.maxHp)) * 100);
+      const distance = Math.round(dist(state.station.pos, target));
+      return `敌方空间站 HP ${hpPercent}% · 距离 ${distance}`;
+    },
+    getHint(objective) {
+      const remaining = Math.max(0, (objective.timeLimit || 0) - (objective.elapsed || 0));
+      const mins = Math.floor(remaining / 60);
+      const secs = Math.floor(remaining % 60);
+      const timeText = `剩余时间 ${mins}:${String(secs).padStart(2, "0")}`;
+      if (objective.spawnPending) {
+        return `${timeText} · 敌方空间站即将出现，可先调整站位与武器。`;
+      }
+      return `${timeText} · 可先打武器 cell 停火，或直击核心快速终结。`;
+    },
+    render(objective) {
+      if (isObjectiveComplete() || objective.spawnPending) return;
+      const target = state.enemies.find((enemy) => enemy.kind === "hostile-station" && enemy.hp > 0);
+      if (!target) return;
+      renderer.ring(target, target.r + 28, 4, [1, 0.2, 0.15, 0.5], 52);
+      renderer.ring(target, target.r + 56, 2, [1, 0.2, 0.15, 0.2], 52);
+    }
   }
 };
 
@@ -2117,6 +2230,36 @@ function pickWeighted(rng, weightTable) {
     if (roll <= 0) return type;
   }
   return entries[entries.length - 1][0];
+}
+
+function getObjectiveWeightTable(level) {
+  const weightTable = {
+    ...(OBJECTIVE_LEVEL_WEIGHTS[level] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1])
+  };
+  if (state.run.hostileStationSpawnedThisGalaxy) {
+    delete weightTable.assault;
+  }
+  return weightTable;
+}
+
+function resolveObjectiveRewardMultiplier(objectiveType, level) {
+  if (!objectiveType) return 1.0;
+  if (typeof objectiveType.rewardMultiplier === "function") {
+    return objectiveType.rewardMultiplier(level);
+  }
+  return objectiveType.rewardMultiplier ?? 1.0;
+}
+
+function resolveObjectiveResearchReward(objectiveType, level, typeName) {
+  if (typeName === "assault") {
+    const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
+    return ASSAULT_RESEARCH_REWARD_BY_LEVEL[effectiveLevel] ?? 9;
+  }
+  if (!objectiveType) return 0;
+  if (typeof objectiveType.researchReward === "function") {
+    return objectiveType.researchReward(level);
+  }
+  return objectiveType.researchReward || 0;
 }
 
 function isObjectiveDefinitionComplete(objective, objectiveType) {
@@ -2162,10 +2305,17 @@ function createObjective() {
   const level = levelIndex(state.run.level);
   const objectiveSeed = (state.run.seed ^ 0x9e3779b9) + level * 0x85ebca6b;
   const objectiveRng = mulberry32(objectiveSeed);
-  const weightTable = OBJECTIVE_LEVEL_WEIGHTS[level] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1];
-  const type = pickWeighted(objectiveRng, weightTable);
-  const objectiveType = OBJECTIVE_TYPES[type] || OBJECTIVE_TYPES.mine;
-  state.run.objective = objectiveType.make(objectiveRng, level, state.galaxy);
+  let weightTable = getObjectiveWeightTable(level);
+  let type = pickWeighted(objectiveRng, weightTable);
+  let objectiveType = OBJECTIVE_TYPES[type] || OBJECTIVE_TYPES.mine;
+  let objective = objectiveType.make(objectiveRng, level, state.galaxy);
+  if (!objective && type === "assault") {
+    delete weightTable.assault;
+    type = pickWeighted(objectiveRng, weightTable);
+    objectiveType = OBJECTIVE_TYPES[type] || OBJECTIVE_TYPES.mine;
+    objective = objectiveType.make(objectiveRng, level, state.galaxy);
+  }
+  state.run.objective = objective;
   state.run.objectiveCompleteAt = 0;
   state.run.endgame = false;
   state.run.guardianSpawned = false;
@@ -2181,17 +2331,24 @@ function grantObjectiveReward() {
   if (isObjectiveComplete()) return;
   state.run.objectiveCompleteAt = Math.max(state.time, 1e-6);
   state.run.completedObjectives++;
-  const rewardMultiplier = OBJECTIVE_TYPES[state.run.objective?.type]?.rewardMultiplier ?? 1.0;
+  const objectiveType = OBJECTIVE_TYPES[state.run.objective?.type];
+  const level = state.run.level || 0;
+  const rewardMultiplier = resolveObjectiveRewardMultiplier(objectiveType, level);
   const base = 2 + state.run.level;
   const gained = Math.floor(base * rewardMultiplier);
   state.run.totalObjectiveRewardBase += base;
   state.meta.points += gained;
   saveMeta();
-  const objectiveType = OBJECTIVE_TYPES[state.run.objective?.type];
-  if (objectiveType && objectiveType.researchReward) {
-    const level = state.run.level || 0;
-    const researchGain = Math.floor(objectiveType.researchReward * (1 + level * 0.1));
+  const researchBase = resolveObjectiveResearchReward(objectiveType, level, state.run.objective?.type);
+  if (researchBase > 0) {
+    const researchGain = Math.floor(researchBase * (1 + level * 0.1));
     state.resources.research = (state.resources.research || 0) + researchGain;
+  }
+  if (state.run.objective?.type === "assault") {
+    const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
+    const metalBase = ASSAULT_METAL_BASE_BY_LEVEL[effectiveLevel] ?? 35;
+    const metalGain = Math.floor(metalBase * rewardMultiplier * (1 + level * 0.1));
+    state.resources.metal += metalGain;
   }
   if (state.run.level >= ENDGAME_LEVEL || state.run.objective?.type === "guardian") {
     showToast(`终局任务完成，基础奖励 ${gained} 点已计入，正在结算本局收益。`);
@@ -3172,6 +3329,23 @@ function renderNpcs() {
   }
 }
 
+function buildHostileStationHudAlerts() {
+  const alerts = [];
+  for (const enemy of state.enemies) {
+    if (enemy.kind !== "hostile-station" || enemy.hp <= 0) continue;
+    const hpPercent = enemy.cellsHpMax > 0
+      ? Math.round((enemy.hp / enemy.cellsHpMax) * 100)
+      : Math.round((enemy.hp / Math.max(1, enemy.maxHp)) * 100);
+    const distance = Math.round(dist(state.station.pos, enemy));
+    alerts.push({
+      level: hpPercent < 25 ? "danger" : hpPercent < 50 ? "warn" : "good",
+      cssClass: "alert-hostile-station",
+      text: `敌方空间站 HP ${hpPercent}% | 距离 ${distance}m`
+    });
+  }
+  return alerts;
+}
+
 function buildNpcHudAlerts() {
   const objective = state.run.objective;
   if (!objective || objective.type !== "escort" || isObjectiveComplete()) return [];
@@ -3590,9 +3764,11 @@ function getFragmentCellAtWorld(world) {
   return null;
 }
 
-// v0.6.0 hostile-station T1：cells 工厂、命中、死亡判定（数据结构复用 fragment.cells；T2/T3 实现 AI / 武器 / 死亡 wreck）
+// v0.6.0 引入 hostile-station kind，cells 复用 fragment 模板
 function createHostileStationCells(level) {
-  const scale = level === 4 ? 1.47 : level === 5 ? 2.0 : 1.0;
+  const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
+  const scale = effectiveLevel === 4 ? 1.47 : effectiveLevel === 5 ? 2.0 : 1.0;
+  const shieldStats = HOSTILE_STATION_WEAPON_STATS[effectiveLevel]?.shield;
   const cells = new Map();
   for (const entry of HOSTILE_STATION_LAYOUT_LEVEL3) {
     const [gx, gy] = entry.key.split(",").map(Number);
@@ -3610,12 +3786,33 @@ function createHostileStationCells(level) {
       cell.frameHp = scaledHp;
       cell.baseMaxFrameHp = scaledHp;
     }
+    if (cell.facility === "shield" && shieldStats) {
+      cell.baseMaxShield = shieldStats.maxShield;
+      cell.maxShield = shieldStats.maxShield;
+      cell.shield = shieldStats.maxShield;
+    }
     cell.active = true;
     cell.enabled = true;
     cell.detached = false;
     cells.set(entry.key, cell);
   }
   return cells;
+}
+
+function getHostileStationEffectiveLevel(level) {
+  return level === 4 ? 4 : level === 5 ? 5 : 3;
+}
+
+function getHostileStationCellStat(cell, key, level) {
+  const effectiveLevel = getHostileStationEffectiveLevel(level);
+  const table = HOSTILE_STATION_WEAPON_STATS[effectiveLevel];
+  if (table && cell.facility === "turret" && table.turret[key] != null) {
+    return table.turret[key];
+  }
+  if (table && cell.facility === "shield" && table.shield[key] != null) {
+    return table.shield[key];
+  }
+  return getCellStat(cell, key);
 }
 
 function sumCellsHp(cells) {
@@ -3664,9 +3861,7 @@ function damageHostileStationCell(projectile, hostileStation, cellKey) {
   spawnParticle(hitPos, [1, 0.42, 0.32, 0.9]);
   if (cell.hp <= 0) {
     cell.hp = 0;
-    // T1：不立刻 delete cell（保留位置便于渲染破损 + 后续 T3 wreck 爆出按位置散布）
     if (cell.facility === "core") {
-      // core 破坏即死：让 updateEnemies filter 走死亡分支（T1 不爆 wreck，T3 实现）
       hostileStation.hp = 0;
     }
   }
@@ -3716,23 +3911,23 @@ function updateHostileStationWeapons(hostileStation, dt) {
   const powerCell = findCellByFacility(hostileStation.cells, "power");
   const powerAlive = powerCell && powerCell.hp > 0;
   const reloadMultiplier = powerAlive ? 1.0 : 1.5;
-  const distToPlayer = dist(hostileStation, state.station.pos);
-  const stationRange = hostileStation.range || 480;
+  const stationLevel = hostileStation.level || hostileStation.spawnLevel || state.run.level || 3;
+  const weaponTable = HOSTILE_STATION_WEAPON_STATS[getHostileStationEffectiveLevel(stationLevel)];
+  const stationRange = weaponTable?.turret?.range || hostileStation.range || 480;
 
   hostileStation.cells.forEach((cell, cellKey) => {
     if (cell.facility !== "turret" || cell.hp <= 0) return;
     cell.reload = (cell.reload || 0) - dt;
     if (cell.reload > 0) return;
-    if (distToPlayer > stationRange) return;
 
     const cellWorldPos = getHostileStationCellWorldPos(hostileStation, cellKey);
     const dirX = state.station.pos.x - cellWorldPos.x;
     const dirY = state.station.pos.y - cellWorldPos.y;
     const cellDist = Math.sqrt(dirX * dirX + dirY * dirY);
-    if (cellDist === 0) return;
+    if (cellDist === 0 || cellDist > stationRange) return;
 
-    const damage = getCellStat(cell, "damage") || hostileStation.projectileDamage || 12;
-    const projectileSpeed = getCellStat(cell, "projectileSpeed") || 280;
+    const damage = getHostileStationCellStat(cell, "damage", stationLevel);
+    const projectileSpeed = getHostileStationCellStat(cell, "projectileSpeed", stationLevel);
     fireProjectile(
       cellWorldPos,
       { x: dirX / cellDist, y: dirY / cellDist },
@@ -3741,7 +3936,7 @@ function updateHostileStationWeapons(hostileStation, dt) {
       projectileSpeed
     );
     cell.fire = 1;
-    const baseReload = getCellStat(cell, "reload") || 1.6;
+    const baseReload = getHostileStationCellStat(cell, "reload", stationLevel);
     cell.reload = baseReload * reloadMultiplier;
   });
 }
@@ -3804,6 +3999,7 @@ function triggerHostileStationDeath(enemy) {
   }
   spawnEnemyWrecks(enemy);
   notifyObjective("hostileStationKilled", { enemy });
+  showHostileStationAlert("✓ 主目标已摧毁", 2000, true);
   showToast("敌方空间站已摧毁——拾取残骸强化 build。");
 }
 
@@ -4296,20 +4492,20 @@ function getEnemyData(kind, level) {
     };
   }
   if (kind === "hostile-station") {
-    // v0.6.0 T1：仅给基础 enemy 字段；cells 子结构在 spawnEnemy 内补全
-    const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
+    const effectiveLevel = getHostileStationEffectiveLevel(level);
     const scale = effectiveLevel === 4 ? 1.47 : effectiveLevel === 5 ? 2.0 : 1.0;
+    const weaponStats = HOSTILE_STATION_WEAPON_STATS[effectiveLevel]?.turret || HOSTILE_STATION_WEAPON_STATS[3].turret;
     return {
       hp: Math.floor(1500 * scale),
       r: 90,
       accel: 4,
       drag: 0.5,
-      range: effectiveLevel === 3 ? 480 : effectiveLevel === 4 ? 515 : 550,
+      range: weaponStats.range,
       reward: 0,
       spin: 0,
-      angularVel: 0.15 + Math.random() * 0.05,
-      projectileDamage: effectiveLevel === 3 ? 12 : effectiveLevel === 4 ? 14 : 15,
-      reloadTime: 1.6,
+      angularVel: (0.15 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1),
+      projectileDamage: weaponStats.damage,
+      reloadTime: weaponStats.reload,
       spawnInterval: effectiveLevel === 3 ? 10 : effectiveLevel === 4 ? 8.5 : 7,
       spawnCap: effectiveLevel === 3 ? 3 : effectiveLevel === 4 ? 4 : 5,
       collisionDamage: 8
@@ -4358,7 +4554,7 @@ function spawnGuardianNearStation() {
   showToast("终末守护者已出现：击毁它即可进入本局结算。");
 }
 
-// v0.6.0 hostile-station 远距生成（仿 spawnGuardianNearStation；T1 阶段仅供 __gameTest 手动调用）
+// v0.6.0 hostile-station 远距生成（1000-1300；由 assault 任务 tick 延迟 spawn）
 function spawnHostileStationNearStation(rng, level) {
   const r = typeof rng === "function" ? rng : Math.random;
   const angle = r() * Math.PI * 2;
@@ -4366,7 +4562,12 @@ function spawnHostileStationNearStation(rng, level) {
   const x = state.station.pos.x + Math.cos(angle) * radius;
   const y = state.station.pos.y + Math.sin(angle) * radius;
   const useLevel = Number.isFinite(level) ? level : (state.run.level || 3);
-  return spawnEnemy("hostile-station", x, y, { level: useLevel });
+  const enemy = spawnEnemy("hostile-station", x, y, { level: useLevel });
+  if (enemy) {
+    enemy.id = enemy.id || `hs-${Date.now()}`;
+    state.run.hostileStationAlerted = true;
+  }
+  return enemy;
 }
 
 function updateEnemies(dt) {
@@ -4386,7 +4587,7 @@ function updateEnemies(dt) {
   for (const enemy of state.enemies) {
     enemy.reload -= dt;
 
-    // v0.6.0 T2 hostile-station：470 悬停 AI + 缓慢自转 + 武器 / 召唤
+    // v0.6.0 hostile-station：470 悬停 AI + 缓慢自转 + 武器 / 召唤
     if (enemy.kind === "hostile-station") {
       const toStation = { x: state.station.pos.x - enemy.x, y: state.station.pos.y - enemy.y };
       const dir = normalize(toStation);
@@ -4573,7 +4774,6 @@ function spawnEnemy(kind, x, y, options = {}) {
     ...data
   };
   if (kind === "hostile-station") {
-    // v0.6.0 T1：cells 子结构 + 聚合 hp / maxHp（T2 实现 AI 与武器、T3 实现死亡 wreck）
     enemy.cells = createHostileStationCells(spawnLevel);
     enemy.coreCellKey = HOSTILE_STATION_CORE_KEY;
     enemy.weaponCellKeys = [];
@@ -4590,6 +4790,7 @@ function spawnEnemy(kind, x, y, options = {}) {
     enemy._deathHandled = false;
     enemy.level = spawnLevel;
     enemy.spin = 0;
+    enemy.id = `hs-${Date.now()}-${state.enemies.length}`;
   }
   state.enemies.push(enemy);
   return enemy;
@@ -4762,7 +4963,11 @@ function updateProjectiles(dt) {
           const shieldCell = shieldCellKey ? enemy.cells.get(shieldCellKey) : null;
           if (shieldCell && shieldCell.hp > 0) {
             const shieldWorldPos = getHostileStationCellWorldPos(enemy, shieldCellKey);
-            const shieldRange = getCellStat(shieldCell, "range") || 110;
+            const shieldRange = getHostileStationCellStat(
+              shieldCell,
+              "range",
+              enemy.level || enemy.spawnLevel || state.run.level
+            ) || 110;
             if (dist(projectile, shieldWorldPos) < shieldRange) {
               for (let i = 0; i < 5; i++) spawnParticle(projectile, [0.35, 1, 0.94, 1]);
               shieldCell.fire = 1;
@@ -4996,6 +5201,8 @@ function nextLevel() {
   state.run.endgameExplore = false;
   state.run.spawnFractional = 0;
   state.run.settlementShown = false;
+  state.run.hostileStationSpawnedThisGalaxy = false;
+  state.run.hostileStationAlerted = false;
   runSettlementPanelEl?.classList.add("hidden");
   updateQuickRestartVisibility();
 
@@ -5760,12 +5967,13 @@ function updateHud() {
   }
 
   const fragmentAlerts = buildFragmentHudAlerts();
+  const hostileStationAlerts = buildHostileStationHudAlerts();
   const npcAlerts = buildNpcHudAlerts();
   const alerts = buildStatusAlerts();
   const miningAlerts = buildMiningAlerts();
   const allAlerts = isObjectiveComplete()
-    ? [...fragmentAlerts, ...npcAlerts, ...alerts, ...miningAlerts]
-    : [...fragmentAlerts, ...npcAlerts, ...miningAlerts, ...alerts];
+    ? [...fragmentAlerts, ...hostileStationAlerts, ...npcAlerts, ...alerts, ...miningAlerts]
+    : [...fragmentAlerts, ...hostileStationAlerts, ...npcAlerts, ...miningAlerts, ...alerts];
   const alertsHtml = allAlerts
     .map((a) => {
       const extraClass = a.cssClass ? ` ${a.cssClass}` : "";
@@ -6075,6 +6283,8 @@ window.__gameTest = {
     state.run.completedObjectives = 0;
     state.run.totalObjectiveRewardBase = 0;
     state.run.escortLowHpAlerted = false;
+    state.run.hostileStationSpawnedThisGalaxy = false;
+    state.run.hostileStationAlerted = false;
     state.meta.points = 0;
     state.resources.research = 0;
     state.station.hullMod = 1;
@@ -6100,6 +6310,13 @@ window.__gameTest = {
     const objectiveRng = mulberry32(objectiveSeed);
     const weightTable = OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1];
     return pickWeighted(objectiveRng, weightTable);
+  },
+  sampleAssaultRate(level, sampleCount = 1000, startSeed = 1) {
+    let assaultCount = 0;
+    for (let i = 0; i < sampleCount; i++) {
+      if (this.getObjectiveType(startSeed + i, level) === "assault") assaultCount++;
+    }
+    return assaultCount / sampleCount;
   },
   findEscortSeed(level = 3, startSeed = 1, maxTries = 5000) {
     for (let seed = startSeed; seed < startSeed + maxTries; seed++) {
@@ -6195,7 +6412,7 @@ window.__gameTest = {
   improveStationHp,
   syncCellStorableStatsAfterUpgrade,
   upgradeSelectedCell,
-  // v0.6.0 T1：手动生成 hostile-station（assault 任务尚未接入；T4 才走 OBJECTIVE_TYPES.assault.make）
+  // v0.6.0：调试用手动生成 hostile-station（正式路径走 assault 任务 tick）
   spawnHostileStation(level = 3) {
     return spawnHostileStationNearStation(Math.random, level);
   },
