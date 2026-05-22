@@ -1939,6 +1939,12 @@ function pay(cost = {}) {
   }
 }
 
+function refund(cost = {}) {
+  for (const [name, value] of Object.entries(cost)) {
+    state.resources[name] += value;
+  }
+}
+
 function getBuildCost(facility) {
   const base = TYPES[facility]?.cost || {};
   const discount = state.meta.unlocks.weaponFrame && WEAPON_TYPES.has(facility) ? 0.8 : 1;
@@ -2181,6 +2187,9 @@ function buildAt(x, y, facility) {
     state.station.cells.set(cellKey, createCell(x, y, "frame"));
     clearBuildError();
     const merged = tryBridgeAt(x, y);
+    if (!state.station.cells.has(cellKey)) {
+      return false;
+    }
     if (!merged && !state.lastBuildError) {
       showToast("框架已扩展。");
     }
@@ -2295,6 +2304,9 @@ function mergeFragmentToStation(fragment, anchorCell, newFrame) {
     const targetKey = key(targetX, targetY);
     const occupied = state.station.cells.get(targetKey);
     if (occupied && targetKey !== newFrameKey) {
+      // Bridge merge uses all-or-nothing semantics: rollback the just-built frame and cost.
+      state.station.cells.delete(newFrameKey);
+      refund(TYPES.frame.cost);
       setBuildError("脱落部件无法对接：位置冲突。");
       return false;
     }
