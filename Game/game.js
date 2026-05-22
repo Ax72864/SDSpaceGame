@@ -211,6 +211,8 @@ const state = {
     level: 0,
     objective: null,
     objectiveCompleteAt: 0,
+    awaitingObjectiveChoice: false,
+    objectiveChoiceDismissed: false,
     completedObjectives: 0,
     playerCount: loadPlayerCount()
   },
@@ -470,6 +472,39 @@ function initWorld() {
   ];
 }
 
+function isObjectiveComplete() {
+  return state.run.objectiveCompleteAt > 0;
+}
+
+function resetObjectiveChoiceState() {
+  state.run.awaitingObjectiveChoice = false;
+  state.run.objectiveChoiceDismissed = false;
+}
+
+function buildCompletedObjectiveGuide() {
+  if (state.run.awaitingObjectiveChoice) {
+    return {
+      goal: "星系任务已完成",
+      next: "在「星系任务」下方选择「跃迁下一星系」或「暂时停留」。"
+    };
+  }
+  return {
+    goal: "任务已完成，可随时跃迁",
+    next: "在「星系任务」面板点「跃迁下一星系」；也可继续采集、扩建或战斗。"
+  };
+}
+
+function getObjectiveDisplayProgress(objective) {
+  if (!objective) return { ratio: 0, current: 0, target: 0 };
+  const target = objective.target;
+  const current = clamp(objective.progress, 0, target);
+  return {
+    ratio: target > 0 ? clamp(current / target, 0, 1) : 0,
+    current,
+    target
+  };
+}
+
 function createObjective() {
   const choices = [
     { type: "mine", text: "采集 90 单位资源", target: 90, progress: 0 },
@@ -480,6 +515,46 @@ function createObjective() {
   const objective = choices[state.run.level % choices.length];
   state.run.objective = structuredClone(objective);
   state.run.objectiveCompleteAt = 0;
+  resetObjectiveChoiceState();
+}
+
+function grantObjectiveReward() {
+  if (isObjectiveComplete()) return;
+  state.run.objectiveCompleteAt = Math.max(state.time, 1e-6);
+  state.run.completedObjectives++;
+  const gained = 2 + state.run.level;
+  state.meta.points += gained;
+  saveMeta();
+  state.run.awaitingObjectiveChoice = true;
+  showToast(`任务完成，获得 ${gained} 局外点数。请选择跃迁或暂时停留。`);
+  updateObjectiveChoiceUi();
+}
+
+function updateObjectiveChoiceUi() {
+  const panel = document.getElementById("objectiveChoicePanel");
+  const awaitingBlock = document.getElementById("objectiveChoiceAwaiting");
+  const deferredBlock = document.getElementById("objectiveDeferredActions");
+  if (!panel) return;
+
+  const complete = isObjectiveComplete();
+  const awaiting = state.run.awaitingObjectiveChoice;
+  const dismissed = state.run.objectiveChoiceDismissed;
+
+  if (!complete) {
+    panel.classList.add("hidden");
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  if (awaiting) {
+    awaitingBlock?.classList.remove("hidden");
+    deferredBlock?.classList.add("hidden");
+  } else if (dismissed) {
+    awaitingBlock?.classList.add("hidden");
+    deferredBlock?.classList.remove("hidden");
+  } else {
+    panel.classList.add("hidden");
+  }
 }
 
 const MORE_STATUS_DESKTOP_MQ = "(min-width: 761px)";
@@ -769,6 +844,9 @@ function createBuildUi() {
   document.getElementById("unlockCoreBtn").addEventListener("click", () => window.gameActions.buyUnlock("efficientCore"));
   document.getElementById("unlockWeaponFrameBtn").addEventListener("click", () => window.gameActions.buyUnlock("weaponFrame"));
   document.getElementById("playersBtn").addEventListener("click", () => window.gameActions.setPlayers());
+  document.getElementById("objectiveJumpBtn").addEventListener("click", () => window.gameActions.jumpToNextGalaxy());
+  document.getElementById("objectiveStayBtn").addEventListener("click", () => window.gameActions.stayInCurrentGalaxy());
+  document.getElementById("objectiveJumpDeferredBtn").addEventListener("click", () => window.gameActions.jumpToNextGalaxy());
 }
 
 function updateBuildButtons() {
@@ -1226,7 +1304,7 @@ function updateMiningAndResearch(dt) {
       state.resources.research += amount * 2.4;
     }
   }
-  if (mined && state.run.objective?.type === "mine") {
+  if (mined && state.run.objective?.type === "mine" && !isObjectiveComplete()) {
     state.run.objective.progress += mined;
   }
   if (state.resources.research >= 35 + state.station.techLevel * 22) {
@@ -1302,7 +1380,7 @@ function updateEnemies(dt) {
 
   state.enemies = state.enemies.filter((enemy) => {
     if (enemy.hp > 0) return true;
-    if (state.run.objective?.type === "battle") state.run.objective.progress++;
+    if (state.run.objective?.type === "battle" && !isObjectiveComplete()) state.run.objective.progress++;
     state.resources.metal += enemy.reward;
     state.resources.gas += enemy.reward * 0.15;
     for (let i = 0; i < 12; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
@@ -1632,22 +1710,16 @@ function updateDetachedCells(dt) {
 function updateObjective(dt) {
   const objective = state.run.objective;
   if (!objective) return;
-  if (objective.type === "explore") {
-    objective.progress = dist(state.station.pos, objective.beacon) < 130 ? 1 : 0;
-  }
-  if (objective.type === "survive") {
-    objective.progress += dt;
-  }
-  if (objective.progress >= objective.target && !state.run.objectiveCompleteAt) {
-    state.run.objectiveCompleteAt = state.time;
-    state.run.completedObjectives++;
-    const gained = 2 + state.run.level;
-    state.meta.points += gained;
-    saveMeta();
-    showToast(`任务完成，获得 ${gained} 局外点数。即将进入下一星系。`);
-  }
-  if (state.run.objectiveCompleteAt && state.time - state.run.objectiveCompleteAt > 5) {
-    nextLevel();
+  if (!isObjectiveComplete()) {
+    if (objective.type === "explore") {
+      objective.progress = dist(state.station.pos, objective.beacon) < 130 ? 1 : 0;
+    }
+    if (objective.type === "survive") {
+      objective.progress += dt;
+    }
+    if (objective.progress >= objective.target) {
+      grantObjectiveReward();
+    }
   }
 }
 
@@ -1905,6 +1977,7 @@ function getBlockedThrusters() {
 }
 
 function pickNextForObjective(objective) {
+  if (isObjectiveComplete()) return buildCompletedObjectiveGuide().next;
   if (!objective) return "扩建设施、完成任务或应对来敌。";
   switch (objective.type) {
     case "mine":
@@ -1924,6 +1997,9 @@ function pickNextForObjective(objective) {
 
 function buildGuideText() {
   const objective = state.run.objective;
+  if (isObjectiveComplete()) {
+    return buildCompletedObjectiveGuide();
+  }
   const frameCount = countFacility("frame");
   const powerCount = countFacility("power");
   const miningCount = countFacility("mining");
@@ -1992,6 +2068,19 @@ function buildGuideText() {
 
 function buildStatusAlerts() {
   const alerts = [];
+  if (isObjectiveComplete()) {
+    if (state.run.awaitingObjectiveChoice) {
+      alerts.push({
+        level: "good",
+        text: "星系任务已完成：请在下方选择「跃迁下一星系」或「暂时停留」。"
+      });
+    } else {
+      alerts.push({
+        level: "good",
+        text: "任务已完成，可随时跃迁；继续采集、扩建或战斗均可。"
+      });
+    }
+  }
   if (state.lastBuildError) {
     alerts.push({
       level: "danger",
@@ -2159,7 +2248,7 @@ function updateHud() {
 
   const alerts = buildStatusAlerts();
   const miningAlerts = buildMiningAlerts();
-  const allAlerts = [...miningAlerts, ...alerts];
+  const allAlerts = isObjectiveComplete() ? [...alerts, ...miningAlerts] : [...miningAlerts, ...alerts];
   const alertsHtml = allAlerts
     .map((a) => `<div class="alert-item alert-${a.level}">${a.text}</div>`)
     .join("");
@@ -2169,23 +2258,33 @@ function updateHud() {
   setHtmlIfChanged(resourceGuideEl, "resourceGuide", resourceGuideHtml);
 
   const objective = state.run.objective;
-  const progress = objective ? clamp(objective.progress / objective.target, 0, 1) : 0;
+  const displayProgress = getObjectiveDisplayProgress(objective);
+  const progress = displayProgress.ratio;
   const progressDetail = objective
     ? objective.type === "mine"
-      ? `${Math.floor(objective.progress)} / ${objective.target} 单位`
+      ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 单位`
       : objective.type === "survive"
-        ? `${Math.floor(objective.progress)} / ${objective.target} 秒`
+        ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 秒`
         : objective.type === "battle"
-          ? `${Math.floor(objective.progress)} / ${objective.target} 击毁`
-          : objective.progress >= objective.target
+          ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 击毁`
+          : displayProgress.current >= displayProgress.target
             ? "已抵达"
             : state.target
               ? "航行中"
               : "未设定目标"
     : "";
-  setHtmlIfChanged(objectiveEl, "objective", objective
-    ? `${objective.text}<br><span class="${progress >= 1 ? "good" : ""}">进度 ${Math.floor(progress * 100)}%${progressDetail ? ` · ${progressDetail}` : ""}</span>`
-    : "无任务");
+  const objectiveComplete = isObjectiveComplete();
+  let objectiveHtml = objective
+    ? `${objective.text}<br><span class="${progress >= 1 || objectiveComplete ? "good" : ""}">进度 ${Math.floor(progress * 100)}%${progressDetail ? ` · ${progressDetail}` : ""}</span>`
+    : "无任务";
+  if (objectiveComplete && objective) {
+    const statusNote = state.run.awaitingObjectiveChoice
+      ? " · 请选择跃迁或停留"
+      : " · 可随时跃迁";
+    objectiveHtml += `<br><span class="good">任务已完成${statusNote}</span>`;
+  }
+  setHtmlIfChanged(objectiveEl, "objective", objectiveHtml);
+  updateObjectiveChoiceUi();
 
   const core = state.station.cells.get(key(0, 0));
   const active = [...state.station.cells.values()].filter((c) => c.active && !c.detached).length;
@@ -2339,6 +2438,19 @@ window.gameActions = {
       showToast("浏览器阻止了人数设置保存，本局已临时生效。");
     }
     showToast(`联机合作缩放人数：${state.run.playerCount}。敌人与资源会按人数调整。`);
+    updateHud();
+  },
+  jumpToNextGalaxy() {
+    if (!isObjectiveComplete()) return;
+    nextLevel();
+    updateHud();
+  },
+  stayInCurrentGalaxy() {
+    if (!isObjectiveComplete() || !state.run.awaitingObjectiveChoice) return;
+    state.run.awaitingObjectiveChoice = false;
+    state.run.objectiveChoiceDismissed = true;
+    showToast("继续在当前星系活动。需要时可点「跃迁下一星系」。");
+    updateObjectiveChoiceUi();
     updateHud();
   }
 };

@@ -39,6 +39,20 @@
       <div id="statusAlerts" class="status-alerts" aria-live="polite"></div>
       <h2>星系任务</h2>
       <div id="objective"></div>
+      <div id="objectiveChoicePanel" class="objective-choice-panel hidden" aria-live="polite">
+        <div id="objectiveChoiceAwaiting">
+          <p class="objective-choice-title">星系任务已完成</p>
+          <p class="objective-choice-hint">请选择下一步行动</p>
+          <div class="objective-choice-actions row">
+            <button id="objectiveJumpBtn" type="button">跃迁下一星系</button>
+            <button id="objectiveStayBtn" type="button">暂时停留</button>
+          </div>
+        </div>
+        <div id="objectiveDeferredActions" class="objective-deferred-actions hidden">
+          <p class="objective-choice-hint good">任务已完成，可随时跃迁</p>
+          <button id="objectiveJumpDeferredBtn" type="button">跃迁下一星系</button>
+        </div>
+      </div>
 
       <details id="moreStatusPanel" class="more-status">
         <summary class="more-status-summary">更多状态</summary>
