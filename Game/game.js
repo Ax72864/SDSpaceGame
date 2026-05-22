@@ -359,6 +359,31 @@ const TYPES = {
   }
 };
 
+TYPES.turret.upgrades = [
+  { label: "伤害", tiers: [{ damage: 0.20 }, { damage: 0.40 }, { damage: 0.60 }] },
+  { label: "射速", tiers: [{ reload: 0.20 }, { reload: 0.40 }, { reload: 0.60 }] },
+  { label: "射程", tiers: [{ range: 0.20 }, { range: 0.40 }, { range: 0.60 }] }
+];
+TYPES.missile.upgrades = [
+  { label: "伤害", tiers: [{ damage: 0.25 }, { damage: 0.50 }, { damage: 0.75 }] },
+  { label: "射速", tiers: [{ reload: 0.20 }, { reload: 0.40 }, { reload: 0.60 }] },
+  { label: "速度", tiers: [{ projectileSpeed: 0.30 }, { projectileSpeed: 0.60 }, { projectileSpeed: 0.90 }] }
+];
+TYPES.shield.upgrades = [
+  { label: "护盾值", tiers: [{ maxShield: 0.25 }, { maxShield: 0.50 }, { maxShield: 0.75 }] },
+  { label: "回复速度", tiers: [{ regen: 0.30 }, { regen: 0.60 }, { regen: 0.90 }] },
+  { label: "范围", tiers: [{ range: 0.50 }, { range: 1.00 }, { range: 1.50 }] }
+];
+TYPES.power.upgrades = [{ label: "产电", tiers: [{ powerOut: 0.25 }, { powerOut: 0.50 }, { powerOut: 0.75 }] }];
+TYPES.mining.upgrades = [{ label: "采矿", tiers: [{ mineRate: 0.20 }, { mineRate: 0.40 }, { mineRate: 0.60 }] }];
+TYPES.processor.upgrades = [{ label: "加工", tiers: [{ produceRate: 0.20 }, { produceRate: 0.40 }, { produceRate: 0.60 }] }];
+TYPES.plasma.upgrades = [{ label: "等离子", tiers: [{ produceRate: 0.25 }, { produceRate: 0.50 }, { produceRate: 0.75 }] }];
+TYPES.research.upgrades = [{ label: "研发", tiers: [{ produceRate: 0.25 }, { produceRate: 0.50 }, { produceRate: 0.75 }] }];
+TYPES.repair.upgrades = [{ label: "维修", tiers: [{ repairRate: 0.25 }, { repairRate: 0.50 }, { repairRate: 0.75 }] }];
+TYPES.armor.upgrades = [{ label: "装甲", tiers: [{ maxHp: 0.30 }, { maxHp: 0.60 }, { maxHp: 0.90 }] }];
+TYPES.frame.upgrades = [{ label: "骨架", tiers: [{ maxFrameHp: 0.20 }, { maxFrameHp: 0.40 }, { maxFrameHp: 0.60 }] }];
+TYPES.thruster.upgrades = [{ label: "推力", tiers: [{ thrust: 0.15 }, { thrust: 0.30 }, { thrust: 0.45 }] }];
+
 const FACILITY_ORDER = [
   "frame",
   "power",
@@ -379,6 +404,24 @@ const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
 const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
 
 const MINING_RANGE_OFFSET = 130;
+
+const TIER_UPGRADE_COSTS = [5, 10, 20];
+
+const UPGRADE_STAT_LABELS = {
+  damage: "伤害",
+  reload: "射速",
+  range: "射程",
+  projectileSpeed: "弹速",
+  maxShield: "护盾",
+  regen: "回复",
+  powerOut: "产电",
+  mineRate: "采矿",
+  produceRate: "产出",
+  repairRate: "维修",
+  maxHp: "耐久",
+  maxFrameHp: "骨架",
+  thrust: "推力"
+};
 
 const PLAYER_PHYSICS = {
   keyboardThrust: 108,
@@ -494,6 +537,7 @@ const state = {
     resourceGuide: "",
     status: "",
     selected: "",
+    selectedUpgradeKey: "",
     meta: "",
     runInfo: "",
     asyncText: ""
@@ -848,6 +892,7 @@ function ensureRunRuntimeState() {
   if (!state.run.fragmentHudCache || typeof state.run.fragmentHudCache !== "object") {
     state.run.fragmentHudCache = null;
   }
+  if (!Array.isArray(state.run.researchRateWindow)) state.run.researchRateWindow = [];
   state.run.endgame = Boolean(state.run.endgame);
   state.run.guardianSpawned = Boolean(state.run.guardianSpawned);
   state.run.guardianDefeated = Boolean(state.run.guardianDefeated);
@@ -1153,14 +1198,20 @@ function getCellStat(cell, key) {
   }
 
   const tier = Number.isFinite(cell.tier) ? cell.tier : 0;
-  const pathKey = cell.upgradePath || 0;
-  const tierBonus = type.upgrades
-    && type.upgrades[pathKey]
-    && type.upgrades[pathKey].tiers
-    && type.upgrades[pathKey].tiers[tier]
-    && Number.isFinite(type.upgrades[pathKey].tiers[tier][key])
-      ? type.upgrades[pathKey].tiers[tier][key]
-      : 0;
+  const pathKey = cell.upgradePath != null ? cell.upgradePath : 0;
+  let tierBonus = 0;
+  let reloadSpeedBonus = 0;
+  if (tier > 0 && type.upgrades && type.upgrades[pathKey] && type.upgrades[pathKey].tiers) {
+    const tierData = type.upgrades[pathKey].tiers[tier - 1];
+    if (tierData) {
+      // reload 存射速加成正值；getCellStat 对 reload 取倒数使冷却时间缩短
+      if (key === "reload" && Number.isFinite(tierData.reload)) {
+        reloadSpeedBonus = tierData.reload;
+      } else if (Number.isFinite(tierData[key])) {
+        tierBonus = tierData[key];
+      }
+    }
+  }
 
   const modBonus = type.modifications
     && cell.mod != null
@@ -1173,6 +1224,9 @@ function getCellStat(cell, key) {
   const globalFactor = getGlobalModFactor(cell.facility, key, state.station);
 
   let result = base * (1 + tierBonus + modBonus) * techFactor * globalFactor;
+  if (key === "reload" && reloadSpeedBonus > 0) {
+    result /= 1 + reloadSpeedBonus;
+  }
   if (shouldClamp(key)) {
     result = Math.min(result, 2.5 * base);
   }
@@ -1191,6 +1245,145 @@ function ensureCellUpgradeFields(cell) {
   if (!Number.isFinite(cell.tier)) cell.tier = 0;
   if (cell.upgradePath === undefined) cell.upgradePath = null;
   if (cell.mod === undefined) cell.mod = null;
+}
+
+function getTierUpgradeCost(currentTier) {
+  if (currentTier >= 3) return Infinity;
+  return TIER_UPGRADE_COSTS[currentTier] ?? Infinity;
+}
+
+function trackResearchGrowth(prevResearch) {
+  const delta = state.resources.research - prevResearch;
+  if (delta <= 0) return;
+  ensureRunRuntimeState();
+  if (!Array.isArray(state.run.researchRateWindow)) state.run.researchRateWindow = [];
+  state.run.researchRateWindow.push({ t: state.time, delta });
+  const cutoff = state.time - 30;
+  while (state.run.researchRateWindow.length && state.run.researchRateWindow[0].t < cutoff) {
+    state.run.researchRateWindow.shift();
+  }
+}
+
+function getResearchRatePerSec() {
+  const windowEntries = state.run.researchRateWindow;
+  if (!Array.isArray(windowEntries) || !windowEntries.length) return 0;
+  const cutoff = state.time - 30;
+  let total = 0;
+  for (const entry of windowEntries) {
+    if (entry.t >= cutoff) total += entry.delta;
+  }
+  return total / 30;
+}
+
+function describeTierBonus(tierData) {
+  if (!tierData) return "";
+  return Object.entries(tierData)
+    .map(([statKey, value]) => `${UPGRADE_STAT_LABELS[statKey] || statKey} +${Math.round(value * 100)}%`)
+    .join(" · ");
+}
+
+function getUpgradePreviewStat(cell, path, targetTier) {
+  const type = TYPES[cell.facility];
+  if (!type?.upgrades?.[path]?.tiers?.[targetTier - 1]) return "";
+  return describeTierBonus(type.upgrades[path].tiers[targetTier - 1]);
+}
+
+function upgradeSelectedCell(path) {
+  const cell = state.selectedCell ? state.station.cells.get(state.selectedCell) : null;
+  if (!cell) return false;
+  const type = TYPES[cell.facility];
+  if (!type || !type.upgrades) return false;
+  ensureCellUpgradeFields(cell);
+  const currentTier = cell.tier || 0;
+  if (currentTier >= 3) return false;
+  if (currentTier === 0) {
+    if (path == null || path < 0 || path >= type.upgrades.length) return false;
+    cell.upgradePath = path;
+  } else if (cell.upgradePath == null) {
+    return false;
+  }
+  const cost = getTierUpgradeCost(currentTier);
+  if ((state.resources.research || 0) < cost) return false;
+  state.resources.research -= cost;
+  cell.tier = currentTier + 1;
+  showToast(`${type.name} 升级至 tier ${cell.tier}`);
+  updateHud();
+  return true;
+}
+
+let selectedCellUpgradeEl = null;
+
+function ensureSelectedCellUpgradeUi() {
+  if (selectedCellUpgradeEl) return;
+  selectedCellUpgradeEl = document.createElement("div");
+  selectedCellUpgradeEl.id = "selectedCellUpgrade";
+  selectedCellUpgradeEl.className = "cell-upgrade-panel hidden";
+  selectedCellPanelEl.appendChild(selectedCellUpgradeEl);
+}
+
+function renderSelectedCellUpgradePanel(cell) {
+  ensureSelectedCellUpgradeUi();
+  if (!cell || cell.detached) {
+    selectedCellUpgradeEl.innerHTML = "";
+    selectedCellUpgradeEl.classList.add("hidden");
+    state.hud.selectedUpgradeKey = "";
+    return;
+  }
+  const type = TYPES[cell.facility];
+  if (!type?.upgrades?.length) {
+    selectedCellUpgradeEl.innerHTML = "";
+    selectedCellUpgradeEl.classList.add("hidden");
+    state.hud.selectedUpgradeKey = "";
+    return;
+  }
+  ensureCellUpgradeFields(cell);
+  const currentTier = cell.tier || 0;
+  const research = state.resources.research || 0;
+  const upgradeCacheKey = `${cell.facility}:${currentTier}:${cell.upgradePath}:${Math.floor(research)}`;
+  if (state.hud.selectedUpgradeKey === upgradeCacheKey) {
+    selectedCellUpgradeEl.classList.remove("hidden");
+    return;
+  }
+  state.hud.selectedUpgradeKey = upgradeCacheKey;
+
+  let html = "";
+  if (currentTier > 0 && cell.upgradePath != null) {
+    const pathLabel = type.upgrades[cell.upgradePath]?.label || `路径 ${cell.upgradePath + 1}`;
+    html += `<div class="upgrade-status">升级 tier ${currentTier}/3 · 已锁定路径：${pathLabel}</div>`;
+  } else if (currentTier === 0 && type.upgrades.length > 1) {
+    html += `<div class="upgrade-status">升级 tier 0/3 · 请选择升级路径</div>`;
+  } else {
+    html += `<div class="upgrade-status">升级 tier ${currentTier}/3</div>`;
+  }
+
+  if (currentTier >= 3) {
+    html += `<div class="upgrade-actions"><button type="button" disabled>已满级</button></div>`;
+  } else if (currentTier === 0 && type.upgrades.length > 1) {
+    const cost = getTierUpgradeCost(0);
+    const canAfford = research >= cost;
+    html += `<div class="upgrade-actions upgrade-path-grid">`;
+    type.upgrades.forEach((pathDef, pathIndex) => {
+      const preview = getUpgradePreviewStat(cell, pathIndex, 1);
+      const disabled = canAfford ? "" : " disabled";
+      const title = canAfford ? "" : ' title="研发点不足"';
+      html += `<button type="button" class="upgrade-path-btn"${disabled}${title} onclick="window.gameActions.upgradeSelectedCell(${pathIndex})">${pathDef.label}<small>${preview} · ${cost} 研发</small></button>`;
+    });
+    html += `</div>`;
+    if (!canAfford) html += `<div class="upgrade-hint warn">研发点不足（需要 ${cost}）</div>`;
+  } else {
+    const pathIndex = cell.upgradePath != null ? cell.upgradePath : 0;
+    const cost = getTierUpgradeCost(currentTier);
+    const nextTier = currentTier + 1;
+    const preview = getUpgradePreviewStat(cell, pathIndex, nextTier);
+    const canAfford = research >= cost;
+    const disabled = canAfford ? "" : " disabled";
+    const title = canAfford ? "" : ' title="研发点不足"';
+    html += `<div class="upgrade-actions"><button type="button" class="upgrade-tier-btn"${disabled}${title} onclick="window.gameActions.upgradeSelectedCell(${pathIndex})">升级到 tier ${nextTier}<small>${preview} · ${cost} 研发</small></button></div>`;
+    if (!canAfford) html += `<div class="upgrade-hint warn">研发点不足（需要 ${cost}）</div>`;
+  }
+
+  selectedCellUpgradeEl.innerHTML = html;
+  selectedCellUpgradeEl.classList.remove("hidden");
 }
 
 function createCell(x, y, facility) {
@@ -1324,12 +1517,14 @@ const OBJECTIVE_TYPE_DEFAULTS = {
   getDetail: () => "",
   getHint: () => "",
   render: null,
-  rewardMultiplier: 1.0
+  rewardMultiplier: 1.0,
+  researchReward: 0
 };
 
 const OBJECTIVE_TYPES = {
   mine: {
     ...OBJECTIVE_TYPE_DEFAULTS,
+    researchReward: 3,
     make() {
       return {
         type: "mine",
@@ -1350,6 +1545,7 @@ const OBJECTIVE_TYPES = {
   },
   explore: {
     ...OBJECTIVE_TYPE_DEFAULTS,
+    researchReward: 4,
     make(rng) {
       return {
         type: "explore",
@@ -1384,6 +1580,7 @@ const OBJECTIVE_TYPES = {
   },
   battle: {
     ...OBJECTIVE_TYPE_DEFAULTS,
+    researchReward: 5,
     make() {
       return {
         type: "battle",
@@ -1405,6 +1602,7 @@ const OBJECTIVE_TYPES = {
   },
   survive: {
     ...OBJECTIVE_TYPE_DEFAULTS,
+    researchReward: 6,
     make() {
       return {
         type: "survive",
@@ -1425,6 +1623,7 @@ const OBJECTIVE_TYPES = {
   },
   guardian: {
     ...OBJECTIVE_TYPE_DEFAULTS,
+    researchReward: 12,
     make() {
       return {
         type: "guardian",
@@ -1453,6 +1652,7 @@ const OBJECTIVE_TYPES = {
   salvage: {
     ...OBJECTIVE_TYPE_DEFAULTS,
     rewardMultiplier: 1.5,
+    researchReward: 5,
     make(rng, level, galaxy) {
       const target = level <= 2 ? 2 : 3;
       const plannedCount = level <= 2 ? 3 : 4;
@@ -1495,6 +1695,7 @@ const OBJECTIVE_TYPES = {
   escort: {
     ...OBJECTIVE_TYPE_DEFAULTS,
     rewardMultiplier: 1.6,
+    researchReward: 7,
     make(rng, level, galaxy) {
       const npc = seedEscortNpc(galaxy, rng, level);
       const escortTarget = { x: npc.target.x, y: npc.target.y };
@@ -1632,6 +1833,12 @@ function grantObjectiveReward() {
   state.run.totalObjectiveRewardBase += base;
   state.meta.points += gained;
   saveMeta();
+  const objectiveType = OBJECTIVE_TYPES[state.run.objective?.type];
+  if (objectiveType && objectiveType.researchReward) {
+    const level = state.run.level || 0;
+    const researchGain = Math.floor(objectiveType.researchReward * (1 + level * 0.1));
+    state.resources.research = (state.resources.research || 0) + researchGain;
+  }
   if (state.run.level >= ENDGAME_LEVEL || state.run.objective?.type === "guardian") {
     showToast(`终局任务完成，基础奖励 ${gained} 点已计入，正在结算本局收益。`);
     endRunSettlement();
@@ -3186,6 +3393,7 @@ function mergeFragmentToStation(fragment, anchorCell, newFrame) {
 
 function update(dt) {
   ensureRunRuntimeState();
+  const prevResearch = state.resources.research;
   state.toastTimer -= dt;
   if (state.toastTimer <= 0) toastEl.classList.remove("show");
   if (state.paused) return;
@@ -3203,6 +3411,7 @@ function update(dt) {
   updateParticles(dt);
   updateObjective(dt);
   updateCamera(dt);
+  trackResearchGrowth(prevResearch);
 }
 
 function updatePowerAndFacilities(dt) {
@@ -4754,12 +4963,14 @@ function buildMiningAlerts() {
 function updateHud() {
   const r = state.resources;
   const powerTight = state.power.used >= state.power.available - 0.25;
+  const researchRate = getResearchRatePerSec();
+  const researchRateText = researchRate >= 0.05 ? ` (+${researchRate.toFixed(1)}r/s)` : "";
   const resourceSpans = [
     `金属 ${Math.floor(r.metal)}`,
     `矿物 ${Math.floor(r.ore)}`,
     `气体 ${Math.floor(r.gas)}`,
     `等离子 ${Math.floor(r.plasma)}`,
-    `科研 ${Math.floor(r.research)}`,
+    `科研 ${Math.floor(r.research)}${researchRateText}`,
     `电力 ${Math.floor(state.power.used)}/${Math.floor(state.power.available)}`
   ].map((text, index) => {
     const powerClass = index === 5 && powerTight ? ' class="power-low"' : "";
@@ -4873,8 +5084,13 @@ function updateSelectedCellPanel(cell) {
   if (!cell) {
     if (state.hud.selected !== "") {
       state.hud.selected = "";
+      state.hud.selectedUpgradeKey = "";
       selectedCellPanelEl.classList.add("hidden");
       selectedCellInfoEl.textContent = "";
+      if (selectedCellUpgradeEl) {
+        selectedCellUpgradeEl.innerHTML = "";
+        selectedCellUpgradeEl.classList.add("hidden");
+      }
     }
     return;
   }
@@ -4920,6 +5136,7 @@ function updateSelectedCellPanel(cell) {
     selectedCellPanelEl.classList.remove("hidden");
     selectedCellInfoEl.innerHTML = html;
   }
+  renderSelectedCellUpgradePanel(cell);
 }
 
 function updateMetaUi() {
@@ -4950,6 +5167,20 @@ window.gameActions = {
     cell.priority = (cell.priority + 10) % 110;
     showToast(`资源运输优先级调整为 ${cell.priority}`);
     updateHud();
+  },
+  upgradeSelectedCell(path) {
+    const cell = state.selectedCell ? state.station.cells.get(state.selectedCell) : null;
+    if (!cell) return;
+    const cost = getTierUpgradeCost(cell.tier || 0);
+    if ((state.resources.research || 0) < cost) {
+      showToast("研发点不足。");
+      updateHud();
+      return;
+    }
+    if (!upgradeSelectedCell(path)) {
+      showToast("无法升级该设施。");
+      updateHud();
+    }
   },
   buyTalent(type) {
     if (state.meta.points < 1) {
