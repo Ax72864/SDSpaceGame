@@ -3593,7 +3593,12 @@ function getNearestFragmentHudData() {
     distanceRounded: Math.round(nearest.distance / 50) * 50,
     facilityCount: countFragmentFacilities(nearest.fragment),
     fragmentCount: state.fragments.length,
-    origin: nearest.fragment.origin === "wreck" ? "wreck" : "player",
+    origin:
+      nearest.fragment.origin === "wreck"
+        ? "wreck"
+        : nearest.fragment.origin === "enemy-wreck"
+          ? "enemy-wreck"
+          : "player",
     playerCount: countPlayerFragments(),
     wreckCount: countWreckFragments()
   };
@@ -3615,7 +3620,8 @@ function buildFragmentHudAlerts() {
   }
   const hud = getNearestFragmentHudData();
   if (!hud) return alerts;
-  const originLabel = hud.origin === "wreck" ? "古老残骸" : "我方残骸";
+  const originLabel =
+    hud.origin === "wreck" ? "古老残骸" : hud.origin === "enemy-wreck" ? "敌方残骸" : "我方残骸";
   let text = `最近${originLabel} ${hud.direction} · ${hud.distanceRounded} px · ${hud.facilityCount} 设施`;
   if (wreckCount > 0 && playerCount > 0) {
     text = `古老残骸 ${wreckCount} 段 · 我方 ${playerCount} 段 · ${text}`;
@@ -3625,8 +3631,14 @@ function buildFragmentHudAlerts() {
     text = `我方残骸 ×${playerCount} · ${text}`;
   }
   alerts.push({
-    level: hud.origin === "wreck" ? "good" : playerCount >= FRAGMENT_HUD_WARN_COUNT ? "warn" : "good",
-    cssClass: hud.origin === "wreck" ? "alert-wreck" : "alert-fragment",
+    level:
+      hud.origin === "player" && playerCount >= FRAGMENT_HUD_WARN_COUNT ? "warn" : "good",
+    cssClass:
+      hud.origin === "wreck"
+        ? "alert-wreck"
+        : hud.origin === "enemy-wreck"
+          ? "alert-fragment-enemy"
+          : "alert-fragment",
     text
   });
   return alerts;
