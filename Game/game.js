@@ -704,6 +704,16 @@ function createSeededRng(seed) {
   };
 }
 
+function mulberry32(seed) {
+  let t = (seed >>> 0) || 1;
+  return () => {
+    t = (t + 0x6D2B79F5) >>> 0;
+    let r = Math.imul(t ^ t >>> 15, t | 1);
+    r ^= r + Math.imul(r ^ r >>> 7, r | 61);
+    return ((r ^ r >>> 14) >>> 0) / 4294967296;
+  };
+}
+
 function rngFloat(rng, min, max) {
   return min + rng() * (max - min);
 }
@@ -1071,6 +1081,204 @@ function getObjectiveDisplayProgress(objective) {
   };
 }
 
+const OBJECTIVE_EVENT_HANDLERS = {
+  tick: "tick",
+  mined: "onMined",
+  enemyKilled: "onEnemyKilled",
+  guardianKilled: "onGuardianKilled",
+  fragmentDocked: "onFragmentDocked",
+  npcArrived: "onNpcArrived",
+  npcDestroyed: "onNpcDestroyed"
+};
+
+const OBJECTIVE_LEVEL_WEIGHTS = [
+  { mine: 0.5, explore: 0.5 },
+  { mine: 0.4, explore: 0.35 },
+  { mine: 0.3, explore: 0.3, battle: 0.2 },
+  { battle: 0.3, survive: 0.2 },
+  { battle: 0.3, survive: 0.2 },
+  { battle: 0.4, survive: 0.3 }
+];
+
+const OBJECTIVE_TYPE_DEFAULTS = {
+  tick: null,
+  onMined: null,
+  onEnemyKilled: null,
+  onGuardianKilled: null,
+  onFragmentDocked: null,
+  onNpcArrived: null,
+  onNpcDestroyed: null,
+  isComplete: null,
+  isFailed: null,
+  getDetail: () => "",
+  getHint: () => "",
+  render: null,
+  rewardMultiplier: 1.0
+};
+
+const OBJECTIVE_TYPES = {
+  mine: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    make() {
+      return {
+        type: "mine",
+        text: "采集 90 单位资源",
+        target: 90,
+        progress: 0
+      };
+    },
+    onMined(objective, mined) {
+      objective.progress += mined;
+    },
+    getDetail(objective, displayProgress) {
+      return `${Math.floor(displayProgress.current)} / ${displayProgress.target} 单位`;
+    },
+    getHint() {
+      return "建造采矿站并靠近带彩色外环的资源天体（橙=矿石、银=金属、绿=气、紫=等离子），保持设施通电。";
+    }
+  },
+  explore: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    make(rng) {
+      return {
+        type: "explore",
+        text: "抵达信标区域",
+        target: 1,
+        progress: 0,
+        beacon: {
+          x: rngFloat(rng, 700, 1300),
+          y: rngFloat(rng, -850, 850)
+        }
+      };
+    },
+    tick(objective) {
+      objective.progress = dist(state.station.pos, objective.beacon) < 130 ? 1 : 0;
+    },
+    getDetail(objective, displayProgress) {
+      return displayProgress.current >= displayProgress.target
+        ? "已抵达"
+        : state.target
+          ? "航行中"
+          : "未设定目标";
+    },
+    getHint() {
+      return state.target || hasKeyboardThrust()
+        ? `${getMoveControlHint()}，或保持推进器喷口朝外，朝金色信标环移动。`
+        : `${getMoveControlHint()}，或点空白处设定航行目标后自动推进。`;
+    },
+    render(objective) {
+      renderer.ring(objective.beacon, 80, 5, [0.95, 0.9, 0.35, 0.55], 48);
+      renderer.ring(objective.beacon, 120, 2, [0.95, 0.9, 0.35, 0.22], 48);
+    }
+  },
+  battle: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    make() {
+      return {
+        type: "battle",
+        text: "击毁 6 个敌对目标",
+        target: 6,
+        progress: 0
+      };
+    },
+    onEnemyKilled(objective, enemy) {
+      if (enemy.kind === "guardian") return;
+      objective.progress++;
+    },
+    getDetail(objective, displayProgress) {
+      return `${Math.floor(displayProgress.current)} / ${displayProgress.target} 击毁`;
+    },
+    getHint() {
+      return "建造炮塔或导弹井，必要时点「导弹齐射」。";
+    }
+  },
+  survive: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    make() {
+      return {
+        type: "survive",
+        text: "坚持 180 秒并保持核心存活",
+        target: 180,
+        progress: 0
+      };
+    },
+    tick(objective, dt) {
+      objective.progress += dt;
+    },
+    getDetail(objective, displayProgress) {
+      return `${Math.floor(displayProgress.current)} / ${displayProgress.target} 秒`;
+    },
+    getHint() {
+      return "加固装甲与护盾，确保发电站供电不断。";
+    }
+  },
+  guardian: {
+    ...OBJECTIVE_TYPE_DEFAULTS,
+    make() {
+      return {
+        type: "guardian",
+        text: "击毁本局守护者",
+        target: 1,
+        progress: 0
+      };
+    },
+    onGuardianKilled(objective) {
+      objective.progress = objective.target;
+    },
+    getDetail(objective, displayProgress) {
+      return `${Math.floor(displayProgress.current)} / ${displayProgress.target} 守护者`;
+    },
+    getHint() {
+      return "终末守护者会持续增援海盗，优先清理周边后集中火力击毁守护者。";
+    },
+    render() {
+      if (isObjectiveComplete()) return;
+      const guardian = state.enemies.find((enemy) => enemy.kind === "guardian" && enemy.hp > 0);
+      if (!guardian) return;
+      renderer.ring(guardian, guardian.r + 36, 4, [1, 0.25, 0.2, 0.45], 52);
+      renderer.ring(guardian, guardian.r + 70, 2, [1, 0.25, 0.2, 0.2], 52);
+    }
+  }
+};
+
+function pickWeighted(rng, weightTable) {
+  if (!weightTable || typeof weightTable !== "object") return "mine";
+  const entries = Object.entries(weightTable).filter(
+    ([type, weight]) => OBJECTIVE_TYPES[type] && Number.isFinite(weight) && weight > 0
+  );
+  if (!entries.length) return "mine";
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = rng() * total;
+  for (const [type, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return type;
+  }
+  return entries[entries.length - 1][0];
+}
+
+function isObjectiveDefinitionComplete(objective, objectiveType) {
+  if (!objective || !objectiveType) return false;
+  if (typeof objectiveType.isComplete === "function") {
+    return Boolean(objectiveType.isComplete(objective));
+  }
+  return objective.progress >= objective.target;
+}
+
+function notifyObjective(event, payload) {
+  const objective = state.run.objective;
+  if (!objective || isObjectiveComplete()) return;
+  const objectiveType = OBJECTIVE_TYPES[objective.type];
+  if (!objectiveType) return;
+  const handlerName = OBJECTIVE_EVENT_HANDLERS[event];
+  if (!handlerName) return;
+  const handler = objectiveType[handlerName];
+  if (typeof handler !== "function") return;
+  handler(objective, payload);
+  if (!isObjectiveComplete() && isObjectiveDefinitionComplete(objective, objectiveType)) {
+    grantObjectiveReward();
+  }
+}
+
 function createObjective() {
   ensureRunRuntimeState();
   if (state.run.level >= ENDGAME_LEVEL) {
@@ -1079,24 +1287,22 @@ function createObjective() {
     if (!state.run.guardianDefeated) {
       state.run.guardianSpawnDelay = Math.max(state.run.guardianSpawnDelay, 6);
     }
-    state.run.objective = {
-      type: "guardian",
-      text: "击毁本局守护者",
-      target: 1,
-      progress: state.run.guardianDefeated ? 1 : 0
-    };
+    const objective = OBJECTIVE_TYPES.guardian.make();
+    if (state.run.guardianDefeated) {
+      objective.progress = objective.target;
+    }
+    state.run.objective = objective;
     state.run.objectiveCompleteAt = 0;
     resetObjectiveChoiceState();
     return;
   }
-  const choices = [
-    { type: "mine", text: "采集 90 单位资源", target: 90, progress: 0 },
-    { type: "explore", text: "抵达信标区域", target: 1, progress: 0, beacon: { x: rand(700, 1300), y: rand(-850, 850) } },
-    { type: "battle", text: "击毁 6 个敌对目标", target: 6, progress: 0 },
-    { type: "survive", text: "坚持 180 秒并保持核心存活", target: 180, progress: 0 }
-  ];
-  const objective = choices[state.run.level % choices.length];
-  state.run.objective = structuredClone(objective);
+  const level = levelIndex(state.run.level);
+  const objectiveSeed = (state.run.seed ^ 0x9e3779b9) + level * 0x85ebca6b;
+  const objectiveRng = mulberry32(objectiveSeed);
+  const weightTable = OBJECTIVE_LEVEL_WEIGHTS[level] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1];
+  const type = pickWeighted(objectiveRng, weightTable);
+  const objectiveType = OBJECTIVE_TYPES[type] || OBJECTIVE_TYPES.mine;
+  state.run.objective = objectiveType.make(objectiveRng, level, state.galaxy);
   state.run.objectiveCompleteAt = 0;
   state.run.endgame = false;
   state.run.guardianSpawned = false;
@@ -1111,7 +1317,8 @@ function grantObjectiveReward() {
   if (isObjectiveComplete()) return;
   state.run.objectiveCompleteAt = Math.max(state.time, 1e-6);
   state.run.completedObjectives++;
-  const gained = 2 + state.run.level;
+  const rewardMultiplier = OBJECTIVE_TYPES[state.run.objective?.type]?.rewardMultiplier ?? 1.0;
+  const gained = Math.floor((2 + state.run.level) * rewardMultiplier);
   state.run.totalObjectiveRewardBase += gained;
   state.meta.points += gained;
   saveMeta();
@@ -2520,10 +2727,8 @@ function updateMiningAndResearch(dt) {
       state.resources.research += amount * 2.4;
     }
   }
-  if (mined && state.run.objective?.type === "mine" && !isObjectiveComplete()) {
-    state.run.objective.progress += mined;
-  }
   if (mined > 0) {
+    notifyObjective("mined", mined);
     awardEndgameActivityPoints(mined * ENDGAME_ACTIVITY_POINTS.miningPerUnit);
   }
   if (state.resources.research >= 35 + state.station.techLevel * 22) {
@@ -2790,7 +2995,6 @@ function updateEnemies(dt) {
 
   state.enemies = state.enemies.filter((enemy) => {
     if (enemy.hp > 0) return true;
-    if (state.run.objective?.type === "battle" && !isObjectiveComplete()) state.run.objective.progress++;
     state.resources.metal += enemy.reward;
     state.resources.gas += enemy.reward * 0.15;
     awardEndgameActivityPoints(enemyActivityPointReward(enemy.kind));
@@ -2799,11 +3003,9 @@ function updateEnemies(dt) {
       state.run.guardianSpawned = true;
       state.run.endgame = true;
       triggerGuardianDeathEffect(enemy);
-      if (state.run.objective?.type === "guardian" && !isObjectiveComplete()) {
-        state.run.objective.progress = state.run.objective.target;
-        grantObjectiveReward();
-      }
+      notifyObjective("guardianKilled", enemy);
     } else {
+      notifyObjective("enemyKilled", enemy);
       for (let i = 0; i < 12; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
     }
     return false;
@@ -3194,19 +3396,7 @@ function updateFragments(dt) {
 }
 
 function updateObjective(dt) {
-  const objective = state.run.objective;
-  if (!objective) return;
-  if (!isObjectiveComplete()) {
-    if (objective.type === "explore") {
-      objective.progress = dist(state.station.pos, objective.beacon) < 130 ? 1 : 0;
-    }
-    if (objective.type === "survive") {
-      objective.progress += dt;
-    }
-    if (objective.progress >= objective.target) {
-      grantObjectiveReward();
-    }
-  }
+  notifyObjective("tick", dt);
 }
 
 function nextLevel() {
@@ -3386,15 +3576,9 @@ function renderTargetAndObjective() {
     renderer.line({ x: state.virtualCursor.x, y: state.virtualCursor.y - 24 }, { x: state.virtualCursor.x, y: state.virtualCursor.y + 24 }, 2, [1, 1, 1, 0.35]);
   }
   const objective = state.run.objective;
-  if (objective?.type === "explore") {
-    renderer.ring(objective.beacon, 80, 5, [0.95, 0.9, 0.35, 0.55], 48);
-    renderer.ring(objective.beacon, 120, 2, [0.95, 0.9, 0.35, 0.22], 48);
-  } else if (objective?.type === "guardian" && !isObjectiveComplete()) {
-    const guardian = state.enemies.find((enemy) => enemy.kind === "guardian" && enemy.hp > 0);
-    if (guardian) {
-      renderer.ring(guardian, guardian.r + 36, 4, [1, 0.25, 0.2, 0.45], 52);
-      renderer.ring(guardian, guardian.r + 70, 2, [1, 0.25, 0.2, 0.2], 52);
-    }
+  const objectiveType = objective ? OBJECTIVE_TYPES[objective.type] : null;
+  if (typeof objectiveType?.render === "function") {
+    objectiveType.render(objective);
   }
 }
 
@@ -3620,22 +3804,7 @@ function getBlockedThrusters() {
 function pickNextForObjective(objective) {
   if (isObjectiveComplete()) return buildCompletedObjectiveGuide().next;
   if (!objective) return "扩建设施、完成任务或应对来敌。";
-  switch (objective.type) {
-    case "mine":
-      return "建造采矿站并靠近带彩色外环的资源天体（橙=矿石、银=金属、绿=气、紫=等离子），保持设施通电。";
-    case "explore":
-      return state.target || hasKeyboardThrust()
-        ? `${getMoveControlHint()}，或保持推进器喷口朝外，朝金色信标环移动。`
-        : `${getMoveControlHint()}，或点空白处设定航行目标后自动推进。`;
-    case "battle":
-      return "建造炮塔或导弹井，必要时点「导弹齐射」。";
-    case "survive":
-      return "加固装甲与护盾，确保发电站供电不断。";
-    case "guardian":
-      return "终末守护者会持续增援海盗，优先清理周边后集中火力击毁守护者。";
-    default:
-      return "";
-  }
+  return OBJECTIVE_TYPES[objective.type]?.getHint?.(objective) || "";
 }
 
 function buildGuideText() {
@@ -3940,19 +4109,7 @@ function updateHud() {
   const displayProgress = getObjectiveDisplayProgress(objective);
   const progress = displayProgress.ratio;
   const progressDetail = objective
-    ? objective.type === "mine"
-      ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 单位`
-      : objective.type === "survive"
-        ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 秒`
-        : objective.type === "battle"
-          ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 击毁`
-          : objective.type === "guardian"
-            ? `${Math.floor(displayProgress.current)} / ${displayProgress.target} 守护者`
-          : displayProgress.current >= displayProgress.target
-            ? "已抵达"
-            : state.target
-              ? "航行中"
-              : "未设定目标"
+    ? OBJECTIVE_TYPES[objective.type]?.getDetail?.(objective, displayProgress) || ""
     : "";
   const objectiveComplete = isObjectiveComplete();
   let objectiveHtml = objective
