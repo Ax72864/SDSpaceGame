@@ -326,7 +326,7 @@ const TYPES = {
     powerUse: 5,
     priority: 75,
     baseStats: {
-      maxShield: 0,
+      maxShield: 100,
       regen: 0,
       range: 92
     },
@@ -1194,6 +1194,9 @@ function getTechLevelFactor(facility, key, techLevel) {
   if (facility === "core" && key === "hpPerLevel") {
     return Math.pow(1.08, level);
   }
+  if (key === "maxHp" || key === "maxFrameHp") {
+    return Math.pow(1.08, level);
+  }
   return 1;
 }
 
@@ -1209,17 +1212,105 @@ function getGlobalModFactor(facility, key, station) {
   return factor;
 }
 
+function ensureCellBaseStats(cell) {
+  if (!cell || !cell.facility) return;
+  const def = TYPES[cell.facility];
+  if (!def) return;
+  const metaFactor = 1 + (state.meta?.hull || 0) * 0.1;
+  if (!Number.isFinite(cell.baseMaxHp)) {
+    cell.baseMaxHp = (def.hp ?? def.baseStats?.maxHp ?? 0) * metaFactor;
+  }
+  if (!Number.isFinite(cell.baseMaxFrameHp)) {
+    const frameBase = cell.facility === "core"
+      ? TYPES.core.baseStats.maxFrameHp
+      : TYPES.frame.baseStats.maxFrameHp;
+    cell.baseMaxFrameHp = frameBase * (cell.facility === "core" ? 1 : metaFactor);
+  }
+  if (cell.facility === "shield") {
+    if (!Number.isFinite(cell.baseMaxShield)) {
+      cell.baseMaxShield = TYPES.shield.baseStats.maxShield || 0;
+    }
+    if (cell.maxShield == null) cell.maxShield = cell.baseMaxShield;
+    if (cell.shield == null) cell.shield = cell.maxShield;
+  }
+  if (cell.maxFrameHp == null && Number.isFinite(cell.baseMaxFrameHp)) {
+    cell.maxFrameHp = cell.baseMaxFrameHp;
+  }
+}
+
+function syncCellStorableStatsAfterUpgrade(cell) {
+  const type = TYPES[cell.facility];
+  if (!type) return;
+  ensureCellBaseStats(cell);
+
+  const newMaxHp = getCellStat(cell, "maxHp");
+  if (newMaxHp > 0 && cell.maxHp != null && cell.maxHp > 0) {
+    const ratio = newMaxHp / cell.maxHp;
+    cell.maxHp = newMaxHp;
+    cell.hp = Math.min(cell.maxHp, cell.hp * ratio);
+  } else if (newMaxHp > 0 && (cell.maxHp == null || cell.maxHp <= 0)) {
+    cell.maxHp = newMaxHp;
+    if (cell.hp == null) cell.hp = newMaxHp;
+  }
+
+  const newMaxFrameHp = getCellStat(cell, "maxFrameHp");
+  if (newMaxFrameHp > 0 && cell.maxFrameHp != null && cell.maxFrameHp > 0) {
+    const ratio = newMaxFrameHp / cell.maxFrameHp;
+    cell.maxFrameHp = newMaxFrameHp;
+    cell.frameHp = Math.min(cell.maxFrameHp, cell.frameHp * ratio);
+  } else if (newMaxFrameHp > 0 && (cell.maxFrameHp == null || cell.maxFrameHp <= 0)) {
+    cell.maxFrameHp = newMaxFrameHp;
+    if (cell.frameHp == null) cell.frameHp = newMaxFrameHp;
+  }
+
+  if (cell.facility === "shield") {
+    const newMaxShield = getCellStat(cell, "maxShield");
+    if (newMaxShield > 0 && cell.maxShield != null && cell.maxShield > 0) {
+      const ratio = newMaxShield / cell.maxShield;
+      cell.maxShield = newMaxShield;
+      cell.shield = Math.min(cell.maxShield, (cell.shield || 0) * ratio);
+    } else if (newMaxShield > 0) {
+      cell.maxShield = newMaxShield;
+      cell.shield = newMaxShield;
+    }
+  }
+}
+
+function syncAllCellStorableStats() {
+  for (const cell of state.station.cells.values()) {
+    syncCellStorableStatsAfterUpgrade(cell);
+  }
+  if (state.fragments) {
+    for (const fragment of state.fragments) {
+      if (!fragment?.cells) continue;
+      for (const cell of fragment.cells.values()) {
+        syncCellStorableStatsAfterUpgrade(cell);
+      }
+    }
+  }
+}
+
 // v0.5.0 集中 stat 查询：baseStats → tier → mod → techLevel → globalMod → clamp
 function getCellStat(cell, key) {
   if (!cell || !cell.facility) return 0;
   const type = TYPES[cell.facility];
   if (!type || !type.baseStats) return 0;
   ensureCellUpgradeFields(cell);
+  ensureCellBaseStats(cell);
 
-  const base = type.baseStats[key];
-  if (base == null) {
-    if (cell[key] != null) return cell[key];
-    return 0;
+  let base;
+  if (key === "maxHp") {
+    base = cell.baseMaxHp ?? type.baseStats.maxHp ?? type.hp ?? 0;
+  } else if (key === "maxFrameHp") {
+    base = cell.baseMaxFrameHp ?? type.baseStats.maxFrameHp ?? TYPES.frame.baseStats.maxFrameHp ?? 0;
+  } else if (key === "maxShield") {
+    base = cell.baseMaxShield ?? type.baseStats.maxShield ?? 0;
+  } else {
+    base = type.baseStats[key];
+    if (base == null) {
+      if (cell[key] != null) return cell[key];
+      return 0;
+    }
   }
 
   const tier = Number.isFinite(cell.tier) ? cell.tier : 0;
@@ -1339,6 +1430,7 @@ function upgradeSelectedCell(path) {
   if ((state.resources.research || 0) < cost) return false;
   state.resources.research -= cost;
   cell.tier = currentTier + 1;
+  syncCellStorableStatsAfterUpgrade(cell);
   showToast(`${type.name} 升级至 tier ${cell.tier}`);
   updateHud();
   return true;
@@ -1353,6 +1445,7 @@ function applyModification(cell, modIndex) {
   if ((state.resources.research || 0) < cost) return false;
   state.resources.research -= cost;
   cell.mod = modIndex;
+  syncCellStorableStatsAfterUpgrade(cell);
   const modDef = type.modifications[modIndex];
   showToast(`${type.name} 已改造：${modDef.label}`);
   updateHud();
@@ -1366,6 +1459,7 @@ function unlockGlobalResearch(modKey) {
     if ((state.resources.research || 0) < HULL_MOD_COST) return false;
     state.resources.research -= HULL_MOD_COST;
     station.hullMod = GLOBAL_RESEARCH_UNLOCK_VALUE;
+    syncAllCellStorableStats();
     showToast("船体强化已激活，全 station HP +5%。");
     updateHud();
     return true;
@@ -1375,6 +1469,7 @@ function unlockGlobalResearch(modKey) {
     if ((state.resources.research || 0) < WEAPON_MOD_COST) return false;
     state.resources.research -= WEAPON_MOD_COST;
     station.weaponMod = GLOBAL_RESEARCH_UNLOCK_VALUE;
+    syncAllCellStorableStats();
     showToast("武器强化已激活，炮塔与导弹井 damage +5%。");
     updateHud();
     return true;
@@ -1594,13 +1689,22 @@ function toggleResearchTree(open) {
 
 function createCell(x, y, facility) {
   const def = TYPES[facility] || TYPES.frame;
-  return {
+  const metaFactor = 1 + state.meta.hull * 0.1;
+  const baseMaxHp = (def.hp ?? def.baseStats?.maxHp ?? 0) * metaFactor;
+  const frameBase = facility === "core"
+    ? TYPES.core.baseStats.maxFrameHp
+    : TYPES.frame.baseStats.maxFrameHp;
+  const baseMaxFrameHp = frameBase * (facility === "core" ? 1 : metaFactor);
+  const cell = {
     x,
     y,
     facility,
-    frameHp: TYPES.frame.baseStats.maxFrameHp * (1 + state.meta.hull * 0.1),
-    hp: def.hp * (1 + state.meta.hull * 0.1),
-    maxHp: def.hp * (1 + state.meta.hull * 0.1),
+    baseMaxHp,
+    baseMaxFrameHp,
+    maxFrameHp: baseMaxFrameHp,
+    frameHp: baseMaxFrameHp,
+    hp: baseMaxHp,
+    maxHp: baseMaxHp,
     enabled: true,
     active: facility === "core" || facility === "frame" || facility === "armor",
     detached: false,
@@ -1612,14 +1716,23 @@ function createCell(x, y, facility) {
     upgradePath: null,
     mod: null
   };
+  if (facility === "shield") {
+    cell.baseMaxShield = TYPES.shield.baseStats.maxShield || 0;
+    cell.maxShield = cell.baseMaxShield;
+    cell.shield = cell.maxShield;
+  }
+  return cell;
 }
 
 function initStation() {
   const cells = state.station.cells;
   const core = createCell(0, 0, "core");
-  core.hp = 280 * (1 + state.meta.hull * 0.1);
-  core.maxHp = core.hp;
-  core.frameHp = TYPES.core.baseStats.maxFrameHp;
+  core.baseMaxHp = 280 * (1 + state.meta.hull * 0.1);
+  core.hp = core.baseMaxHp;
+  core.maxHp = core.baseMaxHp;
+  core.baseMaxFrameHp = TYPES.core.baseStats.maxFrameHp;
+  core.maxFrameHp = core.baseMaxFrameHp;
+  core.frameHp = core.baseMaxFrameHp;
   cells.set(key(0, 0), core);
   cells.set(key(1, 0), createCell(1, 0, "frame"));
   cells.set(key(-1, 0), createCell(-1, 0, "frame"));
@@ -5627,6 +5740,10 @@ window.__gameTest = {
   applyModification,
   unlockGlobalResearch,
   resetCellUpgradeState,
+  createCell,
+  improveStationHp,
+  syncCellStorableStatsAfterUpgrade,
+  upgradeSelectedCell,
   snapshot() {
     const wreck = state.fragments.filter((f) => f.origin === "wreck");
     const startPos = state.galaxy?.stationSpawn || state.station.pos;
