@@ -26,3 +26,8 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Subagent 临时验证脚本（_t1_verify.cjs / _t2t3_verify.cjs / ...）
+_*.cjs
+_*.mjs
+_*verify*.js
