@@ -325,6 +325,26 @@ const PLAYER_PHYSICS = {
   coastHighSpeedThreshold: 60
 };
 
+const FRAGMENT_LAUNCH_SPEED_MIN = 22;
+const FRAGMENT_LAUNCH_SPEED_MAX = 36;
+const FRAGMENT_LAUNCH_JITTER = 12;
+const FRAGMENT_ANGULAR_VEL_MIN = -0.6;
+const FRAGMENT_ANGULAR_VEL_MAX = 0.6;
+const FRAGMENT_ANGULAR_JITTER = 0.15;
+const FRAGMENT_LINEAR_DAMP = 0.06;
+const FRAGMENT_ANGULAR_DAMP = 0.35;
+const FRAGMENT_MAX_LINEAR_SPEED = 180;
+const FRAGMENT_MAX_ANGULAR_SPEED = 2.4;
+const FRAGMENT_MAX_COUNT = 8;
+const FRAGMENT_MAX_CELLS_PER = 32;
+const DETACHED_CELLS_TOTAL_SOFT_CAP = 80;
+const DETACHED_CELLS_TOTAL_HARD_CAP = 120;
+const FRAGMENT_BOUNDARY_WARN_DISTANCE = 100;
+const FRAGMENT_BOUNDARY_REMOVE_MARGIN = 200;
+const FRAGMENT_RENDER_ALPHA = 0.55;
+const FRAGMENT_RENDER_DESATURATION = 0.7;
+const FRAGMENT_RENDER_OUTLINE_COLOR = [0.92, 0.6, 0.32, 0.8];
+
 const PIRATE_AI = {
   desiredDistance: 360,
   separationAccel: 34
@@ -409,6 +429,7 @@ const state = {
     thrustMod: 1,
     weaponMod: 1
   },
+  fragments: [],
   stars: [],
   world: { bodies: [] },
   bodies: [],
@@ -433,6 +454,8 @@ const state = {
   fireCooldown: 0,
   spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER
 };
+
+let fragmentIdSeed = 1;
 
 function loadMeta() {
   const base = {
@@ -608,6 +631,25 @@ function dist(a, b) {
 
 function rand(min, max) {
   return min + Math.random() * (max - min);
+}
+
+function clampVectorLength(v, maxLength) {
+  const current = length(v);
+  if (current <= maxLength || current <= 1e-6) return;
+  const factor = maxLength / current;
+  v.x *= factor;
+  v.y *= factor;
+}
+
+function desaturateColor(color, amount) {
+  const mix = clamp(amount, 0, 1);
+  const gray = (color[0] + color[1] + color[2]) / 3;
+  return [
+    color[0] + (gray - color[0]) * mix,
+    color[1] + (gray - color[1]) * mix,
+    color[2] + (gray - color[2]) * mix,
+    color[3]
+  ];
 }
 
 function levelIndex(level) {
@@ -924,6 +966,7 @@ function createCell(x, y, facility) {
     enabled: true,
     active: facility === "core" || facility === "frame" || facility === "armor",
     detached: false,
+    drift: null,
     priority: def.priority || 10,
     reload: 0,
     fire: 0
@@ -1656,6 +1699,205 @@ function cellWorldPosition(cell) {
   return { x: state.station.pos.x + p.x + drift.x, y: state.station.pos.y + p.y + drift.y };
 }
 
+function cellWorldPositionByTransform(cell, transform, localOffset = { x: 0, y: 0 }) {
+  const origin = transform.origin || { x: 0, y: 0 };
+  const local = rotate(
+    {
+      x: (cell.x - origin.x) * CELL + localOffset.x,
+      y: (cell.y - origin.y) * CELL + localOffset.y
+    },
+    transform.angle
+  );
+  return { x: transform.pos.x + local.x, y: transform.pos.y + local.y };
+}
+
+function fragmentCellWorldPosition(fragment, cell) {
+  return cellWorldPositionByTransform(
+    cell,
+    { pos: fragment.pos, angle: fragment.angle, origin: fragment.centerGrid }
+  );
+}
+
+function computeFragmentBounds(cells) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const cell of cells.values()) {
+    minX = Math.min(minX, cell.x);
+    maxX = Math.max(maxX, cell.x);
+    minY = Math.min(minY, cell.y);
+    maxY = Math.max(maxY, cell.y);
+  }
+  if (!cells.size) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  return { minX, maxX, minY, maxY };
+}
+
+function computeFragmentEdgeKeys(cells) {
+  const edgeKeys = new Set();
+  for (const cell of cells.values()) {
+    const cellKey = key(cell.x, cell.y);
+    for (const n of neighbors(cell.x, cell.y)) {
+      if (!cells.has(key(n.x, n.y))) {
+        edgeKeys.add(cellKey);
+        break;
+      }
+    }
+  }
+  return edgeKeys;
+}
+
+function countFragmentCells() {
+  let total = 0;
+  for (const fragment of state.fragments) total += fragment.cells.size;
+  return total;
+}
+
+function buildFragmentFromCells(componentCells) {
+  if (!componentCells.length) return { fragment: null, trimmedCells: 0 };
+  const centerGrid = componentCells.reduce(
+    (acc, cell) => {
+      acc.x += cell.x;
+      acc.y += cell.y;
+      return acc;
+    },
+    { x: 0, y: 0 }
+  );
+  centerGrid.x /= componentCells.length;
+  centerGrid.y /= componentCells.length;
+
+  let keptCells = componentCells;
+  let trimmedCells = 0;
+  if (componentCells.length > FRAGMENT_MAX_CELLS_PER) {
+    keptCells = [...componentCells]
+      .sort((a, b) => {
+        const da = (a.x - centerGrid.x) ** 2 + (a.y - centerGrid.y) ** 2;
+        const db = (b.x - centerGrid.x) ** 2 + (b.y - centerGrid.y) ** 2;
+        return da - db;
+      })
+      .slice(0, FRAGMENT_MAX_CELLS_PER);
+    trimmedCells = componentCells.length - keptCells.length;
+  }
+
+  const worldOffset = rotate({ x: centerGrid.x * CELL, y: centerGrid.y * CELL }, state.station.angle);
+  const pos = { x: state.station.pos.x + worldOffset.x, y: state.station.pos.y + worldOffset.y };
+
+  let outwardLocal = { x: centerGrid.x, y: centerGrid.y };
+  if (length(outwardLocal) < 1e-3) {
+    outwardLocal = { x: rand(-1, 1), y: rand(-1, 1) };
+  }
+  const outwardWorld = normalize(rotate(outwardLocal, state.station.angle));
+  const launchSpeed = rand(FRAGMENT_LAUNCH_SPEED_MIN, FRAGMENT_LAUNCH_SPEED_MAX);
+  const vel = {
+    x: state.station.vel.x + outwardWorld.x * launchSpeed + rand(-FRAGMENT_LAUNCH_JITTER, FRAGMENT_LAUNCH_JITTER),
+    y: state.station.vel.y + outwardWorld.y * launchSpeed + rand(-FRAGMENT_LAUNCH_JITTER, FRAGMENT_LAUNCH_JITTER)
+  };
+  clampVectorLength(vel, FRAGMENT_MAX_LINEAR_SPEED);
+
+  const cells = new Map();
+  for (const cell of keptCells) {
+    cell.detached = false;
+    cell.drift = null;
+    cell.reload = 0;
+    cell.fire = 0;
+    cells.set(key(cell.x, cell.y), cell);
+  }
+  const bounds = computeFragmentBounds(cells);
+  const edgeKeys = computeFragmentEdgeKeys(cells);
+  const angularVel = clamp(
+    rand(FRAGMENT_ANGULAR_VEL_MIN, FRAGMENT_ANGULAR_VEL_MAX) + rand(-FRAGMENT_ANGULAR_JITTER, FRAGMENT_ANGULAR_JITTER),
+    FRAGMENT_ANGULAR_VEL_MIN,
+    FRAGMENT_ANGULAR_VEL_MAX
+  );
+
+  const fragment = {
+    // Fragment 形态说明：独立位姿 + cells 子集 + 边缘与包围盒缓存。
+    id: fragmentIdSeed++,
+    pos,
+    vel,
+    angle: state.station.angle,
+    angularVel,
+    cells,
+    edgeKeys,
+    bounds,
+    centerGrid,
+    spawnAt: state.time,
+    warnedNearBoundary: false
+  };
+  return { fragment, trimmedCells };
+}
+
+function splitDisconnectedIntoFragments(disconnectedKeys) {
+  if (!disconnectedKeys.length) {
+    return { detachedCells: 0, droppedCells: 0, softCapReached: false };
+  }
+  const disconnectedSet = new Set(disconnectedKeys);
+  const visited = new Set();
+  const components = [];
+  for (const startKey of disconnectedSet) {
+    if (visited.has(startKey)) continue;
+    const queue = [startKey];
+    const component = [];
+    while (queue.length) {
+      const current = queue.pop();
+      if (!disconnectedSet.has(current) || visited.has(current)) continue;
+      visited.add(current);
+      component.push(current);
+      const cell = state.station.cells.get(current);
+      if (!cell) continue;
+      for (const n of neighbors(cell.x, cell.y)) {
+        const nextKey = key(n.x, n.y);
+        if (disconnectedSet.has(nextKey) && !visited.has(nextKey)) queue.push(nextKey);
+      }
+    }
+    if (component.length) components.push(component);
+  }
+
+  const currentDetachedCells = countFragmentCells();
+  let pendingCells = 0;
+  let detachedCells = 0;
+  let droppedCells = 0;
+  const newFragments = [];
+
+  for (const componentKeys of components) {
+    const componentCells = [];
+    for (const componentKey of componentKeys) {
+      const cell = state.station.cells.get(componentKey);
+      if (cell) componentCells.push(cell);
+      state.station.cells.delete(componentKey);
+    }
+    if (!componentCells.length) continue;
+    detachedCells += componentCells.length;
+
+    const { fragment, trimmedCells } = buildFragmentFromCells(componentCells);
+    droppedCells += trimmedCells;
+    if (!fragment || !fragment.cells.size) {
+      droppedCells += Math.max(0, componentCells.length - trimmedCells);
+      continue;
+    }
+
+    if (state.fragments.length + newFragments.length >= FRAGMENT_MAX_COUNT) {
+      droppedCells += fragment.cells.size;
+      continue;
+    }
+    if (currentDetachedCells + pendingCells + fragment.cells.size > DETACHED_CELLS_TOTAL_HARD_CAP) {
+      droppedCells += fragment.cells.size;
+      continue;
+    }
+    newFragments.push(fragment);
+    pendingCells += fragment.cells.size;
+  }
+
+  if (newFragments.length) {
+    state.fragments.push(...newFragments);
+  }
+  return {
+    detachedCells,
+    droppedCells,
+    softCapReached: currentDetachedCells + pendingCells > DETACHED_CELLS_TOTAL_SOFT_CAP
+  };
+}
+
 function canPay(cost = {}) {
   return Object.entries(cost).every(([name, value]) => state.resources[name] >= value);
 }
@@ -1735,21 +1977,9 @@ function neighbors(x, y) {
 }
 
 function reconnectDetached(x, y) {
-  const queue = neighbors(x, y).filter((n) => {
-    const c = state.station.cells.get(key(n.x, n.y));
-    return c && c.detached;
-  });
-  let restored = 0;
-  while (queue.length) {
-    const p = queue.pop();
-    const c = state.station.cells.get(key(p.x, p.y));
-    if (!c || !c.detached) continue;
-    c.detached = false;
-    c.drift = null;
-    restored++;
-    for (const n of neighbors(p.x, p.y)) queue.push(n);
-  }
-  if (restored) showToast(`重新接入 ${restored} 个脱落结构。`);
+  void x;
+  void y;
+  // v0.3.0 T1/T2：旧的 grid 邻接重连路径先保留调用、内部停用，T3 再接管 fragment 桥接。
 }
 
 function update(dt) {
@@ -1762,11 +1992,11 @@ function update(dt) {
   updatePowerAndFacilities(dt);
   updateMouseAim(dt);
   updateStationPhysics(dt);
+  updateFragments(dt);
   updateMiningAndResearch(dt);
   updateEnemies(dt);
   updateProjectiles(dt);
   updateRepair(dt);
-  updateDetachedCells(dt);
   updateParticles(dt);
   updateObjective(dt);
   updateCamera(dt);
@@ -2481,23 +2711,24 @@ function checkConnectivity() {
       if (state.station.cells.has(nextKey) && !visited.has(nextKey)) queue.push(nextKey);
     }
   }
-  let detached = 0;
+  const disconnectedKeys = [];
   for (const [cellKey, cell] of state.station.cells.entries()) {
     const isConnected = visited.has(cellKey);
-    if (!isConnected && !cell.detached) {
-      detached++;
-      const outward = normalize({ x: cell.x || rand(-1, 1), y: cell.y || rand(-1, 1) });
-      cell.drift = {
-        x: outward.x * rand(8, 24),
-        y: outward.y * rand(8, 24),
-        vx: outward.x * rand(10, 28) + rand(-8, 8),
-        vy: outward.y * rand(10, 28) + rand(-8, 8)
-      };
+    if (!isConnected) {
+      disconnectedKeys.push(cellKey);
+      continue;
     }
-    cell.detached = !isConnected;
-    if (isConnected) cell.drift = null;
+    cell.detached = false;
+    cell.drift = null;
   }
-  if (detached) showToast(`${detached} 个结构失去核心连接并脱落。`);
+  if (!disconnectedKeys.length) return;
+
+  const result = splitDisconnectedIntoFragments(disconnectedKeys);
+  if (!result.detachedCells) return;
+  let message = `${result.detachedCells} 个结构脱落 - 找空位接回`;
+  if (result.droppedCells > 0) message += `（${result.droppedCells} 个已散失）`;
+  if (result.softCapReached) message += "，残骸总量临近上限";
+  showToast(message);
 }
 
 function updateRepair(dt) {
@@ -2552,14 +2783,62 @@ function updateRepair(dt) {
   state.repairDrones = state.repairDrones.filter((d) => d.life > 0);
 }
 
-function updateDetachedCells(dt) {
-  for (const cell of state.station.cells.values()) {
-    if (!cell.detached || !cell.drift) continue;
-    cell.drift.x += cell.drift.vx * dt;
-    cell.drift.y += cell.drift.vy * dt;
-    cell.drift.vx *= 1 - Math.min(0.08 * dt, 0.08);
-    cell.drift.vy *= 1 - Math.min(0.08 * dt, 0.08);
+function isOutsideGalaxyBounds(position, margin) {
+  return position.x < GALAXY_WORLD_BOUNDS.minX - margin
+    || position.x > GALAXY_WORLD_BOUNDS.maxX + margin
+    || position.y < GALAXY_WORLD_BOUNDS.minY - margin
+    || position.y > GALAXY_WORLD_BOUNDS.maxY + margin;
+}
+
+function isNearGalaxyBounds(position, margin) {
+  return position.x < GALAXY_WORLD_BOUNDS.minX + margin
+    || position.x > GALAXY_WORLD_BOUNDS.maxX - margin
+    || position.y < GALAXY_WORLD_BOUNDS.minY + margin
+    || position.y > GALAXY_WORLD_BOUNDS.maxY - margin;
+}
+
+function updateFragments(dt) {
+  if (!state.fragments.length) return;
+  let nearBoundaryCount = 0;
+  let driftedOutCount = 0;
+  const survivors = [];
+  for (const fragment of state.fragments) {
+    fragment.pos.x += fragment.vel.x * dt;
+    fragment.pos.y += fragment.vel.y * dt;
+    fragment.angle += fragment.angularVel * dt;
+
+    const linearFactor = 1 - clamp(FRAGMENT_LINEAR_DAMP * dt, 0, FRAGMENT_LINEAR_DAMP);
+    const angularFactor = 1 - clamp(FRAGMENT_ANGULAR_DAMP * dt, 0, FRAGMENT_ANGULAR_DAMP);
+    fragment.vel.x *= linearFactor;
+    fragment.vel.y *= linearFactor;
+    fragment.angularVel *= angularFactor;
+
+    clampVectorLength(fragment.vel, FRAGMENT_MAX_LINEAR_SPEED);
+    fragment.angularVel = clamp(fragment.angularVel, -FRAGMENT_MAX_ANGULAR_SPEED, FRAGMENT_MAX_ANGULAR_SPEED);
+
+    if (!fragment.warnedNearBoundary && isNearGalaxyBounds(fragment.pos, FRAGMENT_BOUNDARY_WARN_DISTANCE)) {
+      fragment.warnedNearBoundary = true;
+      nearBoundaryCount++;
+    }
+    if (isOutsideGalaxyBounds(fragment.pos, FRAGMENT_BOUNDARY_REMOVE_MARGIN)) {
+      driftedOutCount++;
+      continue;
+    }
+    if (fragment.cells.size <= 0) continue;
+    survivors.push(fragment);
   }
+  state.fragments = survivors;
+
+  if (driftedOutCount > 0) {
+    showToast(driftedOutCount > 1 ? `${driftedOutCount} 段残骸已漂出星系。` : "一段残骸已漂出星系。");
+  } else if (nearBoundaryCount > 0) {
+    showToast(nearBoundaryCount > 1 ? `${nearBoundaryCount} 段残骸接近星系边界。` : "一段残骸即将漂出星系边界。");
+  }
+}
+
+function updateDetachedCells(dt) {
+  void dt;
+  // v0.3.0 T1/T2：detached cell 已抽离到 state.fragments，保留空壳给 T3+。
 }
 
 function updateObjective(dt) {
@@ -2599,6 +2878,7 @@ function nextLevel() {
   applyGalaxy(galaxy);
   createObjective();
 
+  state.fragments = [];
   state.enemies = [];
   state.projectiles = [];
   state.repairDrones = [];
@@ -2669,6 +2949,7 @@ function render() {
   renderBackground();
   renderBodies();
   renderTargetAndObjective();
+  renderFragments();
   renderStation();
   renderMiningEffects();
   renderEnemies();
@@ -2764,33 +3045,114 @@ function renderTargetAndObjective() {
   }
 }
 
-function renderStation() {
-  const selected = state.selectedCell;
-  for (const cell of state.station.cells.values()) {
-    const p = cellWorldPosition(cell);
-    const def = TYPES[cell.facility] || { color: [1, 1, 1, 1] };
-    const color = cell.detached ? [0.55, 0.38, 0.22, 0.55] : cell.active ? def.color : [def.color[0] * 0.45, def.color[1] * 0.45, def.color[2] * 0.45, 0.8];
-    renderer.rect(p, CELL * 0.88, CELL * 0.88, state.station.angle, color);
-    renderer.rect(p, CELL * 0.96, 2, state.station.angle, [0.05, 0.12, 0.2, 0.8]);
-    renderer.rect(p, 2, CELL * 0.96, state.station.angle, [0.05, 0.12, 0.2, 0.8]);
+function renderCellAt(cell, transform, opts = {}) {
+  const {
+    alpha = 1,
+    desaturation = 0,
+    selected = false,
+    drawHpBar = true,
+    drawEffects = true,
+    forceInactive = false
+  } = opts;
+  const p = cellWorldPositionByTransform(cell, transform);
+  const def = TYPES[cell.facility] || { color: [1, 1, 1, 1] };
+  const baseColor = forceInactive || !cell.active
+    ? [def.color[0] * 0.45, def.color[1] * 0.45, def.color[2] * 0.45, 0.82]
+    : def.color;
+  let color = [baseColor[0], baseColor[1], baseColor[2], (baseColor[3] ?? 1) * alpha];
+  if (desaturation > 0) color = desaturateColor(color, desaturation);
+  renderer.rect(p, CELL * 0.88, CELL * 0.88, transform.angle, color);
 
-    if (cell.facility === "core") renderer.circle(p, CELL * 0.34, [0.8, 0.92, 1, 0.9], 18);
-    if (cell.facility === "thruster") renderThruster(cell, p);
-    if (cell.facility === "shield" && cell.active) renderShield(cell, p);
-    if (selected === key(cell.x, cell.y)) renderer.ring(p, CELL * 0.58, 3, [1, 1, 1, 0.75], 24);
+  let edgeColor = [0.05, 0.12, 0.2, 0.8 * alpha];
+  if (desaturation > 0) edgeColor = desaturateColor(edgeColor, desaturation * 0.6);
+  renderer.rect(p, CELL * 0.96, 2, transform.angle, edgeColor);
+  renderer.rect(p, 2, CELL * 0.96, transform.angle, edgeColor);
 
-    const hpRate = clamp(cell.hp / cell.maxHp, 0, 1);
-    if (hpRate < 0.95 && !cell.detached) {
-      const barCenter = rotate({ x: cell.x * CELL, y: cell.y * CELL + CELL * 0.54 }, state.station.angle);
-      const a = { x: state.station.pos.x + barCenter.x - CELL * 0.35, y: state.station.pos.y + barCenter.y };
-      const b = { x: a.x + CELL * 0.7 * hpRate, y: a.y };
-      renderer.line(a, b, 3, [1, 0.25, 0.2, 0.85]);
-    }
+  if (cell.facility === "core") renderer.circle(p, CELL * 0.34, [0.8, 0.92, 1, 0.9 * alpha], 18);
+  if (drawEffects && cell.facility === "thruster") renderThruster(cell, p, transform.angle);
+  if (drawEffects && cell.facility === "shield" && cell.active) renderShield(cell, p, transform.angle);
+  if (selected) renderer.ring(p, CELL * 0.58, 3, [1, 1, 1, 0.75], 24);
+
+  const hpRate = clamp(cell.hp / cell.maxHp, 0, 1);
+  if (drawHpBar && hpRate < 0.95) {
+    const barCenter = cellWorldPositionByTransform(cell, transform, { x: 0, y: CELL * 0.54 });
+    const a = { x: barCenter.x - CELL * 0.35, y: barCenter.y };
+    const b = { x: a.x + CELL * 0.7 * hpRate, y: a.y };
+    renderer.line(a, b, 3, [1, 0.25, 0.2, 0.85 * alpha]);
   }
 }
 
-function renderThruster(cell, p) {
-  const nozzle = rotate(thrusterNozzle(cell), state.station.angle);
+function renderStation() {
+  const selected = state.selectedCell;
+  const stationTransform = {
+    pos: state.station.pos,
+    angle: state.station.angle,
+    origin: { x: 0, y: 0 }
+  };
+  for (const cell of state.station.cells.values()) {
+    renderCellAt(cell, stationTransform, {
+      selected: selected === key(cell.x, cell.y),
+      drawHpBar: true,
+      drawEffects: true
+    });
+  }
+}
+
+function renderDashedRing(center, radius, width, color, segments = 30) {
+  for (let i = 0; i < segments; i += 2) {
+    const a0 = i / segments * Math.PI * 2;
+    const a1 = (i + 0.7) / segments * Math.PI * 2;
+    const p0 = { x: center.x + Math.cos(a0) * radius, y: center.y + Math.sin(a0) * radius };
+    const p1 = { x: center.x + Math.cos(a1) * radius, y: center.y + Math.sin(a1) * radius };
+    renderer.line(p0, p1, width, color);
+  }
+}
+
+function renderFragmentOutline(fragment) {
+  const spanX = Math.max(1, fragment.bounds.maxX - fragment.bounds.minX + 1) * CELL;
+  const spanY = Math.max(1, fragment.bounds.maxY - fragment.bounds.minY + 1) * CELL;
+  const radius = Math.max(spanX, spanY) * 0.62;
+  const pulse = 0.8 + 0.2 * Math.sin(state.time * Math.PI * 3 + fragment.id);
+  renderDashedRing(
+    fragment.pos,
+    radius,
+    2,
+    [
+      FRAGMENT_RENDER_OUTLINE_COLOR[0],
+      FRAGMENT_RENDER_OUTLINE_COLOR[1],
+      FRAGMENT_RENDER_OUTLINE_COLOR[2],
+      FRAGMENT_RENDER_OUTLINE_COLOR[3] * pulse
+    ]
+  );
+}
+
+function renderFragments() {
+  for (const fragment of state.fragments) {
+    const alpha = clamp(
+      FRAGMENT_RENDER_ALPHA + Math.sin(state.time * Math.PI * 3 + fragment.id) * 0.06,
+      0.42,
+      0.68
+    );
+    const transform = {
+      pos: fragment.pos,
+      angle: fragment.angle,
+      origin: fragment.centerGrid
+    };
+    for (const cell of fragment.cells.values()) {
+      renderCellAt(cell, transform, {
+        alpha,
+        desaturation: FRAGMENT_RENDER_DESATURATION,
+        drawHpBar: false,
+        drawEffects: false,
+        forceInactive: true
+      });
+    }
+    renderFragmentOutline(fragment);
+  }
+}
+
+function renderThruster(cell, p, angle) {
+  const nozzle = rotate(thrusterNozzle(cell), angle);
   const base = { x: p.x + nozzle.x * CELL * 0.45, y: p.y + nozzle.y * CELL * 0.45 };
   const tip = { x: p.x + nozzle.x * CELL * 0.78, y: p.y + nozzle.y * CELL * 0.78 };
   renderer.line(base, tip, 7, [0.05, 0.1, 0.16, 1]);
@@ -2800,17 +3162,16 @@ function renderThruster(cell, p) {
   }
 }
 
-function renderShield(cell, p) {
-  const nozzle = shieldDirection(cell);
+function renderShield(cell, p, angle) {
+  const nozzle = shieldDirection(cell, p, angle);
   const center = { x: p.x + nozzle.x * 60, y: p.y + nozzle.y * 60 };
   renderer.ring(center, 48, 4, [0.35, 1, 0.94, cell.fire ? 0.55 : 0.24], 28);
 }
 
-function shieldDirection(cell) {
-  const origin = cellWorldPosition(cell);
+function shieldDirection(cell, origin = cellWorldPosition(cell), angle = state.station.angle) {
   const enemy = nearestEnemy(origin, 420);
   if (enemy) return normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
-  return rotate(thrusterNozzle(cell), state.station.angle);
+  return rotate(thrusterNozzle(cell), angle);
 }
 
 function renderEnemies() {
