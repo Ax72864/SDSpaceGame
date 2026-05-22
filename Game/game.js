@@ -3908,7 +3908,6 @@ function nextLevel() {
 
   const galaxy = generateGalaxy(state.run.level, `${state.run.seed}:${state.run.level}`);
   applyGalaxy(galaxy);
-  createObjective();
 
   state.fragments = [];
   state.npcs = [];
@@ -3916,6 +3915,7 @@ function nextLevel() {
   state.projectiles = [];
   state.repairDrones = [];
   state.particles = [];
+  createObjective();
 
   state.resources.metal += 55;
   state.resources.ore += 25;
