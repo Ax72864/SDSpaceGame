@@ -24,13 +24,20 @@
       <h2>建造</h2>
       <div id="buildButtons" class="button-grid"></div>
       <div class="hint">
-        点击设施后点空间站网格建造。拖动画面旋转空间站，空白处点击设定移动目的地。方向键/WASD 可移动虚拟指针，Enter 确认。
+        默认「屏幕方向」：W=上、S=下、A=左、D=右；点右侧「移动模式」可切换为「朝向前方」。鼠标指向决定朝向，拖动画布可手动旋转/缩放。选设施后点网格或 Enter 建造；失败不退出建造模式，Esc 或「指针/航行」才退出。
       </div>
     </section>
 
     <section class="panel status-panel">
-      <h2>状态</h2>
+      <h2>引导</h2>
+      <div id="guideBox" class="guide-box">
+        <div class="guide-row"><span class="guide-label">当前目标</span><span id="currentGoal" class="guide-goal">加载中…</span></div>
+        <div class="guide-row"><span class="guide-label">下一步</span><span id="nextStep" class="guide-next">加载中…</span></div>
+      </div>
+      <div id="statusAlerts" class="status-alerts" aria-live="polite"></div>
+      <h2>星系任务</h2>
       <div id="objective"></div>
+      <h2>状态</h2>
       <div id="stationStatus">
         <div id="stationData"></div>
         <div id="selectedCellPanel" class="selected-panel hidden">
@@ -44,6 +51,9 @@
       <div class="row">
         <button id="missileBtn" type="button">导弹齐射</button>
         <button id="toggleAsyncBtn" type="button">异步敌站: 开</button>
+      </div>
+      <div class="row">
+        <button id="toggleControlModeBtn" type="button" data-mode="screen">移动: 屏幕方向</button>
       </div>
       <div class="row">
         <button id="rotateLeftBtn" type="button">左旋</button>

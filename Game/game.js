@@ -5,6 +5,9 @@ const resourcesEl = document.getElementById("resources");
 const buildButtonsEl = document.getElementById("buildButtons");
 const runInfoEl = document.getElementById("runInfo");
 const objectiveEl = document.getElementById("objective");
+const currentGoalEl = document.getElementById("currentGoal");
+const nextStepEl = document.getElementById("nextStep");
+const statusAlertsEl = document.getElementById("statusAlerts");
 const stationDataEl = document.getElementById("stationData");
 const selectedCellPanelEl = document.getElementById("selectedCellPanel");
 const selectedCellInfoEl = document.getElementById("selectedCellInfo");
@@ -154,7 +157,19 @@ const state = {
   selectedBuild: "frame",
   selectedCell: null,
   uiBound: false,
-  hud: { timer: 0, resources: "", objective: "", status: "", selected: "", meta: "", runInfo: "", asyncText: "" },
+  hud: {
+    timer: 0,
+    resources: "",
+    objective: "",
+    guideGoal: "",
+    guideNext: "",
+    alerts: "",
+    status: "",
+    selected: "",
+    meta: "",
+    runInfo: "",
+    asyncText: ""
+  },
   target: null,
   drag: null,
   toastTimer: 0,
@@ -165,7 +180,7 @@ const state = {
     completedObjectives: 0,
     playerCount: loadPlayerCount()
   },
-  resources: { metal: 95, ore: 45, gas: 35, plasma: 8, research: 0 },
+  resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
   power: { available: 0, used: 0 },
   meta: loadMeta(),
   asyncEnabled: localStorage.getItem(ASYNC_KEY) !== "false",
@@ -186,9 +201,15 @@ const state = {
   projectiles: [],
   repairDrones: [],
   virtualCursor: { x: -780, y: -260, active: false },
+  input: {
+    moveKeys: new Set(),
+    mouseWorld: null,
+    controlMode: "screen"
+  },
+  lastBuildError: "",
   particles: [],
   fireCooldown: 0,
-  spawnTimer: 8
+  spawnTimer: 22
 };
 
 function loadMeta() {
@@ -226,10 +247,98 @@ function saveMeta() {
   }
 }
 
-function showToast(message) {
+function showToast(message, duration = 2.8) {
   toastEl.textContent = message;
   toastEl.classList.add("show");
-  state.toastTimer = 2.8;
+  state.toastTimer = duration;
+}
+
+function setBuildError(message) {
+  state.lastBuildError = message;
+  showToast(message, 4.2);
+}
+
+function clearBuildError() {
+  state.lastBuildError = "";
+}
+
+function isMoveKey(key) {
+  return key === "ArrowLeft" || key === "ArrowRight" || key === "ArrowUp" || key === "ArrowDown"
+    || key === "w" || key === "a" || key === "s" || key === "d";
+}
+
+function getControlModeLabel(mode = state.input.controlMode) {
+  return mode === "heading" ? "朝向前方" : "屏幕方向";
+}
+
+function getKeyboardThrustLocal() {
+  const keys = state.input.moveKeys;
+  let x = 0;
+  let y = 0;
+  if (keys.has("w") || keys.has("ArrowUp")) y -= 1;
+  if (keys.has("s") || keys.has("ArrowDown")) y += 1;
+  if (keys.has("a") || keys.has("ArrowLeft")) x -= 1;
+  if (keys.has("d") || keys.has("ArrowRight")) x += 1;
+  if (x === 0 && y === 0) return null;
+  return normalize({ x, y });
+}
+
+function getKeyboardThrustScreen() {
+  return getKeyboardThrustLocal();
+}
+
+function getKeyboardThrustHeading() {
+  const local = getKeyboardThrustLocal();
+  return local ? rotate(local, state.station.angle) : null;
+}
+
+function getKeyboardThrustWorld() {
+  if (state.input.controlMode === "heading") {
+    return getKeyboardThrustHeading();
+  }
+  return getKeyboardThrustScreen();
+}
+
+function hasKeyboardThrust() {
+  return Boolean(getKeyboardThrustWorld());
+}
+
+function getMoveControlHint() {
+  if (state.input.controlMode === "heading") {
+    return "WASD 沿舰站当前朝向移动";
+  }
+  return "WASD 按屏幕方向移动（W 上 / S 下 / A 左 / D 右）";
+}
+
+function updateControlModeUi() {
+  const button = document.getElementById("toggleControlModeBtn");
+  if (!button) return;
+  button.textContent = `移动: ${getControlModeLabel()}`;
+  button.classList.toggle("active", state.input.controlMode === "screen");
+  button.dataset.mode = state.input.controlMode;
+}
+
+function toggleControlMode() {
+  state.input.controlMode = state.input.controlMode === "screen" ? "heading" : "screen";
+  updateControlModeUi();
+  showToast(`移动模式已切换为「${getControlModeLabel()}」。${getMoveControlHint()}。`);
+  updateHud();
+}
+
+function updateMouseAim(dt) {
+  if (state.drag?.moved || !state.input.mouseWorld) return;
+  const toMouse = {
+    x: state.input.mouseWorld.x - state.station.pos.x,
+    y: state.input.mouseWorld.y - state.station.pos.y
+  };
+  if (length(toMouse) < 24) return;
+  const desired = Math.atan2(toMouse.x, -toMouse.y);
+  let delta = desired - state.station.angle;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const turnRate = 7.5;
+  state.station.angle += delta * clamp(dt * turnRate, 0, 1);
+  state.station.angularVel *= 1 - clamp(dt * 4, 0, 0.85);
 }
 
 function key(x, y) {
@@ -329,7 +438,7 @@ function initWorld() {
 
 function createObjective() {
   const choices = [
-    { type: "mine", text: "采集 120 单位资源", target: 120, progress: 0 },
+    { type: "mine", text: "采集 90 单位资源", target: 90, progress: 0 },
     { type: "explore", text: "抵达信标区域", target: 1, progress: 0, beacon: { x: rand(700, 1300), y: rand(-850, 850) } },
     { type: "battle", text: "击毁 6 个敌对目标", target: 6, progress: 0 },
     { type: "survive", text: "坚持 180 秒并保持核心存活", target: 180, progress: 0 }
@@ -345,8 +454,9 @@ function initGame() {
   createObjective();
   createBuildUi();
   bindInput();
+  updateControlModeUi();
   updateHud();
-  showToast("核心已上线。扩展框架并靠近行星或小行星采矿。");
+  showToast("核心已上线。默认「屏幕方向」移动（W=上）；点右侧「移动模式」可切换为朝向前方。鼠标指向决定朝向。");
 }
 
 class Renderer {
@@ -561,7 +671,9 @@ function createBuildUi() {
   pointer.addEventListener("click", () => {
     state.selectedBuild = null;
     state.selectedCell = null;
+    clearBuildError();
     updateBuildButtons();
+    updateHud();
   });
   buildButtonsEl.appendChild(pointer);
 
@@ -604,6 +716,7 @@ function createBuildUi() {
   document.getElementById("rotateRightBtn").addEventListener("click", () => {
     state.station.angularVel += 0.55;
   });
+  document.getElementById("toggleControlModeBtn").addEventListener("click", toggleControlMode);
   document.getElementById("toggleSelectedBtn").addEventListener("click", () => window.gameActions.toggleSelected());
   document.getElementById("prioritySelectedBtn").addEventListener("click", () => window.gameActions.prioritySelected());
   document.getElementById("talentMiningBtn").addEventListener("click", () => window.gameActions.buyTalent("mining"));
@@ -618,6 +731,7 @@ function updateBuildButtons() {
   for (const button of buildButtonsEl.querySelectorAll("button")) {
     button.classList.toggle("active", button.dataset.type === state.selectedBuild || (!button.dataset.type && state.selectedBuild === null));
   }
+  buildButtonsEl.closest(".build-panel")?.classList.toggle("build-mode-active", Boolean(state.selectedBuild));
 }
 
 function formatCost(cost = {}) {
@@ -649,6 +763,7 @@ function bindInput() {
   });
 
   canvas.addEventListener("pointermove", (event) => {
+    state.input.mouseWorld = renderer.screenToWorld({ x: event.clientX, y: event.clientY });
     if (!state.drag || state.drag.id !== event.pointerId) return;
     const dx = event.clientX - state.drag.lastX;
     const dy = event.clientY - state.drag.lastY;
@@ -678,40 +793,45 @@ function bindInput() {
   });
 
   window.addEventListener("keydown", (event) => {
-    const step = 46 / state.camera.zoom;
-    const cursor = state.virtualCursor;
-    const keyMap = {
-      ArrowLeft: { x: -step, y: 0 },
-      ArrowRight: { x: step, y: 0 },
-      ArrowUp: { x: 0, y: -step },
-      ArrowDown: { x: 0, y: step },
-      a: { x: -step, y: 0 },
-      d: { x: step, y: 0 },
-      w: { x: 0, y: -step },
-      s: { x: 0, y: step }
-    };
-    if (keyMap[event.key]) {
-      cursor.active = true;
-      cursor.x += keyMap[event.key].x;
-      cursor.y += keyMap[event.key].y;
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    if (isMoveKey(key)) {
+      state.input.moveKeys.add(key);
       event.preventDefault();
-    } else if (event.key === "Enter" || event.key === " ") {
-      cursor.active = true;
-      handleWorldClick({ x: cursor.x, y: cursor.y });
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      const world = state.input.mouseWorld || state.virtualCursor;
+      handleWorldClick(world);
       event.preventDefault();
     } else if (event.key === "Escape") {
       state.selectedBuild = null;
       state.selectedCell = null;
+      clearBuildError();
       updateBuildButtons();
+      updateHud();
     } else if (/^[1-90\-=]$/.test(event.key)) {
       const hotkeyIndex = event.key === "0" ? 9 : event.key === "-" ? 10 : event.key === "=" ? 11 : Number(event.key) - 1;
       const type = FACILITY_ORDER[hotkeyIndex];
       if (type) {
         state.selectedBuild = type;
         state.selectedCell = null;
+        clearBuildError();
         updateBuildButtons();
+        updateHud();
       }
     }
+  });
+
+  window.addEventListener("keyup", (event) => {
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    if (isMoveKey(key)) {
+      state.input.moveKeys.delete(key);
+      event.preventDefault();
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    state.input.moveKeys.clear();
   });
 }
 
@@ -725,20 +845,24 @@ function handleCanvasClick(screen) {
 
 function handleWorldClick(world) {
   const grid = worldToGrid(world);
-  const cell = state.station.cells.get(key(grid.x, grid.y));
+  const cellKey = key(grid.x, grid.y);
+  const cell = state.station.cells.get(cellKey);
+
   if (state.selectedBuild) {
-    if (buildAt(grid.x, grid.y, state.selectedBuild)) {
-      updateHud();
-      return;
+    buildAt(grid.x, grid.y, state.selectedBuild);
+    if (cell) {
+      state.selectedCell = cellKey;
     }
-  }
-  if (cell) {
-    state.selectedCell = key(grid.x, grid.y);
-    state.selectedBuild = null;
-    updateBuildButtons();
     updateHud();
     return;
   }
+
+  if (cell) {
+    state.selectedCell = cellKey;
+    updateHud();
+    return;
+  }
+
   state.target = world;
   showToast("航行目标已设定，推进器将按结构自动出力。");
   updateHud();
@@ -779,39 +903,40 @@ function buildAt(x, y, facility) {
   if (facility === "frame") {
     if (existing) {
       state.selectedCell = cellKey;
-      state.selectedBuild = null;
-      updateBuildButtons();
+      setBuildError("该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。");
       return false;
     }
     if (!hasConnectedNeighbor(x, y)) {
-      showToast("框架必须连接到核心或已连接结构。");
+      setBuildError("框架必须连接到核心或已连接结构。");
       return false;
     }
     if (!canPay(TYPES.frame.cost)) {
-      showToast("金属不足，核心会缓慢补给。");
+      setBuildError("金属不足，核心会缓慢补给；建造模式已保持。");
       return false;
     }
     pay(TYPES.frame.cost);
     state.station.cells.set(cellKey, createCell(x, y, "frame"));
     reconnectDetached(x, y);
+    clearBuildError();
     showToast("框架已扩展。");
     return true;
   }
 
   if (!existing || existing.facility !== "frame" || existing.detached) {
-    showToast("设施只能建造在已连接的空框架上。");
+    setBuildError("设施只能建造在已连接的空框架上。");
     return false;
   }
   const def = TYPES[facility];
   const cost = getBuildCost(facility);
   if (!canPay(cost)) {
-    showToast(`${def.name}资源不足：${formatCost(cost)}`);
+    setBuildError(`${def.name} 资源不足：${formatCost(cost)}（建造模式已保持）`);
     return false;
   }
   pay(cost);
   const next = createCell(x, y, facility);
   next.frameHp = existing.frameHp;
   state.station.cells.set(cellKey, next);
+  clearBuildError();
   showToast(`${def.name}已建造。`);
   return true;
 }
@@ -857,6 +982,7 @@ function update(dt) {
   state.time += dt;
 
   updatePowerAndFacilities(dt);
+  updateMouseAim(dt);
   updateStationPhysics(dt);
   updateMiningAndResearch(dt);
   updateEnemies(dt);
@@ -869,7 +995,7 @@ function update(dt) {
 }
 
 function updatePowerAndFacilities(dt) {
-  state.resources.metal += (0.65 + (state.meta.unlocks.efficientCore ? 0.35 : 0)) * dt;
+  state.resources.metal += (0.85 + (state.meta.unlocks.efficientCore ? 0.35 : 0)) * dt;
   state.resources.ore += 0.18 * dt;
   state.resources.gas += 0.12 * dt;
   state.resources.plasma += 0.025 * dt;
@@ -907,9 +1033,15 @@ function updateStationPhysics(dt) {
   const station = state.station;
   let force = { x: 0, y: 0 };
   let torque = 0;
-  const targetVector = state.target
-    ? normalize({ x: state.target.x - station.pos.x, y: state.target.y - station.pos.y })
-    : null;
+  const keyboardThrust = getKeyboardThrustWorld();
+  const targetVector = keyboardThrust
+    ? keyboardThrust
+    : state.target
+      ? normalize({ x: state.target.x - station.pos.x, y: state.target.y - station.pos.y })
+      : null;
+  if (keyboardThrust) {
+    state.target = null;
+  }
   const mass = 1 + state.station.cells.size * 0.28;
   for (const cell of state.station.cells.values()) {
     if (cell.facility !== "thruster" || !cell.active || cell.detached) continue;
@@ -938,6 +1070,11 @@ function updateStationPhysics(dt) {
       },
       [0.3, 0.85, 1, 0.8]
     );
+  }
+  if (keyboardThrust) {
+    const directThrust = 78 * (1 + state.station.techLevel * 0.06) * state.station.thrustMod;
+    force.x += keyboardThrust.x * directThrust;
+    force.y += keyboardThrust.y * directThrust;
   }
   station.vel.x += force.x / mass * dt;
   station.vel.y += force.y / mass * dt;
@@ -1017,14 +1154,14 @@ function updateEnemies(dt) {
   state.spawnTimer -= dt;
   if (state.spawnTimer <= 0) {
     spawnWave();
-    state.spawnTimer = rand(18, 30) / Math.sqrt(state.run.playerCount);
+    state.spawnTimer = rand(26, 40) / Math.sqrt(state.run.playerCount);
   }
 
   for (const enemy of state.enemies) {
     enemy.reload -= dt;
     const toStation = { x: state.station.pos.x - enemy.x, y: state.station.pos.y - enemy.y };
     const dir = normalize(toStation);
-    const desiredDistance = enemy.kind === "station" ? 470 : enemy.kind === "pirate" ? 290 : 0;
+    const desiredDistance = enemy.kind === "station" ? 470 : enemy.kind === "pirate" ? 360 : 0;
     if (length(toStation) > desiredDistance) {
       enemy.vx += dir.x * enemy.accel * dt;
       enemy.vy += dir.y * enemy.accel * dt;
@@ -1067,7 +1204,7 @@ function updateEnemies(dt) {
 }
 
 function spawnWave() {
-  const count = Math.ceil(state.run.playerCount * rand(1, 3));
+  const count = Math.ceil(state.run.playerCount * rand(0.6, 2));
   for (let i = 0; i < count; i++) {
     const roll = Math.random();
     const a = rand(0, Math.PI * 2);
@@ -1107,8 +1244,8 @@ function updateTurret(cell, dt) {
   const enemy = nearestEnemy(origin, 450);
   if (!enemy || !hasLineOfSight(origin, enemy)) return;
   const dir = normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
-  cell.reload = Math.max(0.28, 0.72 - state.station.techLevel * 0.03);
-  fireProjectile(origin, dir, "player", 14 * (1 + state.meta.weapons * 0.1), 460);
+  cell.reload = Math.max(0.28, 0.60 - state.station.techLevel * 0.03);
+  fireProjectile(origin, dir, "player", 14 * (1 + state.meta.weapons * 0.1), 620);
 }
 
 function hasLineOfSight(origin, target) {
@@ -1568,21 +1705,235 @@ function renderProjectilesAndEffects() {
   }
 }
 
+function countFacility(type) {
+  let count = 0;
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached) continue;
+    if (cell.facility === type) count++;
+  }
+  return count;
+}
+
+function isThrusterNozzleBlocked(cell) {
+  if (cell.facility !== "thruster") return false;
+  const nozzle = thrusterNozzle(cell);
+  return state.station.cells.has(key(cell.x + nozzle.x, cell.y + nozzle.y));
+}
+
+function getInactiveDueToPower() {
+  const list = [];
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached || !cell.enabled) continue;
+    const use = TYPES[cell.facility]?.powerUse || 0;
+    if (use > 0 && !cell.active) list.push(cell);
+  }
+  return list;
+}
+
+function getManualOffFacilities() {
+  return [...state.station.cells.values()].filter(
+    (c) => !c.detached && !c.enabled && c.facility !== "core" && c.facility !== "frame"
+  );
+}
+
+function getBlockedThrusters() {
+  return [...state.station.cells.values()].filter(
+    (c) => !c.detached && c.enabled && isThrusterNozzleBlocked(c)
+  );
+}
+
+function pickNextForObjective(objective) {
+  if (!objective) return "扩建设施、完成任务或应对来敌。";
+  switch (objective.type) {
+    case "mine":
+      return "建造采矿站并靠近行星/小行星（彩色天体），保持设施通电。";
+    case "explore":
+      return state.target || hasKeyboardThrust()
+        ? `${getMoveControlHint()}，或保持推进器喷口朝外，朝金色信标环移动。`
+        : `${getMoveControlHint()}，或点空白处设定航行目标后自动推进。`;
+    case "battle":
+      return "建造炮塔或导弹井，必要时点「导弹齐射」。";
+    case "survive":
+      return "加固装甲与护盾，确保发电站供电不断。";
+    default:
+      return "";
+  }
+}
+
+function buildGuideText() {
+  const objective = state.run.objective;
+  const frameCount = countFacility("frame");
+  const powerCount = countFacility("power");
+  const miningCount = countFacility("mining");
+  const thrusterCount = countFacility("thruster");
+  const isEarlyRun = state.run.level === 0 && state.run.completedObjectives === 0;
+
+  if (isEarlyRun) {
+    if (frameCount <= 6) {
+      return {
+        goal: "扩建空间站骨架",
+        next: "选中「框架」，在核心外围已连接的空格点击建造。"
+      };
+    }
+    if (powerCount === 0) {
+      return {
+        goal: "为设施提供电力",
+        next: "在已连接框架上建造「发电站」，否则采矿/推进器等无法运作。"
+      };
+    }
+    const blocked = getBlockedThrusters();
+    if (blocked.length) {
+      return {
+        goal: "恢复推进器出力",
+        next: "移开推进器外侧格上的结构，保证喷口方向无遮挡。"
+      };
+    }
+    if (objective?.type === "mine" && miningCount === 0) {
+      return {
+        goal: `完成星系任务：${objective.text}`,
+        next: "建造「采矿站」后，点空白处设目标，靠近蓝锈星或碎矿带采集。"
+      };
+    }
+    if (objective?.type === "mine" && miningCount > 0 && objective.progress < objective.target * 0.25) {
+      return {
+        goal: `完成星系任务：${objective.text}`,
+        next: state.target || hasKeyboardThrust()
+          ? `${getMoveControlHint()}靠近资源天体；观察采矿站是否因电力不足停机（见下方提示）。`
+          : `${getMoveControlHint()}，或点空白处设航行目标后靠近矿石天体。`
+      };
+    }
+    if (objective?.type === "explore" && !state.target) {
+      return {
+        goal: `完成星系任务：${objective.text}`,
+        next: `${getMoveControlHint()}，或点空白处设定航行目标，朝金色信标环前进。`
+      };
+    }
+    if (thrusterCount === 0) {
+      return {
+        goal: "学习移动空间站",
+        next: "在框架上建造「推进器」；默认屏幕方向移动，点「移动模式」可切换为朝向前方；鼠标决定朝向。"
+      };
+    }
+    if (!state.target && !hasKeyboardThrust() && length(state.station.vel) < 3) {
+      return {
+        goal: objective ? `完成星系任务：${objective.text}` : "熟悉基本操作",
+        next: `${getMoveControlHint()}；鼠标指向决定朝向；拖动画布可手动旋转与缩放。`
+      };
+    }
+  }
+
+  return {
+    goal: objective ? `星系任务：${objective.text}` : "维持空间站运转",
+    next: pickNextForObjective(objective)
+  };
+}
+
+function buildStatusAlerts() {
+  const alerts = [];
+  if (state.lastBuildError) {
+    alerts.push({
+      level: "danger",
+      text: state.lastBuildError
+    });
+  }
+  if (state.selectedBuild) {
+    alerts.push({
+      level: "warn",
+      text: `建造模式：${TYPES[state.selectedBuild].name} — 点网格或 Enter 放置；Esc / 「指针/航行」退出`
+    });
+  }
+  const used = state.power.used;
+  const available = state.power.available;
+  if (used >= available - 0.25 && available > 0) {
+    alerts.push({
+      level: used > available ? "danger" : "warn",
+      text: `电力紧张：${Math.floor(used)}/${Math.floor(available)}，优先级低的设施会自动停机`
+    });
+  }
+  const starved = getInactiveDueToPower();
+  if (starved.length) {
+    const names = [...new Set(starved.map((c) => TYPES[c.facility].name))].slice(0, 4);
+    alerts.push({
+      level: "warn",
+      text: `因电力或优先级未运作：${names.join("、")}${starved.length > names.length ? " 等" : ""}`
+    });
+  }
+  const off = getManualOffFacilities();
+  if (off.length) {
+    alerts.push({
+      level: "warn",
+      text: `${off.length} 处设施已手动关闭，选中格子后点「开关设施」可恢复`
+    });
+  }
+  const blocked = getBlockedThrusters();
+  if (blocked.length) {
+    alerts.push({
+      level: "danger",
+      text: `${blocked.length} 个推进器喷口被遮挡，外侧需留空才能施力`
+    });
+  }
+  if (state.selectedBuild) {
+    const cost = getBuildCost(state.selectedBuild);
+    const missing = Object.entries(cost).filter(([res, value]) => state.resources[res] < value);
+    if (missing.length) {
+      alerts.push({
+        level: "warn",
+        text: `建造「${TYPES[state.selectedBuild].name}」资源不足：${formatCost(cost)}（核心会缓慢产金属）`
+      });
+    }
+  }
+  return alerts;
+}
+
 function updateHud() {
   const r = state.resources;
-  setHtmlIfChanged(resourcesEl, "resources", [
+  const powerTight = state.power.used >= state.power.available - 0.25;
+  const resourceSpans = [
     `金属 ${Math.floor(r.metal)}`,
     `矿物 ${Math.floor(r.ore)}`,
     `气体 ${Math.floor(r.gas)}`,
     `等离子 ${Math.floor(r.plasma)}`,
     `科研 ${Math.floor(r.research)}`,
     `电力 ${Math.floor(state.power.used)}/${Math.floor(state.power.available)}`
-  ].map((text) => `<span>${text}</span>`).join(""));
+  ].map((text, index) => {
+    const powerClass = index === 5 && powerTight ? ' class="power-low"' : "";
+    return `<span${powerClass}>${text}</span>`;
+  });
+  setHtmlIfChanged(resourcesEl, "resources", resourceSpans.join(""));
+
+  const guide = buildGuideText();
+  if (state.hud.guideGoal !== guide.goal) {
+    state.hud.guideGoal = guide.goal;
+    currentGoalEl.textContent = guide.goal;
+  }
+  if (state.hud.guideNext !== guide.next) {
+    state.hud.guideNext = guide.next;
+    nextStepEl.textContent = guide.next;
+  }
+
+  const alerts = buildStatusAlerts();
+  const alertsHtml = alerts
+    .map((a) => `<div class="alert-item alert-${a.level}">${a.text}</div>`)
+    .join("");
+  setHtmlIfChanged(statusAlertsEl, "alerts", alertsHtml);
 
   const objective = state.run.objective;
   const progress = objective ? clamp(objective.progress / objective.target, 0, 1) : 0;
+  const progressDetail = objective
+    ? objective.type === "mine"
+      ? `${Math.floor(objective.progress)} / ${objective.target} 单位`
+      : objective.type === "survive"
+        ? `${Math.floor(objective.progress)} / ${objective.target} 秒`
+        : objective.type === "battle"
+          ? `${Math.floor(objective.progress)} / ${objective.target} 击毁`
+          : objective.progress >= objective.target
+            ? "已抵达"
+            : state.target
+              ? "航行中"
+              : "未设定目标"
+    : "";
   setHtmlIfChanged(objectiveEl, "objective", objective
-    ? `星系 ${state.run.level + 1}：${objective.text}<br><span class="${progress >= 1 ? "good" : ""}">进度 ${Math.floor(progress * 100)}%</span>`
+    ? `${objective.text}<br><span class="${progress >= 1 ? "good" : ""}">进度 ${Math.floor(progress * 100)}%${progressDetail ? ` · ${progressDetail}` : ""}</span>`
     : "无任务");
 
   const core = state.station.cells.get(key(0, 0));
@@ -1607,6 +1958,7 @@ function updateHud() {
     document.getElementById("toggleAsyncBtn").textContent = asyncText;
   }
   updateMetaUi();
+  updateControlModeUi();
 }
 
 function setHtmlIfChanged(element, cacheKey, html) {
@@ -1625,7 +1977,17 @@ function updateSelectedCellPanel(cell) {
     return;
   }
   const name = cell.facility === "core" ? "核心" : TYPES[cell.facility].name;
-  const html = `已选：${name} ${cell.enabled ? "<span class='good'>启用</span>" : "<span class='danger'>关闭</span>"} / 优先级 ${cell.priority}`;
+  let stateNote = "";
+  if (!cell.detached && !cell.enabled && cell.facility !== "core") {
+    stateNote = " <span class='danger'>（已手动关闭）</span>";
+  } else if (!cell.detached && cell.enabled && !cell.active && (TYPES[cell.facility]?.powerUse || 0) > 0) {
+    stateNote = " <span class='danger'>（电力不足停机）</span>";
+  } else if (!cell.detached && cell.enabled && cell.facility === "thruster" && isThrusterNozzleBlocked(cell)) {
+    stateNote = " <span class='danger'>（喷口被遮挡）</span>";
+  } else if (cell.active) {
+    stateNote = " <span class='good'>（运作中）</span>";
+  }
+  const html = `已选：${name} ${cell.enabled ? "<span class='good'>启用</span>" : "<span class='danger'>关闭</span>"} / 优先级 ${cell.priority}${stateNote}`;
   document.getElementById("toggleSelectedBtn").disabled = cell.facility === "core";
   document.getElementById("prioritySelectedBtn").disabled = cell.facility === "core";
   if (state.hud.selected !== html) {

@@ -138,10 +138,84 @@ h2 {
 .hint,
 #stationStatus,
 #objective,
-#meta {
+#meta,
+.guide-box,
+.status-alerts {
   color: #b7c8e6;
   font-size: 13px;
   line-height: 1.55;
+}
+
+.guide-box {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(48, 92, 150, 0.18);
+  border: 1px solid rgba(118, 194, 255, 0.16);
+}
+
+.guide-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.guide-row:last-child {
+  margin-bottom: 0;
+}
+
+.guide-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #7fa3cc;
+  text-transform: uppercase;
+}
+
+.guide-goal {
+  color: #eaf4ff;
+  font-weight: 600;
+}
+
+.guide-next {
+  color: #9ed4ff;
+  font-size: 12px;
+}
+
+.status-alerts:empty {
+  display: none;
+}
+
+.status-alerts {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(80, 28, 28, 0.14);
+  border: 1px solid rgba(255, 140, 120, 0.18);
+}
+
+.alert-item {
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 2px 0;
+}
+
+.alert-item + .alert-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.alert-warn {
+  color: #ffd080;
+}
+
+.alert-danger {
+  color: #ff9a9a;
+}
+
+.power-low {
+  background: rgba(255, 120, 90, 0.22);
 }
 
 .hidden {
@@ -166,6 +240,29 @@ h2 {
 
 .hint {
   margin-top: 10px;
+}
+
+.build-panel.build-mode-active {
+  border-color: rgba(117, 245, 255, 0.55);
+  box-shadow: 0 0 18px rgba(91, 224, 255, 0.18);
+}
+
+.build-panel.build-mode-active .hint {
+  color: #d8ecff;
+}
+
+#toggleControlModeBtn {
+  width: 100%;
+  font-weight: 600;
+}
+
+#toggleControlModeBtn[data-mode="heading"] {
+  border-color: rgba(255, 196, 120, 0.55);
+  background: rgba(94, 62, 24, 0.72);
+}
+
+#toggleControlModeBtn[data-mode="screen"].active {
+  border-color: #75f5ff;
 }
 
 .row {
@@ -216,9 +313,20 @@ h2 {
   .status-panel {
     top: 136px;
     right: 8px;
-    width: 220px;
-    max-height: 44vh;
+    width: min(240px, calc(100vw - 16px));
+    max-height: 38vh;
     overflow: auto;
+    font-size: 12px;
+  }
+
+  .guide-box,
+  .status-alerts {
+    font-size: 11px;
+  }
+
+  .build-panel .hint {
+    font-size: 11px;
+    line-height: 1.4;
   }
 
   .build-panel {
