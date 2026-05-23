@@ -6453,6 +6453,7 @@ function initGame() {
   ensureMetaPanelUi();
   bindGalaxyMapPanelEvents();
   bindInput();
+  bindPlaytestErrorListeners();
   syncMoreStatusPanel();
   window.addEventListener("resize", syncMoreStatusPanel);
   updateControlModeUi();
@@ -11734,6 +11735,478 @@ function runEscapeSequenceSelfCheck() {
   return { ok: checks.every((entry) => entry.ok), checks };
 }
 
+const PLAYTEST_RUNTIME_ERROR_CAPACITY = 50;
+const PLAYTEST_RUNTIME_ERROR_DEFAULT_LIMIT = 10;
+const playtestRuntimeErrorBuffer = [];
+let playtestRuntimeErrorBound = false;
+const playtestSelfCheckState = {
+  capturedAt: null,
+  ok: null,
+  passed: 0,
+  total: 0,
+  checks: {}
+};
+
+function clonePlaytestSnapshotFallback(value, seen = new WeakMap()) {
+  if (value == null || typeof value !== "object") return value;
+  if (seen.has(value)) return seen.get(value);
+
+  if (Array.isArray(value)) {
+    const clonedArray = [];
+    seen.set(value, clonedArray);
+    for (const item of value) clonedArray.push(clonePlaytestSnapshotFallback(item, seen));
+    return clonedArray;
+  }
+
+  if (value instanceof Map) {
+    const clonedMap = new Map();
+    seen.set(value, clonedMap);
+    for (const [key, mapValue] of value.entries()) {
+      clonedMap.set(clonePlaytestSnapshotFallback(key, seen), clonePlaytestSnapshotFallback(mapValue, seen));
+    }
+    return clonedMap;
+  }
+
+  if (value instanceof Set) {
+    const clonedSet = new Set();
+    seen.set(value, clonedSet);
+    for (const item of value.values()) clonedSet.add(clonePlaytestSnapshotFallback(item, seen));
+    return clonedSet;
+  }
+
+  if (value instanceof Date) {
+    return new Date(value.getTime());
+  }
+
+  const clonedObject = {};
+  seen.set(value, clonedObject);
+  for (const [key, objectValue] of Object.entries(value)) {
+    clonedObject[key] = clonePlaytestSnapshotFallback(objectValue, seen);
+  }
+  return clonedObject;
+}
+
+function cloneForPlaytestSnapshot(value) {
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch {
+      // ignore and fallback below
+    }
+  }
+  return clonePlaytestSnapshotFallback(value);
+}
+
+function captureStorageSnapshot(storage, key) {
+  try {
+    const value = storage.getItem(key);
+    return {
+      supported: true,
+      hasValue: value != null,
+      value
+    };
+  } catch {
+    return {
+      supported: false,
+      hasValue: false,
+      value: null
+    };
+  }
+}
+
+function restoreStorageSnapshot(storage, key, snapshot) {
+  if (!snapshot?.supported) return;
+  try {
+    if (snapshot.hasValue) storage.setItem(key, snapshot.value);
+    else storage.removeItem(key);
+  } catch {
+    // ignore storage restore failures in non-browser contexts
+  }
+}
+
+function capturePlaytestPanelClassNames() {
+  const galaxyMapPanelEl = document.getElementById("galaxyMapPanel");
+  const objectiveChoicePanelEl = document.getElementById("objectiveChoicePanel");
+  const hudEl = document.getElementById("hud");
+  const pauseBtn = document.getElementById("pauseBtn");
+  return {
+    bodyClassName: document.body?.className || "",
+    hudClassName: hudEl?.className || "",
+    metaPanelClassName: metaPanelEl?.className || "",
+    researchTreePanelClassName: researchTreePanelEl?.className || "",
+    galaxyMapPanelClassName: galaxyMapPanelEl?.className || "",
+    objectiveChoicePanelClassName: objectiveChoicePanelEl?.className || "",
+    runSettlementPanelClassName: runSettlementPanelEl?.className || "",
+    pauseButtonText: pauseBtn?.textContent ?? ""
+  };
+}
+
+function restorePlaytestPanelClassNames(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  const hudEl = document.getElementById("hud");
+  const galaxyMapPanelEl = document.getElementById("galaxyMapPanel");
+  const objectiveChoicePanelEl = document.getElementById("objectiveChoicePanel");
+  const pauseBtn = document.getElementById("pauseBtn");
+
+  if (document.body && typeof snapshot.bodyClassName === "string") {
+    document.body.className = snapshot.bodyClassName;
+  }
+  if (hudEl && typeof snapshot.hudClassName === "string") {
+    hudEl.className = snapshot.hudClassName;
+  }
+  if (metaPanelEl && typeof snapshot.metaPanelClassName === "string") {
+    metaPanelEl.className = snapshot.metaPanelClassName;
+  }
+  if (researchTreePanelEl && typeof snapshot.researchTreePanelClassName === "string") {
+    researchTreePanelEl.className = snapshot.researchTreePanelClassName;
+  }
+  if (galaxyMapPanelEl && typeof snapshot.galaxyMapPanelClassName === "string") {
+    galaxyMapPanelEl.className = snapshot.galaxyMapPanelClassName;
+  }
+  if (objectiveChoicePanelEl && typeof snapshot.objectiveChoicePanelClassName === "string") {
+    objectiveChoicePanelEl.className = snapshot.objectiveChoicePanelClassName;
+  }
+  if (runSettlementPanelEl && typeof snapshot.runSettlementPanelClassName === "string") {
+    runSettlementPanelEl.className = snapshot.runSettlementPanelClassName;
+  }
+  if (pauseBtn && typeof snapshot.pauseButtonText === "string") {
+    pauseBtn.textContent = snapshot.pauseButtonText;
+  }
+}
+
+function capturePlaytestExecutionSnapshot() {
+  return {
+    state: cloneForPlaytestSnapshot(state),
+    metaPanelUi: cloneForPlaytestSnapshot(metaPanelUi),
+    seeds: {
+      fragmentIdSeed,
+      npcIdSeed,
+      galaxyNodeIdSeed,
+      encounterIdSeed
+    },
+    galaxyJumpInFlight,
+    panelClasses: capturePlaytestPanelClassNames(),
+    storage: {
+      save: captureStorageSnapshot(localStorage, SAVE_KEY),
+      corruptRaw: captureStorageSnapshot(sessionStorage, META_CORRUPT_RAW_KEY)
+    }
+  };
+}
+
+function restorePlaytestExecutionSnapshot(snapshot) {
+  if (!snapshot?.state) return;
+
+  const restoredState = cloneForPlaytestSnapshot(snapshot.state);
+  for (const key of Object.keys(state)) {
+    delete state[key];
+  }
+  Object.assign(state, restoredState);
+
+  const restoredMetaPanelUi = cloneForPlaytestSnapshot(snapshot.metaPanelUi || {});
+  metaPanelUi.open = !!restoredMetaPanelUi.open;
+  metaPanelUi.activeTab = typeof restoredMetaPanelUi.activeTab === "string" ? restoredMetaPanelUi.activeTab : "talents";
+  metaPanelUi.categoryFilter = typeof restoredMetaPanelUi.categoryFilter === "string" ? restoredMetaPanelUi.categoryFilter : "all";
+
+  if (snapshot.seeds) {
+    if (Number.isFinite(snapshot.seeds.fragmentIdSeed)) fragmentIdSeed = snapshot.seeds.fragmentIdSeed;
+    if (Number.isFinite(snapshot.seeds.npcIdSeed)) npcIdSeed = snapshot.seeds.npcIdSeed;
+    if (Number.isFinite(snapshot.seeds.galaxyNodeIdSeed)) galaxyNodeIdSeed = snapshot.seeds.galaxyNodeIdSeed;
+    if (Number.isFinite(snapshot.seeds.encounterIdSeed)) encounterIdSeed = snapshot.seeds.encounterIdSeed;
+  }
+  galaxyJumpInFlight = !!snapshot.galaxyJumpInFlight;
+
+  restoreStorageSnapshot(localStorage, SAVE_KEY, snapshot.storage?.save);
+  restoreStorageSnapshot(sessionStorage, META_CORRUPT_RAW_KEY, snapshot.storage?.corruptRaw);
+  restorePlaytestPanelClassNames(snapshot.panelClasses);
+
+  try {
+    syncMainPanelUiState();
+    updateObjectiveChoiceUi();
+    updateMetaEntrySummary();
+    updateHud();
+  } catch {
+    // ignore restore refresh failures in non-interactive contexts
+  }
+}
+
+function toPlaytestErrorMessage(value) {
+  if (value == null) return "unknown";
+  if (typeof value === "string") return value;
+  if (typeof value.message === "string") return value.message;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function pushPlaytestRuntimeError(entry) {
+  playtestRuntimeErrorBuffer.push(entry);
+  if (playtestRuntimeErrorBuffer.length > PLAYTEST_RUNTIME_ERROR_CAPACITY) {
+    playtestRuntimeErrorBuffer.splice(0, playtestRuntimeErrorBuffer.length - PLAYTEST_RUNTIME_ERROR_CAPACITY);
+  }
+}
+
+function bindPlaytestErrorListeners() {
+  if (playtestRuntimeErrorBound) return;
+  playtestRuntimeErrorBound = true;
+
+  window.addEventListener("error", (event) => {
+    const message = toPlaytestErrorMessage(event?.error || event?.message);
+    pushPlaytestRuntimeError({
+      type: "error",
+      message,
+      source: event?.filename || null,
+      line: Number.isFinite(event?.lineno) ? event.lineno : null,
+      col: Number.isFinite(event?.colno) ? event.colno : null,
+      stack: typeof event?.error?.stack === "string" ? event.error.stack : null,
+      timestamp: Date.now()
+    });
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event?.reason;
+    pushPlaytestRuntimeError({
+      type: "unhandledrejection",
+      message: toPlaytestErrorMessage(reason),
+      stack: typeof reason?.stack === "string" ? reason.stack : null,
+      timestamp: Date.now()
+    });
+  });
+}
+
+function getPlaytestRuntimeErrors(limit = PLAYTEST_RUNTIME_ERROR_DEFAULT_LIMIT) {
+  const parsedLimit = Math.floor(Number(limit));
+  const safeLimit = Number.isFinite(parsedLimit)
+    ? Math.max(1, Math.min(PLAYTEST_RUNTIME_ERROR_CAPACITY, parsedLimit))
+    : PLAYTEST_RUNTIME_ERROR_DEFAULT_LIMIT;
+  return playtestRuntimeErrorBuffer.slice(-safeLimit).map((entry) => ({ ...entry }));
+}
+
+function clearPlaytestRuntimeErrors() {
+  const cleared = playtestRuntimeErrorBuffer.length;
+  playtestRuntimeErrorBuffer.length = 0;
+  return { ok: true, cleared, remaining: 0 };
+}
+
+function isSnapshotNodeVisible(node) {
+  if (!node || node.classList.contains("hidden")) return false;
+  const rect = node.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const style = window.getComputedStyle(node);
+  return style.display !== "none" && style.visibility !== "hidden";
+}
+
+function snapshotDomNodeState(elementId) {
+  const node = document.getElementById(elementId);
+  return {
+    exists: !!node,
+    visible: isSnapshotNodeVisible(node)
+  };
+}
+
+function listOpenPanelsForSnapshot(panelState) {
+  const openPanels = [];
+  if (panelState.runSettlementOpen) openPanels.push("runSettlement");
+  if (panelState.galaxyMapOpen) openPanels.push("galaxyMap");
+  if (panelState.metaOpen) openPanels.push("meta");
+  if (panelState.researchTreeOpen) openPanels.push("researchTree");
+  if (panelState.objectiveChoiceOpen) openPanels.push("objectiveChoice");
+  return openPanels;
+}
+
+function hasStorageEntry(storage, key) {
+  try {
+    return storage.getItem(key) != null;
+  } catch {
+    return false;
+  }
+}
+
+function summarizeMetaStorageForPlaytestSnapshot() {
+  const metaState = isMetaObject(state.meta) ? state.meta : null;
+  const talents = isMetaObject(metaState?.talents) ? metaState.talents : {};
+  let talentCount = 0;
+  for (const rank of Object.values(talents)) {
+    const normalizedRank = Math.floor(Number(rank));
+    if (Number.isFinite(normalizedRank) && normalizedRank > 0) talentCount += 1;
+  }
+  return {
+    schemaVersion: metaState?.schemaVersion ?? null,
+    points: normalizeMetaPoints(metaState?.points),
+    talentCount,
+    selectedProtocol: typeof metaState?.selectedStartProtocol === "string" ? metaState.selectedStartProtocol : null,
+    activeProtocol: getActiveStartProtocolId(),
+    hasCorruptRaw: hasStorageEntry(sessionStorage, META_CORRUPT_RAW_KEY)
+  };
+}
+
+function summarizeResourceForPlaytestSnapshot() {
+  const resources = isMetaObject(state.resources) ? state.resources : {};
+  const power = isMetaObject(state.power) ? state.power : {};
+  return {
+    metal: Math.floor(Number(resources.metal) || 0),
+    ore: Math.floor(Number(resources.ore) || 0),
+    gas: Math.floor(Number(resources.gas) || 0),
+    plasma: Math.floor(Number(resources.plasma) || 0),
+    research: Math.floor(Number(resources.research) || 0),
+    powerUsed: Math.floor(Number(power.used) || 0),
+    powerAvailable: Math.floor(Number(power.available) || 0)
+  };
+}
+
+function summarizeObjectiveForPlaytestSnapshot() {
+  const objective = state.run.objective;
+  const displayProgress = getObjectiveDisplayProgress(objective);
+  return {
+    type: objective?.type ?? null,
+    text: objective?.text ?? null,
+    progress: Number.isFinite(objective?.progress) ? objective.progress : null,
+    target: Number.isFinite(objective?.target) ? objective.target : null,
+    progressRatio: Number.isFinite(displayProgress?.ratio) ? displayProgress.ratio : 0,
+    complete: isObjectiveComplete(),
+    failed: isObjectiveFailed(),
+    awaitingObjectiveChoice: !!state.run.awaitingObjectiveChoice,
+    objectiveChoiceDismissed: !!state.run.objectiveChoiceDismissed,
+    level: state.run.level,
+    currentGalaxyType: state.run.currentGalaxyType
+  };
+}
+
+function summarizeGuideForPlaytestSnapshot() {
+  const guide = buildGuideText();
+  const goal = typeof guide?.goal === "string" ? guide.goal : "";
+  const next = typeof guide?.next === "string" ? guide.next : "";
+  const resourceGuideHtml = String(buildResourceGuideHtml() || "");
+  return {
+    goal,
+    next,
+    hasUndefined: [goal, next, resourceGuideHtml].some((value) => value.includes("undefined")),
+    resourceGuideLength: resourceGuideHtml.length
+  };
+}
+
+function summarizeSelfCheckResult(rawResult, thrownError) {
+  if (thrownError) {
+    const reason = thrownError?.message || String(thrownError);
+    return {
+      ok: false,
+      status: "fail",
+      totalCases: 1,
+      passedCases: 0,
+      failedCases: [reason]
+    };
+  }
+
+  const result = isMetaObject(rawResult) ? rawResult : {};
+  const caseResults = Array.isArray(result.checks)
+    ? result.checks.map((entry) => ({
+      name: typeof entry?.name === "string" ? entry.name : "unknown",
+      ok: !!entry?.ok
+    }))
+    : [];
+  const failedCaseNames = caseResults.filter((entry) => !entry.ok).map((entry) => entry.name);
+  const fallbackFailure = typeof result.reason === "string" ? result.reason : "self_check_failed";
+  const totalCases = caseResults.length > 0 ? caseResults.length : 1;
+  const passedCases = caseResults.length > 0
+    ? caseResults.length - failedCaseNames.length
+    : (result.ok === true ? 1 : 0);
+  const ok = result.ok === true && failedCaseNames.length === 0;
+  return {
+    ok,
+    status: ok ? "pass" : "fail",
+    totalCases,
+    passedCases,
+    failedCases: ok ? [] : (failedCaseNames.length > 0 ? failedCaseNames : [fallbackFailure])
+  };
+}
+
+function runGuideSnapshotBasicSelfCheck() {
+  const guide = window.__gameTest.guideSnapshot?.();
+  const checks = [
+    { name: "guideSnapshotExists", ok: !!guide },
+    { name: "goalIsString", ok: typeof guide?.goal === "string" },
+    { name: "nextIsString", ok: typeof guide?.next === "string" },
+    { name: "resourceGuideHtmlIsString", ok: typeof guide?.resourceGuideHtml === "string" },
+    { name: "noUndefinedText", ok: !guide?.hasUndefined }
+  ];
+  return {
+    ok: checks.every((entry) => entry.ok),
+    checks
+  };
+}
+
+function runPlaytestSelfCheckInSandbox(key, checkFn) {
+  const baseline = capturePlaytestExecutionSnapshot();
+  const startedAt = Date.now();
+  let rawResult = null;
+  let thrownError = null;
+  try {
+    rawResult = checkFn();
+  } catch (error) {
+    thrownError = error;
+  } finally {
+    restorePlaytestExecutionSnapshot(baseline);
+  }
+  const summary = summarizeSelfCheckResult(rawResult, thrownError);
+  return {
+    key,
+    ...summary,
+    durationMs: Math.max(0, Date.now() - startedAt)
+  };
+}
+
+function updatePlaytestSelfCheckState(summary) {
+  playtestSelfCheckState.capturedAt = summary.capturedAt;
+  playtestSelfCheckState.ok = summary.ok;
+  playtestSelfCheckState.passed = summary.passed;
+  playtestSelfCheckState.total = summary.total;
+  playtestSelfCheckState.checks = {};
+  for (const check of summary.checks) {
+    playtestSelfCheckState.checks[check.key] = {
+      status: check.status,
+      ok: check.ok,
+      totalCases: check.totalCases,
+      passedCases: check.passedCases,
+      failedCases: [...check.failedCases],
+      durationMs: check.durationMs
+    };
+  }
+}
+
+function getPlaytestSelfCheckStateSnapshot() {
+  return {
+    capturedAt: playtestSelfCheckState.capturedAt,
+    ok: playtestSelfCheckState.ok,
+    passed: playtestSelfCheckState.passed,
+    total: playtestSelfCheckState.total,
+    checks: cloneForPlaytestSnapshot(playtestSelfCheckState.checks)
+  };
+}
+
+function runAllPlaytestSelfChecks() {
+  const definitions = [
+    { key: "metaS2Regression", run: () => runMetaS2RegressionSelfCheck() },
+    { key: "panelMutualExclusion", run: () => runPanelMutualExclusionSelfCheck() },
+    { key: "escapeSequence", run: () => runEscapeSequenceSelfCheck() },
+    { key: "galaxyJumpStateMachine", run: () => runGalaxyJumpStateMachineSelfCheck() },
+    { key: "guideSnapshotBasic", run: () => runGuideSnapshotBasicSelfCheck() }
+  ];
+
+  const checks = definitions.map((entry) => runPlaytestSelfCheckInSandbox(entry.key, entry.run));
+  const passed = checks.filter((entry) => entry.ok).length;
+  const summary = {
+    ok: passed === checks.length,
+    capturedAt: Date.now(),
+    passed,
+    failed: checks.length - passed,
+    total: checks.length,
+    checks
+  };
+  updatePlaytestSelfCheckState(summary);
+  return summary;
+}
+
 function handlePlaytestEscapeKeydown() {
   if (isGalaxyMapPanelOpen()) {
     cancelGalaxyJump();
@@ -11762,17 +12235,55 @@ function handlePlaytestEscapeKeydown() {
 
 window.__gameTest.playtest = {
   snapshot() {
+    const activeMainPanel = getActiveMainPanel();
+    const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
+    const panels = {
+      activeMainPanel,
+      focusPanel: activeMainPanel,
+      metaOpen: isMetaPanelOpen(),
+      galaxyMapOpen: isGalaxyMapPanelOpen(),
+      runSettlementOpen: isRunSettlementPanelOpen(),
+      objectiveChoiceOpen,
+      researchTreeOpen: !!state.hud?.researchTreeOpen,
+      overlapCount: countSimultaneouslyOpenMainPanels()
+    };
+    panels.openPanels = listOpenPanelsForSnapshot(panels);
+
     return {
       version: "v0.11.0-playtest-readiness",
       capturedAt: Date.now(),
-      panels: {
-        activeMainPanel: getActiveMainPanel(),
-        metaOpen: isMetaPanelOpen(),
-        galaxyMapOpen: isGalaxyMapPanelOpen(),
-        runSettlementOpen: isRunSettlementPanelOpen(),
-        objectiveChoiceOpen: !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden"),
-        researchTreeOpen: !!state.hud?.researchTreeOpen,
-        overlapCount: countSimultaneouslyOpenMainPanels()
+      panels,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        narrowViewport: window.matchMedia("(max-width: 760px)").matches
+      },
+      keyDom: {
+        game: snapshotDomNodeState("game"),
+        hud: snapshotDomNodeState("hud"),
+        metaPanel: snapshotDomNodeState("metaPanel"),
+        galaxyMapPanel: snapshotDomNodeState("galaxyMapPanel"),
+        runSettlementPanel: snapshotDomNodeState("runSettlementPanel"),
+        objectiveChoicePanel: snapshotDomNodeState("objectiveChoicePanel"),
+        currentGoal: snapshotDomNodeState("currentGoal"),
+        nextStep: snapshotDomNodeState("nextStep"),
+        metaPanelToggle: snapshotDomNodeState("metaPanelToggle"),
+        objectiveJumpBtn: snapshotDomNodeState("objectiveJumpBtn"),
+        summaryRestartBtn: snapshotDomNodeState("summaryRestartBtn")
+      },
+      metaStorage: {
+        saveKey: SAVE_KEY,
+        hasSave: hasStorageEntry(localStorage, SAVE_KEY),
+        summary: summarizeMetaStorageForPlaytestSnapshot()
+      },
+      resource: summarizeResourceForPlaytestSnapshot(),
+      objective: summarizeObjectiveForPlaytestSnapshot(),
+      guide: summarizeGuideForPlaytestSnapshot(),
+      selfChecks: getPlaytestSelfCheckStateSnapshot(),
+      runtimeErrors: {
+        count: playtestRuntimeErrorBuffer.length,
+        latest: getPlaytestRuntimeErrors()
       },
       objectiveChoice: {
         awaiting: !!state.run.awaitingObjectiveChoice,
@@ -11781,17 +12292,21 @@ window.__gameTest.playtest = {
       }
     };
   },
+  runAllSelfChecks() {
+    return runAllPlaytestSelfChecks();
+  },
+  getRuntimeErrors(limit = PLAYTEST_RUNTIME_ERROR_DEFAULT_LIMIT) {
+    return getPlaytestRuntimeErrors(limit);
+  },
+  clearRuntimeErrors() {
+    return clearPlaytestRuntimeErrors();
+  },
   describeOpenPanels() {
     const snap = this.snapshot();
-    const open = [];
-    if (snap.panels.runSettlementOpen) open.push("runSettlement");
-    if (snap.panels.galaxyMapOpen) open.push("galaxyMap");
-    if (snap.panels.metaOpen) open.push("meta");
-    if (snap.panels.researchTreeOpen) open.push("researchTree");
-    if (snap.panels.objectiveChoiceOpen) open.push("objectiveChoice");
     return {
       activeMainPanel: snap.panels.activeMainPanel,
-      openPanels: open,
+      focusPanel: snap.panels.focusPanel,
+      openPanels: [...snap.panels.openPanels],
       overlapCount: snap.panels.overlapCount
     };
   },
