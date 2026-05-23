@@ -15,8 +15,13 @@
       <div class="run-header">
         <strong>星环工站</strong>
         <span id="runInfo">准备中</span>
+        <div id="currentGalaxyInfoEl" class="hud-galaxy-info" aria-live="polite"></div>
         <span id="runDanger" class="run-pill danger-safe">危险度：安全</span>
         <span id="runProgress" class="run-progress">第 1 关 / 共 7 关</span>
+        <div id="galaxyPathEl" class="hud-galaxy-path" aria-label="星系路径">
+          <span class="hud-galaxy-path-label">路径</span>
+          <div class="hud-galaxy-path-dots"></div>
+        </div>
       </div>
       <div id="resources"></div>
       <div id="weaponsRow" class="weapons-row"></div>
@@ -54,6 +59,17 @@
         <div id="objectiveDeferredActions" class="objective-deferred-actions hidden">
           <p class="objective-choice-hint good">任务已完成，可随时跃迁</p>
           <button id="objectiveJumpDeferredBtn" type="button">跃迁下一星系</button>
+        </div>
+      </div>
+      <div id="galaxyMapPanel" class="galaxy-map-panel hidden" role="dialog" aria-modal="true" aria-labelledby="galaxyMapTitle">
+        <div class="galaxy-map-overlay"></div>
+        <div class="galaxy-map-content">
+          <h2 id="galaxyMapTitle">选择跃迁目的地</h2>
+          <p class="galaxy-map-subtitle">扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。</p>
+          <div class="galaxy-map-cards"></div>
+          <div class="galaxy-map-footer">
+            <button type="button" class="galaxy-map-cancel-btn">暂时停留（Esc）</button>
+          </div>
         </div>
       </div>
       <div id="runSettlementPanel" class="objective-choice-panel run-settlement-panel hidden" aria-live="polite">

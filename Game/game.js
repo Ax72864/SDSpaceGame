@@ -20,6 +20,8 @@ const toastEl = document.getElementById("toast");
 const runSettlementPanelEl = document.getElementById("runSettlementPanel");
 const runSettlementStatsEl = document.getElementById("runSettlementStats");
 const quickRestartBtnEl = document.getElementById("quickRestartBtn");
+const currentGalaxyInfoEl = document.getElementById("currentGalaxyInfoEl");
+const galaxyPathEl = document.getElementById("galaxyPathEl");
 
 const CELL = 30;
 
@@ -1993,6 +1995,7 @@ let selectedCellUpgradeEl = null;
 let selectedCellModificationEl = null;
 let researchTreePanelEl = null;
 let researchTreeBtnEl = null;
+let galaxyMapPanelBound = false;
 
 function ensureSelectedCellUpgradeUi() {
   if (selectedCellUpgradeEl) return;
@@ -3355,8 +3358,7 @@ function generateGalaxyChoices(targetLevel, rng) {
 function confirmGalaxyJump(galaxyType) {
   if (!GALAXY_TYPES[galaxyType]) return false;
   if (state.run.level >= ENDGAME_LEVEL) return false;
-  const panel = (typeof document !== "undefined") ? document.getElementById("galaxyMapPanel") : null;
-  if (panel) panel.classList.add("hidden");
+  hideGalaxyMapPanel();
   if (state.run.galaxyMap) {
     state.run.galaxyMap.pendingChoices = [];
   }
@@ -3387,11 +3389,204 @@ function confirmGalaxyJump(galaxyType) {
 // 仅清理 galaxyChoicesShown 标记并刷新 objectiveChoicePanel + HUD；
 // pendingChoices 留待 jumpBtn 重新触发时按 RNG 再生成（数值方案 §6.1 校验 5）。
 function cancelGalaxyJump() {
-  const panel = (typeof document !== "undefined") ? document.getElementById("galaxyMapPanel") : null;
-  if (panel) panel.classList.add("hidden");
+  hideGalaxyMapPanel();
   state.run.galaxyChoicesShown = false;
   if (typeof updateObjectiveChoiceUi === "function") updateObjectiveChoiceUi();
   if (typeof updateHud === "function") updateHud();
+}
+
+const OBJECTIVE_PREF_LABELS = {
+  mine: "采矿",
+  survive: "生存",
+  battle: "战斗",
+  explore: "探索",
+  salvage: "拾荒",
+  escort: "护送",
+  assault: "突击",
+  guardian: "守护者"
+};
+
+const ENCOUNTER_PREF_LABELS = {
+  trader: "贸易",
+  distress: "求救",
+  ambush: "伏击",
+  derelict: "残骸",
+  signal: "信号"
+};
+
+const RESOURCE_PREF_LABELS = {
+  metal: "金属",
+  ore: "矿物",
+  gas: "气体",
+  plasma: "等离子",
+  research: "科研"
+};
+
+function rgbaArrayToCss(rgba) {
+  if (!Array.isArray(rgba)) return "#555555";
+  const [r, g, b, a = 1] = rgba;
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+}
+
+function isGalaxyMapPanelOpen() {
+  const panel = document.getElementById("galaxyMapPanel");
+  return !!(panel && !panel.classList.contains("hidden"));
+}
+
+function hideGalaxyMapPanel() {
+  const panel = document.getElementById("galaxyMapPanel");
+  if (panel) panel.classList.add("hidden");
+}
+
+function formatRiskLabel(risk) {
+  return { low: "低风险", mid: "中风险", high: "高风险", extreme: "极高风险" }[risk] || "未知风险";
+}
+
+function summarizeWeightModPreferences(mod, labels, minMod = 1.05) {
+  if (!mod || typeof mod !== "object") return "均衡";
+  const ranked = Object.entries(mod)
+    .filter(([, value]) => Number.isFinite(value) && value >= minMod)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2);
+  if (!ranked.length) return "均衡";
+  return ranked.map(([key, value]) => {
+    const modText = value >= 2 ? Math.round(value) : value.toFixed(1);
+    return `${labels[key] || key} ×${modText}`;
+  }).join(" / ");
+}
+
+function summarizeObjectivePreferences(mod) {
+  return summarizeWeightModPreferences(mod, OBJECTIVE_PREF_LABELS);
+}
+
+function summarizeEncounterPreferences(mod) {
+  return summarizeWeightModPreferences(mod, ENCOUNTER_PREF_LABELS);
+}
+
+function formatResourceModSummary(resourceMod) {
+  if (!resourceMod || typeof resourceMod !== "object") return null;
+  const boosted = Object.entries(resourceMod)
+    .filter(([, value]) => Number.isFinite(value) && value !== 1.0)
+    .sort((a, b) => Math.abs(b[1] - 1) - Math.abs(a[1] - 1))
+    .slice(0, 2);
+  if (!boosted.length) return null;
+  return boosted.map(([key, value]) => `${RESOURCE_PREF_LABELS[key] || key} ×${value.toFixed(1)}`).join(" / ");
+}
+
+function formatGalaxyModsHtml(def) {
+  const parts = [];
+  if (def.enemySpawnMod != null && def.enemySpawnMod !== 1.0) {
+    parts.push(`<li>敌人 ×${def.enemySpawnMod.toFixed(1)}</li>`);
+  }
+  const resourceSummary = formatResourceModSummary(def.resourceMod);
+  if (resourceSummary) parts.push(`<li>资源：${resourceSummary}</li>`);
+  if (def.hostileStationMod && def.hostileStationMod !== 1.0) {
+    parts.push(`<li>突击概率 ×${def.hostileStationMod.toFixed(1)}</li>`);
+  }
+  parts.push(`<li>任务：${summarizeObjectivePreferences(def.objectiveWeightMod)}</li>`);
+  parts.push(`<li>事件：${summarizeEncounterPreferences(def.encounterWeightMod)}</li>`);
+  return parts.join("");
+}
+
+function renderGalaxyMapCards(choices) {
+  const panel = document.getElementById("galaxyMapPanel");
+  const cardsEl = panel?.querySelector(".galaxy-map-cards");
+  if (!cardsEl) return false;
+  const safeChoices = Array.isArray(choices)
+    ? choices.filter((choice) => choice && GALAXY_TYPES[choice.galaxyType])
+    : [];
+  if (!safeChoices.length) return false;
+
+  let html = "";
+  for (const choice of safeChoices) {
+    const def = GALAXY_TYPES[choice.galaxyType];
+    const riskLabel = formatRiskLabel(def.riskLevel);
+    const iconCss = rgbaArrayToCss(def.iconColor);
+    const modsHtml = formatGalaxyModsHtml(def);
+    html += `<button type="button" class="galaxy-map-card ${def.cssClass || ""}" data-galaxy-type="${choice.galaxyType}">`
+      + `<span class="galaxy-map-card-icon" style="background-color: ${iconCss}"></span>`
+      + `<h3 class="galaxy-map-card-name">${def.name}</h3>`
+      + `<span class="galaxy-map-card-risk risk-${def.riskLevel}">${riskLabel}</span>`
+      + `<p class="galaxy-map-card-description">${def.description}</p>`
+      + `<ul class="galaxy-map-card-mods">${modsHtml}</ul>`
+      + `</button>`;
+  }
+  setHtmlIfChanged(cardsEl, "galaxyMapCards", html);
+  return true;
+}
+
+function openGalaxyMapPanel(choices) {
+  const panel = document.getElementById("galaxyMapPanel");
+  if (!panel) return false;
+  const safeChoices = Array.isArray(choices)
+    ? choices.filter((choice) => choice && GALAXY_TYPES[choice.galaxyType])
+    : [];
+  if (!safeChoices.length) {
+    confirmGalaxyJump("emptyVoid");
+    return false;
+  }
+  if (!renderGalaxyMapCards(safeChoices)) {
+    confirmGalaxyJump(safeChoices[0].galaxyType);
+    return false;
+  }
+  panel.classList.remove("hidden");
+  return true;
+}
+
+function bindGalaxyMapPanelEvents() {
+  if (galaxyMapPanelBound) return;
+  const panel = document.getElementById("galaxyMapPanel");
+  if (!panel) return;
+  galaxyMapPanelBound = true;
+  panel.querySelector(".galaxy-map-cancel-btn")?.addEventListener("click", () => cancelGalaxyJump());
+  panel.querySelector(".galaxy-map-overlay")?.addEventListener("click", () => cancelGalaxyJump());
+  panel.querySelector(".galaxy-map-cards")?.addEventListener("click", (event) => {
+    const card = event.target.closest(".galaxy-map-card");
+    if (!card) return;
+    const galaxyType = card.dataset.galaxyType;
+    if (galaxyType && GALAXY_TYPES[galaxyType]) confirmGalaxyJump(galaxyType);
+  });
+}
+
+function updateGalaxyPathHud() {
+  const el = galaxyPathEl || document.getElementById("galaxyPathEl");
+  if (!el) return;
+  const dotsEl = el.querySelector(".hud-galaxy-path-dots");
+  if (!dotsEl) return;
+
+  const nodes = state.run.galaxyMap?.nodes || [];
+  const currentLevel = levelIndex(state.run.level);
+  let html = "";
+
+  for (let lvl = 0; lvl <= ENDGAME_LEVEL; lvl++) {
+    const node = nodes.find((entry) => entry && entry.level === lvl);
+    const fallbackType = lvl === ENDGAME_LEVEL ? "warFront" : null;
+    const galaxyType = node?.galaxyType ?? fallbackType;
+    const galaxyDef = galaxyType ? getGalaxyDefinition(galaxyType) : null;
+    const color = galaxyDef ? rgbaArrayToCss(galaxyDef.iconColor) : "#555555";
+
+    const classes = ["path-dot"];
+    if (node && node.visited && !node.current) classes.push("visited");
+    else if (lvl === currentLevel) classes.push("current");
+    else classes.push("future");
+    if (lvl === ENDGAME_LEVEL) classes.push("endgame");
+
+    const titleAttr = galaxyDef ? ` title="${galaxyDef.name}（${formatRiskLabel(galaxyDef.riskLevel)}）"` : "";
+    html += `<span class="${classes.join(" ")}" data-level="${lvl}"${titleAttr} style="background-color: ${color}"></span>`;
+  }
+  setHtmlIfChanged(dotsEl, "galaxyPathDots", html);
+}
+
+function updateCurrentGalaxyInfoHud() {
+  const el = currentGalaxyInfoEl || document.getElementById("currentGalaxyInfoEl");
+  if (!el) return;
+  const def = getGalaxyDefinition(state.run.currentGalaxyType);
+  const iconCss = rgbaArrayToCss(def.iconColor);
+  const riskLabel = formatRiskLabel(def.riskLevel);
+  const html = `<span class="galaxy-info-icon" style="background-color: ${iconCss}"></span>`
+    + `<span class="galaxy-info-name">${def.name}</span>`
+    + `<span class="galaxy-info-risk risk-${def.riskLevel}">${riskLabel}</span>`;
+  setHtmlIfChanged(el, "currentGalaxyInfo", html);
 }
 
 function getObjectiveWeightTable(level) {
@@ -3901,6 +4096,7 @@ function initGame() {
   seedEncountersForLevel(state.run.level);
   createBuildUi();
   ensureResearchTreeUi();
+  bindGalaxyMapPanelEvents();
   bindInput();
   syncMoreStatusPanel();
   window.addEventListener("resize", syncMoreStatusPanel);
@@ -4282,6 +4478,17 @@ function enemyActivityPointReward(kind) {
 }
 
 function bindInput() {
+  if (!state.galaxyEscapeBound) {
+    state.galaxyEscapeBound = true;
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (!isGalaxyMapPanelOpen()) return;
+      event.stopPropagation();
+      event.preventDefault();
+      cancelGalaxyJump();
+    }, true);
+  }
+
   canvas.addEventListener("contextmenu", (event) => {
     event.preventDefault();
   });
@@ -4353,6 +4560,7 @@ function bindInput() {
       handleWorldClick(world);
       event.preventDefault();
     } else if (event.key === "Escape") {
+      if (isGalaxyMapPanelOpen()) return;
       state.selectedBuild = null;
       state.selectedCell = null;
       clearBuildError();
@@ -7942,6 +8150,8 @@ function updateHud() {
   }
   updateMetaUi();
   updateControlModeUi();
+  updateCurrentGalaxyInfoHud();
+  updateGalaxyPathHud();
 }
 
 function setHtmlIfChanged(element, cacheKey, html) {
@@ -8213,49 +8423,31 @@ window.gameActions = {
       return;
     }
     if (!isObjectiveComplete()) return;
-    // v0.9.0：跃迁分支
-    //  - 下一关是终末关（level 6）：直接确认 warFront，跳过候选选择面板（保护 guardian 决战体验）
-    //  - 否则若 #galaxyMapPanel DOM 已存在（T5 注入后）：生成候选 + 打开 panel，让玩家选择
-    //  - DOM 缺失时（T1/T2 阶段尚未注入 UI）：保守 fallback 到 nextLevel("emptyVoid")，保证现有按钮路径不卡死
     const nextLvl = levelIndex(state.run.level + 1);
     if (nextLvl >= ENDGAME_LEVEL) {
       confirmGalaxyJump("warFront");
       return;
     }
-    const galaxyPanel = (typeof document !== "undefined") ? document.getElementById("galaxyMapPanel") : null;
+    const galaxyPanel = document.getElementById("galaxyMapPanel");
     if (galaxyPanel) {
-      // T5 UI 接入后走候选选择面板路径
       if (state.run.galaxyChoicesShown) return;
       const rng = getGalaxyChoiceRng(nextLvl);
       const choices = generateGalaxyChoices(nextLvl, rng);
+      if (!choices || choices.length === 0) {
+        confirmGalaxyJump("emptyVoid");
+        return;
+      }
       if (state.run.galaxyMap) {
         state.run.galaxyMap.pendingChoices = choices.slice();
       }
       state.run.galaxyChoicesShown = true;
       const objPanel = document.getElementById("objectiveChoicePanel");
       if (objPanel) objPanel.classList.add("hidden");
-      galaxyPanel.classList.remove("hidden");
+      if (!openGalaxyMapPanel(choices)) return;
       updateHud();
       return;
     }
-    // 兜底路径：T5 UI 未接入时（本批），按 emptyVoid fallback 保证可玩
-    nextLevel("emptyVoid");
-    if (state.run.galaxyMap) {
-      for (const node of state.run.galaxyMap.nodes) {
-        if (node) node.current = false;
-      }
-      galaxyNodeIdSeed += 1;
-      const newNode = {
-        id: `node-${galaxyNodeIdSeed}`,
-        level: levelIndex(state.run.level),
-        galaxyType: state.run.currentGalaxyType,
-        visited: true,
-        current: true
-      };
-      state.run.galaxyMap.nodes.push(newNode);
-      state.run.galaxyMap.currentNodeId = newNode.id;
-    }
-    updateHud();
+    confirmGalaxyJump("emptyVoid");
   },
   stayInCurrentGalaxy() {
     if (state.run.endgame) return;
@@ -8515,6 +8707,28 @@ window.__gameTest = {
   cancelGalaxyJump() {
     cancelGalaxyJump();
     return { ok: true, galaxyChoicesShown: state.run.galaxyChoicesShown, awaiting: state.run.awaitingObjectiveChoice };
+  },
+  openGalaxyMapForTest(targetLevel) {
+    const lvl = targetLevel != null ? levelIndex(targetLevel) : levelIndex(state.run.level + 1);
+    const rng = getGalaxyChoiceRng(lvl);
+    const choices = generateGalaxyChoices(lvl, rng);
+    if (state.run.galaxyMap) state.run.galaxyMap.pendingChoices = choices.slice();
+    state.run.galaxyChoicesShown = true;
+    const opened = openGalaxyMapPanel(choices);
+    return { ok: opened, choices, level: lvl };
+  },
+  getGalaxyHudSnapshot() {
+    return {
+      currentGalaxyType: state.run.currentGalaxyType,
+      currentGalaxyInfoHtml: document.getElementById("currentGalaxyInfoEl")?.innerHTML || null,
+      galaxyPathDotsHtml: document.getElementById("galaxyPathEl")?.querySelector(".hud-galaxy-path-dots")?.innerHTML || null,
+      panelOpen: isGalaxyMapPanelOpen(),
+      pendingChoices: [...(state.run.galaxyMap?.pendingChoices || [])],
+      galaxyChoicesShown: state.run.galaxyChoicesShown
+    };
+  },
+  isGalaxyMapPanelOpen() {
+    return isGalaxyMapPanelOpen();
   },
   // 读取完整 galaxyMap.nodes 路径
   getGalaxyPath() {
