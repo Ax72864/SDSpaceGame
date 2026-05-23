@@ -108,6 +108,170 @@ const GALAXY_PALETTES = {
   }
 };
 
+// v0.9.0 GALAXY_TYPES 注册表：7 种平行星系类型，作为 OBJECTIVE / ENCOUNTER / spawn / 资源 / 视觉的乘子覆盖层
+// 设计约束：
+//  - emptyVoid 是 v0.8.0 兼容锚点，所有数值乘子（objectiveWeightMod / encounterWeightMod / enemySpawnMod
+//    / resourceMod / hostileStationMod / enemyKindWeightMod / asteroidDensityMod / crossLevelBufferMod）
+//    均为 1.0，保证玩家全程选 emptyVoid 时与 v0.8.0 体验精确等价
+//  - 数值与 Workspaces/pm-qa-coordinator/v0.9.0-galaxy-map-numerics.md（含 §0.4 制作人拍板）保持一致
+//  - paletteKey 复用现有 GALAXY_PALETTES key，不引入新调色板
+//  - 未在 objectiveWeightMod / encounterWeightMod 中列出的 type 走默认 1.0
+//  - 资源对象使用 5 资源命名空间，与 numerics 文档一致；T3 接入时由乘子运行路径决定 research 是否乘子
+const GALAXY_TYPES = {
+  tradeHub: {
+    name: "稳定贸易区",
+    description: "和平的星际港，商船频繁，敌意稀少。",
+    riskLevel: "low",
+    iconColor: [0.29, 0.56, 0.89, 1],
+    nebulaTint: [0.37, 0.66, 1.0, 1],
+    bgColor: [0.039, 0.102, 0.165, 1],
+    planetColorTint: [0.37, 0.66, 1.0, 1],
+    paletteKey: "frost",
+    objectiveWeightMod: { mine: 1.5, survive: 1.5, battle: 0.5, explore: 1.0, salvage: 1.0, escort: 1.3, guardian: 1.0, assault: 0.5 },
+    encounterWeightMod: { trader: 3.0, distress: 0.8, ambush: 0.3, derelict: 0.8, signal: 0.8 },
+    enemySpawnMod: 0.7,
+    enemyKindWeightMod: { pirate: 0.7, station: 0.8, asteroid: 1.0 },
+    resourceMod: { metal: 1.2, ore: 1.0, gas: 1.0, plasma: 1.0, research: 1.0 },
+    hostileStationMod: 0.5,
+    asteroidDensityMod: 0.8,
+    crossLevelBufferMod: 1.0,
+    cssClass: "galaxy-trade-hub"
+  },
+  pirateTerritory: {
+    name: "海盗领地",
+    description: "海盗盘踞之地，战利品丰厚但险象环生。",
+    riskLevel: "high",
+    iconColor: [0.80, 0.20, 0.20, 1],
+    nebulaTint: [0.67, 0.22, 0.22, 1],
+    bgColor: [0.102, 0.031, 0.031, 1],
+    planetColorTint: [0.67, 0.22, 0.22, 1],
+    paletteKey: "crimson",
+    objectiveWeightMod: { mine: 0.5, survive: 1.0, battle: 2.0, explore: 0.7, salvage: 1.2, escort: 0.5, guardian: 1.0, assault: 1.2 },
+    encounterWeightMod: { trader: 0.5, distress: 1.5, ambush: 2.0, derelict: 1.0, signal: 0.7 },
+    enemySpawnMod: 1.5,
+    enemyKindWeightMod: { pirate: 1.5, station: 1.0, asteroid: 1.0 },
+    resourceMod: { metal: 1.3, ore: 1.0, gas: 1.0, plasma: 1.1, research: 1.0 },
+    hostileStationMod: 1.0,
+    asteroidDensityMod: 1.0,
+    crossLevelBufferMod: 1.0,
+    cssClass: "galaxy-pirate-territory"
+  },
+  miningBelt: {
+    name: "矿产带",
+    description: "矿物资源密集，小行星遍布，开采者天堂。",
+    riskLevel: "mid",
+    iconColor: [0.78, 0.60, 0.35, 1],
+    nebulaTint: [0.72, 0.54, 0.29, 1],
+    bgColor: [0.122, 0.094, 0.063, 1],
+    planetColorTint: [0.72, 0.54, 0.29, 1],
+    paletteKey: "sun",
+    objectiveWeightMod: { mine: 2.0, survive: 1.0, battle: 0.7, explore: 1.0, salvage: 1.3, escort: 1.0, guardian: 1.0, assault: 0.7 },
+    encounterWeightMod: { trader: 1.2, distress: 0.8, ambush: 0.7, derelict: 1.5, signal: 0.8 },
+    enemySpawnMod: 0.9,
+    enemyKindWeightMod: { pirate: 0.9, station: 0.8, asteroid: 1.5 },
+    resourceMod: { metal: 1.3, ore: 1.5, gas: 1.0, plasma: 1.0, research: 1.0 },
+    hostileStationMod: 0.8,
+    asteroidDensityMod: 2.0,
+    crossLevelBufferMod: 1.0,
+    cssClass: "galaxy-mining-belt"
+  },
+  mysteryZone: {
+    name: "疑虑空间",
+    description: "迷雾笼罩的未知区域，神秘信号频发。",
+    riskLevel: "mid",
+    iconColor: [0.61, 0.35, 0.72, 1],
+    nebulaTint: [0.56, 0.27, 0.68, 1],
+    bgColor: [0.082, 0.039, 0.122, 1],
+    planetColorTint: [0.56, 0.27, 0.68, 1],
+    paletteKey: "violet",
+    objectiveWeightMod: { mine: 1.0, survive: 1.0, battle: 1.0, explore: 2.0, salvage: 1.3, escort: 1.0, guardian: 1.0, assault: 1.0 },
+    encounterWeightMod: { trader: 0.5, distress: 0.8, ambush: 1.0, derelict: 1.2, signal: 3.0 },
+    enemySpawnMod: 1.0,
+    enemyKindWeightMod: { pirate: 1.0, station: 1.0, asteroid: 1.0 },
+    resourceMod: { metal: 1.0, ore: 1.0, gas: 1.2, plasma: 1.3, research: 1.2 },
+    hostileStationMod: 0.8,
+    asteroidDensityMod: 0.9,
+    crossLevelBufferMod: 1.0,
+    cssClass: "galaxy-mystery-zone"
+  },
+  warFront: {
+    name: "战争前线",
+    description: "舰队交火激烈，BOSS 出没频繁，硬核试炼。",
+    riskLevel: "extreme",
+    iconColor: [1.0, 0.40, 0.20, 1],
+    nebulaTint: [0.80, 0.27, 0.13, 1],
+    bgColor: [0.122, 0.039, 0.020, 1],
+    planetColorTint: [0.80, 0.27, 0.13, 1],
+    paletteKey: "abyss",
+    objectiveWeightMod: { mine: 0.3, survive: 1.5, battle: 2.0, explore: 0.5, salvage: 1.2, escort: 0.5, guardian: 1.5, assault: 2.0 },
+    encounterWeightMod: { trader: 0.3, distress: 2.0, ambush: 1.5, derelict: 1.0, signal: 0.7 },
+    enemySpawnMod: 2.0,
+    enemyKindWeightMod: { pirate: 1.5, station: 2.0, asteroid: 0.8 },
+    resourceMod: { metal: 1.2, ore: 1.0, gas: 1.0, plasma: 1.2, research: 1.5 },
+    hostileStationMod: 2.0,
+    asteroidDensityMod: 0.9,
+    crossLevelBufferMod: 1.5,
+    cssClass: "galaxy-war-front"
+  },
+  techRuin: {
+    name: "科技废墟",
+    description: "古代文明遗迹，散落着先进科技残片。",
+    riskLevel: "mid",
+    iconColor: [0.29, 0.78, 0.63, 1],
+    nebulaTint: [0.24, 0.66, 0.53, 1],
+    bgColor: [0.039, 0.122, 0.094, 1],
+    planetColorTint: [0.24, 0.66, 0.53, 1],
+    paletteKey: "mist",
+    objectiveWeightMod: { mine: 0.7, survive: 1.0, battle: 0.8, explore: 1.5, salvage: 2.0, escort: 1.0, guardian: 1.0, assault: 0.8 },
+    encounterWeightMod: { trader: 0.7, distress: 0.8, ambush: 0.8, derelict: 2.0, signal: 1.5 },
+    enemySpawnMod: 0.9,
+    enemyKindWeightMod: { pirate: 0.8, station: 1.2, asteroid: 1.0 },
+    resourceMod: { metal: 1.0, ore: 1.0, gas: 1.0, plasma: 1.3, research: 1.5 },
+    hostileStationMod: 1.0,
+    asteroidDensityMod: 1.0,
+    crossLevelBufferMod: 1.0,
+    cssClass: "galaxy-tech-ruin"
+  },
+  // emptyVoid 是 v0.8.0 兼容锚点：所有数值乘子 = 1.0，玩家在 emptyVoid 关卡内体验与 v0.8.0 基线精确等价；
+  // 低风险低压差异由 tradeHub 承担，emptyVoid 仅保留灰色视觉签名 + 基线 / 空旷语义
+  emptyVoid: {
+    name: "空旷星域",
+    description: "万籁俱寂的星际深空，基线节奏的星际深空。",
+    riskLevel: "low",
+    iconColor: [0.53, 0.53, 0.53, 1],
+    nebulaTint: [0.40, 0.40, 0.40, 1],
+    bgColor: [0.039, 0.039, 0.039, 1],
+    planetColorTint: [0.40, 0.40, 0.40, 1],
+    paletteKey: "coldfront",
+    objectiveWeightMod: { mine: 1.0, survive: 1.0, battle: 1.0, explore: 1.0, salvage: 1.0, escort: 1.0, guardian: 1.0, assault: 1.0 },
+    encounterWeightMod: { trader: 1.0, distress: 1.0, ambush: 1.0, derelict: 1.0, signal: 1.0 },
+    enemySpawnMod: 1.0,
+    enemyKindWeightMod: { pirate: 1.0, station: 1.0, asteroid: 1.0 },
+    resourceMod: { metal: 1.0, ore: 1.0, gas: 1.0, plasma: 1.0, research: 1.0 },
+    hostileStationMod: 1.0,
+    asteroidDensityMod: 1.0,
+    crossLevelBufferMod: 1.0,
+    cssClass: "galaxy-empty-void"
+  }
+};
+
+// v0.9.0 候选生成相关常量
+// 数值与 numerics §2 一致：level 0 / 6 强制锚点；level 1-5 候选数量随 level 上升；
+// levelBias 以百分比单位记录"风险等级抽中概率"，先抽 risk 再在该 risk 池内均匀抽 galaxyType
+const GALAXY_CANDIDATE_COUNT = [1, 2, 2, 3, 3, 3, 1];
+const GALAXY_CHOICE_BASE_WEIGHTS = { low: 30, mid: 40, high: 25, extreme: 5 };
+const GALAXY_LEVEL_BIAS = [
+  null,
+  { low: 50, mid: 40, high: 10, extreme: 0 },
+  { low: 40, mid: 40, high: 15, extreme: 5 },
+  { low: 30, mid: 40, high: 25, extreme: 5 },
+  { low: 20, mid: 35, high: 35, extreme: 10 },
+  { low: 10, mid: 30, high: 40, extreme: 20 }
+];
+// 候选 RNG 流：与 OBJECTIVE（^ 0x9e3779b9 + level * 0x85ebca6b）/ ENCOUNTER（^ 0xb5297a4d + level * 0xcc9e2d51）完全正交
+const GALAXY_CHOICE_RNG_XOR = 0xd3b07cf3;
+const GALAXY_CHOICE_RNG_MUL = 0x6c8e9cf5;
+
 const LEVEL_TIMER_SCALE = [1.0, 0.98, 0.96, 0.88, 0.8, 0.72, 1.2];
 const LEVEL0_SPAWN_WINDOW_SEC = 60;
 const LEVEL0_INITIAL_SPAWN_TIMER = 22;
@@ -662,7 +826,11 @@ const state = {
     hostileStationSpawnedThisGalaxy: false,
     hostileStationAlerted: false,
     encounters: [], // v0.8.0：本星系随机事件列表（pending/active/complete/failed/expired）
-    encounterCooldownThisGalaxy: new Set() // v0.8.0：单星系事件冷却（按 encounter.type）
+    encounterCooldownThisGalaxy: new Set(), // v0.8.0：单星系事件冷却（按 encounter.type）
+    // v0.9.0：局间星系图状态；走 runtime 路径不进 SAVE_KEY，刷新即重置
+    galaxyMap: { nodes: [], currentNodeId: null, pendingChoices: [] },
+    currentGalaxyType: "emptyVoid",
+    galaxyChoicesShown: false
   },
   resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
   power: { available: 0, used: 0 },
@@ -718,6 +886,8 @@ const state = {
 
 let fragmentIdSeed = 1;
 let npcIdSeed = 1;
+// v0.9.0：galaxyMap.nodes 节点 id 序列，跨关累计，run 间不重置
+let galaxyNodeIdSeed = 0;
 
 function loadMeta() {
   const base = {
@@ -1071,6 +1241,35 @@ function ensureRunRuntimeState() {
       if (npc.encounterId === undefined) npc.encounterId = null;
     }
   }
+  // v0.9.0：galaxyMap / currentGalaxyType / galaxyChoicesShown 兼容兜底
+  // 旧存档 / 旧运行态缺字段时回填默认值，并按当前 level + currentGalaxyType 补一个起点节点；
+  // 已有节点不动，避免 ensureRunRuntimeState 重复调用清空 nodes
+  if (!state.run.galaxyMap || typeof state.run.galaxyMap !== "object") {
+    state.run.galaxyMap = { nodes: [], currentNodeId: null, pendingChoices: [] };
+  }
+  if (!Array.isArray(state.run.galaxyMap.nodes)) state.run.galaxyMap.nodes = [];
+  if (!Array.isArray(state.run.galaxyMap.pendingChoices)) state.run.galaxyMap.pendingChoices = [];
+  if (typeof state.run.galaxyMap.currentNodeId !== "string" && state.run.galaxyMap.currentNodeId !== null) {
+    state.run.galaxyMap.currentNodeId = null;
+  }
+  if (typeof state.run.currentGalaxyType !== "string" || !GALAXY_TYPES[state.run.currentGalaxyType]) {
+    state.run.currentGalaxyType = "emptyVoid";
+  }
+  if (typeof state.run.galaxyChoicesShown !== "boolean") {
+    state.run.galaxyChoicesShown = false;
+  }
+  if (state.run.galaxyMap.nodes.length === 0) {
+    galaxyNodeIdSeed += 1;
+    const nodeId = `node-${galaxyNodeIdSeed}`;
+    state.run.galaxyMap.nodes.push({
+      id: nodeId,
+      level: levelIndex(state.run.level),
+      galaxyType: state.run.currentGalaxyType,
+      visited: true,
+      current: true
+    });
+    state.run.galaxyMap.currentNodeId = nodeId;
+  }
 }
 
 function setWorldBodies(bodies) {
@@ -1187,13 +1386,23 @@ function findStationSpawn(star, bodies, rng) {
   return { x: star.x - 920, y: star.y - 120 };
 }
 
-function generateGalaxy(level, seed) {
+function generateGalaxy(level, seed, galaxyTypeOverride) {
   const currentLevel = levelIndex(level);
   const config = GALAXY_LEVEL_CONFIG[currentLevel];
   const rng = createSeededRng(seed);
   const galaxyType = config.preferredType || pickGalaxyType(currentLevel, rng);
   const weights = GALAXY_RESOURCE_WEIGHTS[galaxyType] || GALAXY_RESOURCE_WEIGHTS.balance;
-  const palette = GALAXY_PALETTES[config.paletteKey] || GALAXY_PALETTES.sun;
+  // v0.9.0：根据 v0.9.0 galaxyType 覆盖 paletteKey 实现视觉签名差异；
+  // 仅切换 GALAXY_PALETTES 调色板，不改变 weights / planetCount / asteroidCount 等资源主逻辑，
+  // 保证 emptyVoid 关卡资源分布与 v0.8.0 基线等价（资源乘子留 T3 在运行路径接入）。
+  const runGalaxyType = (typeof galaxyTypeOverride === "string" && GALAXY_TYPES[galaxyTypeOverride])
+    ? galaxyTypeOverride
+    : (state.run?.currentGalaxyType && GALAXY_TYPES[state.run.currentGalaxyType] ? state.run.currentGalaxyType : null);
+  const galaxyDef = runGalaxyType ? GALAXY_TYPES[runGalaxyType] : null;
+  const paletteKey = (galaxyDef?.paletteKey && GALAXY_PALETTES[galaxyDef.paletteKey])
+    ? galaxyDef.paletteKey
+    : config.paletteKey;
+  const palette = GALAXY_PALETTES[paletteKey] || GALAXY_PALETTES.sun;
 
   const star = {
     type: "star",
@@ -1276,7 +1485,7 @@ function generateGalaxy(level, seed) {
     level: currentLevel,
     type: galaxyType,
     seed: hashSeed(seed),
-    paletteKey: config.paletteKey,
+    paletteKey,
     palette,
     bodies,
     stars: generateStarsByPalette(palette, rng),
@@ -2829,6 +3038,147 @@ function getEncounterRng(level) {
   const lvl = levelIndex(level);
   const seed = (state.run.seed ^ ENCOUNTER_RNG_XOR) + lvl * ENCOUNTER_RNG_MUL;
   return mulberry32(seed >>> 0);
+}
+
+// v0.9.0：galaxy 候选 RNG 派生流（与 OBJECTIVE / ENCOUNTER 公式完全正交）
+// 用 targetLevel 作为 RNG 种子分量，玩家在同 seed 同 level 取到同一组候选
+function getGalaxyChoiceRng(targetLevel) {
+  const lvl = levelIndex(targetLevel);
+  const seed = ((state.run.seed ^ GALAXY_CHOICE_RNG_XOR) >>> 0) + lvl * GALAXY_CHOICE_RNG_MUL;
+  return mulberry32(seed >>> 0);
+}
+
+// v0.9.0：通用乘子叠加 helper
+// final[type] = base[type] × (galaxyMod[type] ?? 1.0)；乘子缺失走 1.0；保护负值不出现
+// 本批仅供 __gameTest.getObjectiveType / __gameTest.getGalaxyTypeWeights 测试钩子使用，
+// 不接入 getObjectiveWeightTable / seedEncountersForLevel 等运行路径（T3 再接入）。
+function applyGalaxyWeightMod(baseWeights, galaxyMod) {
+  if (!baseWeights || typeof baseWeights !== "object") return {};
+  if (!galaxyMod || typeof galaxyMod !== "object") return { ...baseWeights };
+  const result = {};
+  for (const [type, baseWeight] of Object.entries(baseWeights)) {
+    const mod = galaxyMod[type];
+    if (mod == null) {
+      result[type] = baseWeight;
+    } else {
+      const finalWeight = baseWeight * mod;
+      result[type] = Number.isFinite(finalWeight) ? Math.max(0, finalWeight) : 0;
+    }
+  }
+  return result;
+}
+
+// v0.9.0：基于 GALAXY_LEVEL_BIAS 的二阶段加权候选抽样
+// 先在 candidatePool 中按 riskLevel 分组，再按 riskBias[risk] / 组内 type 数量 形成单 type 权重，
+// 最后一次性加权抽取（等价于 numerics §2.5 二阶段抽样的单步实现，便于直接用 mulberry32 RNG）
+function pickWeightedGalaxyType(rng, candidatePool, riskBias) {
+  if (!Array.isArray(candidatePool) || candidatePool.length === 0) return null;
+  const effectiveBias = riskBias && typeof riskBias === "object" ? riskBias : GALAXY_CHOICE_BASE_WEIGHTS;
+  const riskGroups = {};
+  for (const type of candidatePool) {
+    const def = GALAXY_TYPES[type];
+    const risk = def?.riskLevel || "mid";
+    if (!riskGroups[risk]) riskGroups[risk] = [];
+    riskGroups[risk].push(type);
+  }
+  const entries = [];
+  let total = 0;
+  for (const type of candidatePool) {
+    const def = GALAXY_TYPES[type];
+    const risk = def?.riskLevel || "mid";
+    const biasValue = effectiveBias[risk];
+    if (!Number.isFinite(biasValue) || biasValue <= 0) continue;
+    const groupSize = riskGroups[risk]?.length || 1;
+    const weight = biasValue / groupSize;
+    if (!Number.isFinite(weight) || weight <= 0) continue;
+    entries.push([type, weight]);
+    total += weight;
+  }
+  if (!entries.length || total <= 0) {
+    // 兜底：所有 risk bias 为 0（如 level 1 风险池只剩 extreme），随机选一个保留可推进
+    const idx = Math.floor(rng() * candidatePool.length);
+    return candidatePool[Math.min(idx, candidatePool.length - 1)];
+  }
+  let roll = rng() * total;
+  for (const [type, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return type;
+  }
+  return entries[entries.length - 1][0];
+}
+
+// v0.9.0：候选生成主函数
+// level 0 起点固定 emptyVoid；level >= ENDGAME_LEVEL 终末强制 warFront；
+// 中间关按 GALAXY_CANDIDATE_COUNT 决定候选数量，按 GALAXY_LEVEL_BIAS 风险倾向抽样；
+// 候选池保留 emptyVoid（玩家可"喘息"），尽量排除当前 galaxyType（避免连续两关同类型）。
+function generateGalaxyChoices(targetLevel, rng) {
+  const lvl = levelIndex(targetLevel);
+  if (lvl <= 0) return [{ galaxyType: "emptyVoid", reason: "start" }];
+  if (lvl >= ENDGAME_LEVEL) return [{ galaxyType: "warFront", reason: "endgame" }];
+  const candidateCount = GALAXY_CANDIDATE_COUNT[lvl] || 2;
+  const riskBias = GALAXY_LEVEL_BIAS[lvl] || GALAXY_CHOICE_BASE_WEIGHTS;
+  const currentType = state.run?.currentGalaxyType;
+  let available = Object.keys(GALAXY_TYPES);
+  if (currentType && available.length > 1) {
+    available = available.filter((t) => t !== currentType);
+  }
+  const choices = [];
+  const used = new Set();
+  for (let i = 0; i < candidateCount; i++) {
+    const pool = available.filter((t) => !used.has(t));
+    if (pool.length === 0) break;
+    const picked = pickWeightedGalaxyType(rng, pool, riskBias);
+    if (!picked) break;
+    choices.push({ galaxyType: picked, reason: "random" });
+    used.add(picked);
+  }
+  return choices;
+}
+
+// v0.9.0：跃迁到候选确认入口
+// 本批可由测试钩子（forceConfirmGalaxyJump）调用，UI 层 T5 接入卡片点击时同样走此函数；
+// 关闭 galaxyMapPanel（若 DOM 存在）、清理 pendingChoices / galaxyChoicesShown，
+// 然后通过 nextLevel(galaxyType) 推进关卡，并在 galaxyMap.nodes 中追加新节点。
+function confirmGalaxyJump(galaxyType) {
+  if (!GALAXY_TYPES[galaxyType]) return false;
+  if (state.run.level >= ENDGAME_LEVEL) return false;
+  const panel = (typeof document !== "undefined") ? document.getElementById("galaxyMapPanel") : null;
+  if (panel) panel.classList.add("hidden");
+  if (state.run.galaxyMap) {
+    state.run.galaxyMap.pendingChoices = [];
+  }
+  state.run.galaxyChoicesShown = false;
+  nextLevel(galaxyType);
+  // 在 galaxyMap.nodes 中追加新节点；前一个 current 节点转为 visited
+  if (state.run.galaxyMap) {
+    for (const node of state.run.galaxyMap.nodes) {
+      if (node) node.current = false;
+    }
+    galaxyNodeIdSeed += 1;
+    const newNode = {
+      id: `node-${galaxyNodeIdSeed}`,
+      level: levelIndex(state.run.level),
+      galaxyType,
+      visited: true,
+      current: true
+    };
+    state.run.galaxyMap.nodes.push(newNode);
+    state.run.galaxyMap.currentNodeId = newNode.id;
+  }
+  if (typeof updateHud === "function") updateHud();
+  return true;
+}
+
+// v0.9.0：玩家在 galaxyMapPanel 按 Escape 或点击「暂时停留」时调用
+// 保持 awaitingObjectiveChoice 不变，让玩家可再次点击 jumpBtn 重新弹出选择；
+// 仅清理 galaxyChoicesShown 标记并刷新 objectiveChoicePanel + HUD；
+// pendingChoices 留待 jumpBtn 重新触发时按 RNG 再生成（数值方案 §6.1 校验 5）。
+function cancelGalaxyJump() {
+  const panel = (typeof document !== "undefined") ? document.getElementById("galaxyMapPanel") : null;
+  if (panel) panel.classList.add("hidden");
+  state.run.galaxyChoicesShown = false;
+  if (typeof updateObjectiveChoiceUi === "function") updateObjectiveChoiceUi();
+  if (typeof updateHud === "function") updateHud();
 }
 
 function getObjectiveWeightTable(level) {
@@ -6407,14 +6757,26 @@ function updateObjective(dt) {
   notifyEncounters("tick", dt);
 }
 
-function nextLevel() {
+// v0.9.0：nextLevel 新增可选 galaxyType 参数
+// 默认 "emptyVoid" 保证无参调用（如 __gameTest.resetRun 间接路径、确认前 fallback）与 v0.8.0 行为精确等价；
+// 非法 galaxyType 也回落 emptyVoid，避免破坏后续 generateGalaxy / createObjective 等流程。
+// 注意：本批不清空 state.run.galaxyMap.nodes（节点累积，由 confirmGalaxyJump 显式 push），
+// 仅清理 pendingChoices / galaxyChoicesShown 这两个跨关瞬态字段。
+function nextLevel(galaxyType = "emptyVoid") {
   ensureRunRuntimeState();
   if (state.run.level >= ENDGAME_LEVEL) {
     showToast("终末星系已就绪，无法继续跃迁；请完成守护者结算或直接开始新局。");
     return;
   }
+  const safeGalaxyType = (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType]) ? galaxyType : "emptyVoid";
   state.run.level = levelIndex(state.run.level + 1);
   state.run.endgame = state.run.level >= ENDGAME_LEVEL;
+  // 先写入新 galaxyType，再 generateGalaxy / createObjective / seedEncountersForLevel，保证 paletteKey 与（T3 之后的）权重乘子按本关 galaxyType 生效
+  state.run.currentGalaxyType = safeGalaxyType;
+  if (state.run.galaxyMap) {
+    state.run.galaxyMap.pendingChoices = [];
+  }
+  state.run.galaxyChoicesShown = false;
   state.run.guardianSpawned = false;
   state.run.guardianDefeated = false;
   state.run.guardianSpawnDelay = state.run.endgame ? 6 : 0;
@@ -6426,7 +6788,7 @@ function nextLevel() {
   runSettlementPanelEl?.classList.add("hidden");
   updateQuickRestartVisibility();
 
-  const galaxy = generateGalaxy(state.run.level, `${state.run.seed}:${state.run.level}`);
+  const galaxy = generateGalaxy(state.run.level, `${state.run.seed}:${state.run.level}`, safeGalaxyType);
   applyGalaxy(galaxy);
 
   state.fragments = [];
@@ -7617,7 +7979,48 @@ window.gameActions = {
       return;
     }
     if (!isObjectiveComplete()) return;
-    nextLevel();
+    // v0.9.0：跃迁分支
+    //  - 下一关是终末关（level 6）：直接确认 warFront，跳过候选选择面板（保护 guardian 决战体验）
+    //  - 否则若 #galaxyMapPanel DOM 已存在（T5 注入后）：生成候选 + 打开 panel，让玩家选择
+    //  - DOM 缺失时（T1/T2 阶段尚未注入 UI）：保守 fallback 到 nextLevel("emptyVoid")，保证现有按钮路径不卡死
+    const nextLvl = levelIndex(state.run.level + 1);
+    if (nextLvl >= ENDGAME_LEVEL) {
+      confirmGalaxyJump("warFront");
+      return;
+    }
+    const galaxyPanel = (typeof document !== "undefined") ? document.getElementById("galaxyMapPanel") : null;
+    if (galaxyPanel) {
+      // T5 UI 接入后走候选选择面板路径
+      if (state.run.galaxyChoicesShown) return;
+      const rng = getGalaxyChoiceRng(nextLvl);
+      const choices = generateGalaxyChoices(nextLvl, rng);
+      if (state.run.galaxyMap) {
+        state.run.galaxyMap.pendingChoices = choices.slice();
+      }
+      state.run.galaxyChoicesShown = true;
+      const objPanel = document.getElementById("objectiveChoicePanel");
+      if (objPanel) objPanel.classList.add("hidden");
+      galaxyPanel.classList.remove("hidden");
+      updateHud();
+      return;
+    }
+    // 兜底路径：T5 UI 未接入时（本批），按 emptyVoid fallback 保证可玩
+    nextLevel("emptyVoid");
+    if (state.run.galaxyMap) {
+      for (const node of state.run.galaxyMap.nodes) {
+        if (node) node.current = false;
+      }
+      galaxyNodeIdSeed += 1;
+      const newNode = {
+        id: `node-${galaxyNodeIdSeed}`,
+        level: levelIndex(state.run.level),
+        galaxyType: state.run.currentGalaxyType,
+        visited: true,
+        current: true
+      };
+      state.run.galaxyMap.nodes.push(newNode);
+      state.run.galaxyMap.currentNodeId = newNode.id;
+    }
     updateHud();
   },
   stayInCurrentGalaxy() {
@@ -7639,7 +8042,9 @@ window.gameActions = {
 window.__gameState = state;
 
 window.__gameTest = {
-  resetRun(seed, level) {
+  // v0.9.0：第 3 参 galaxyType 可选，缺省 emptyVoid（行为与 v0.8.0 基线精确等价）；
+  // 旧签名 resetRun(seed, level) 完全兼容（不传 galaxyType 时走 emptyVoid 路径）
+  resetRun(seed, level, galaxyType = "emptyVoid") {
     ensureRunRuntimeState();
     state.run.seed = seed;
     state.run.level = levelIndex(level);
@@ -7670,9 +8075,26 @@ window.__gameTest = {
     state.run.encounterCooldownThisGalaxy = new Set();
     state.hudCenterAlertQueue = [];
     state.hudCenterAlertCurrent = null;
+    // v0.9.0：在 generateGalaxy 之前先确定 galaxyType + 重置 galaxyMap，
+    // 让本次 generateGalaxy 走对应 paletteKey；非法 galaxyType 回落 emptyVoid 等价 v0.8.0
+    const safeGalaxyType = (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType]) ? galaxyType : "emptyVoid";
+    state.run.currentGalaxyType = safeGalaxyType;
+    state.run.galaxyMap = { nodes: [], currentNodeId: null, pendingChoices: [] };
+    state.run.galaxyChoicesShown = false;
     const lvl = levelIndex(level);
-    const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`);
+    const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`, safeGalaxyType);
     applyGalaxy(galaxy);
+    // 显式补一个对应当前 level + galaxyType 的起点节点
+    galaxyNodeIdSeed += 1;
+    const startNodeId = `node-${galaxyNodeIdSeed}`;
+    state.run.galaxyMap.nodes.push({
+      id: startNodeId,
+      level: lvl,
+      galaxyType: safeGalaxyType,
+      visited: true,
+      current: true
+    });
+    state.run.galaxyMap.currentNodeId = startNodeId;
     for (const cell of state.station.cells.values()) {
       resetCellUpgradeState(cell);
     }
@@ -7680,11 +8102,22 @@ window.__gameTest = {
     seedEncountersForLevel(lvl);
     state.run.fragmentHudCache = null;
   },
-  getObjectiveType(seed, level) {
+  // v0.9.0：第 3 参 galaxyType 可选；未传时按 v0.8.0 基线表抽样（与 v0.8.0 行为精确等价）；
+  // 传入有效 galaxyType 时叠加 objectiveWeightMod + warFront 的 hostileStationMod
+  getObjectiveType(seed, level, galaxyType) {
     const lvl = levelIndex(level);
     const objectiveSeed = (seed ^ 0x9e3779b9) + lvl * 0x85ebca6b;
     const objectiveRng = mulberry32(objectiveSeed);
-    const weightTable = OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1];
+    let weightTable = { ...(OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1]) };
+    if (typeof galaxyType === "string") {
+      const galaxyDef = GALAXY_TYPES[galaxyType];
+      if (galaxyDef && galaxyDef.objectiveWeightMod) {
+        weightTable = applyGalaxyWeightMod(weightTable, galaxyDef.objectiveWeightMod);
+        if (weightTable.assault != null && Number.isFinite(galaxyDef.hostileStationMod)) {
+          weightTable.assault = Math.max(0, weightTable.assault * galaxyDef.hostileStationMod);
+        }
+      }
+    }
     return pickWeighted(objectiveRng, weightTable);
   },
   sampleAssaultRate(level, sampleCount = 1000, startSeed = 1) {
@@ -7813,6 +8246,85 @@ window.__gameTest = {
     const enc = (state.run.encounters || []).find((entry) => entry.id === encounterId);
     if (!enc) return { ok: false, reason: "not found" };
     return { ok: performTraderTrade(enc, optionIndex), encounter: enc.id };
+  },
+  // v0.9.0 测试钩子集合：仅供 PM 浏览器级回归与节点 A 验证用，不影响主路径行为
+  // 仅切换 currentGalaxyType 状态；不重新 createObjective / seedEncountersForLevel
+  // （PM 想刷新本关 OBJECTIVE / ENCOUNTER 时显式调 resetRun 即可）
+  setGalaxyType(galaxyType) {
+    if (!GALAXY_TYPES[galaxyType]) return { ok: false, reason: "unknown galaxyType" };
+    state.run.currentGalaxyType = galaxyType;
+    return { ok: true, galaxyType: state.run.currentGalaxyType };
+  },
+  // 读取当前候选列表（玩家点 jumpBtn 后由 jumpToNextGalaxy 或 generateGalaxyChoices 填入）
+  getGalaxyChoices() {
+    return [...(state.run.galaxyMap?.pendingChoices || [])];
+  },
+  // 不依赖 panel DOM，按指定 RNG 重新生成 targetLevel 的候选；不修改 state.run
+  generateGalaxyChoices(targetLevel) {
+    const rng = getGalaxyChoiceRng(targetLevel);
+    return generateGalaxyChoices(targetLevel, rng);
+  },
+  // 跑 N 次同 level 候选生成，统计各 galaxyType 出现频次（PM 节点 A 验证分布）
+  simulateGalaxyChoices(targetLevel, count = 100) {
+    const stats = {};
+    const lvl = levelIndex(targetLevel);
+    for (let i = 0; i < count; i++) {
+      // 临时变种 RNG 流：用 i 偏移让多次模拟独立，且不影响真实 state.run.seed RNG
+      const seed = (((state.run.seed ^ GALAXY_CHOICE_RNG_XOR) >>> 0) + lvl * GALAXY_CHOICE_RNG_MUL + i * 0x9e3779b9) >>> 0;
+      const rng = mulberry32(seed);
+      const choices = generateGalaxyChoices(targetLevel, rng);
+      for (const choice of choices) {
+        stats[choice.galaxyType] = (stats[choice.galaxyType] || 0) + 1;
+      }
+    }
+    return { count, level: lvl, stats };
+  },
+  // 强制确认跃迁到指定 galaxyType（绕过 panel 点击）；非法 type 报错
+  forceConfirmGalaxyJump(galaxyType) {
+    if (!GALAXY_TYPES[galaxyType]) return { ok: false, reason: "unknown galaxyType" };
+    const ok = confirmGalaxyJump(galaxyType);
+    return { ok, level: state.run.level, galaxyType: state.run.currentGalaxyType };
+  },
+  // 测试 Escape 取消流程（不破坏 awaitingObjectiveChoice）
+  cancelGalaxyJump() {
+    cancelGalaxyJump();
+    return { ok: true, galaxyChoicesShown: state.run.galaxyChoicesShown, awaiting: state.run.awaitingObjectiveChoice };
+  },
+  // 读取完整 galaxyMap.nodes 路径
+  getGalaxyPath() {
+    return (state.run.galaxyMap?.nodes || []).map((node) => ({
+      id: node.id,
+      level: node.level,
+      galaxyType: node.galaxyType,
+      visited: !!node.visited,
+      current: !!node.current
+    }));
+  },
+  // 调试乘子叠加后的权重表：OBJECTIVE / ENCOUNTER（叠加 galaxyType 乘子后的 base × mod 结果）
+  // 当 galaxyType 缺省或为 emptyVoid 时，输出与 base 表完全一致（emptyVoid 所有 mod = 1.0）
+  getGalaxyTypeWeights(galaxyType, level) {
+    const lvl = levelIndex(level);
+    const galaxyDef = GALAXY_TYPES[galaxyType];
+    const objectiveBase = { ...(OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1]) };
+    const encounterBase = { ...(ENCOUNTER_LEVEL_WEIGHTS[lvl] || {}) };
+    if (!galaxyDef) {
+      return { ok: false, reason: "unknown galaxyType", level: lvl, objective: objectiveBase, encounter: encounterBase };
+    }
+    let objectiveModded = applyGalaxyWeightMod(objectiveBase, galaxyDef.objectiveWeightMod);
+    if (objectiveModded.assault != null && Number.isFinite(galaxyDef.hostileStationMod)) {
+      objectiveModded.assault = Math.max(0, objectiveModded.assault * galaxyDef.hostileStationMod);
+    }
+    const encounterModded = applyGalaxyWeightMod(encounterBase, galaxyDef.encounterWeightMod);
+    return {
+      ok: true,
+      level: lvl,
+      galaxyType,
+      objective: objectiveModded,
+      encounter: encounterModded,
+      enemySpawnMod: galaxyDef.enemySpawnMod,
+      resourceMod: galaxyDef.resourceMod,
+      hostileStationMod: galaxyDef.hostileStationMod
+    };
   },
   getCellStat,
   applyModification,
