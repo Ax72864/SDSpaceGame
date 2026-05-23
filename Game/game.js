@@ -791,6 +791,246 @@ const RESOURCE_VISUAL = {
   plasma: { ring: [0.85, 0.38, 1.0, 1], label: "等离子", css: "plasma" }
 };
 
+const META_SCHEMA_VERSION = 2;
+const META_DEFAULT_PROTOCOL_ID = "balanced";
+const META_TALENT_TREE = [
+  {
+    id: "miningYield",
+    name: "采集校准",
+    desc: "提升所有采集设施的产出。",
+    category: "resource",
+    tier: 1,
+    cost: [1, 1, 2],
+    maxRank: 3,
+    prereq: [],
+    effects: [{ key: "miningYield", op: "addPercent", perRank: 0.1 }],
+    uiHint: { color: "resource", icon: "ore", recommendTag: "新手推荐" }
+  },
+  {
+    id: "metalRefining",
+    name: "金属精炼",
+    desc: "所有建造的金属消耗降低。",
+    category: "resource",
+    tier: 2,
+    cost: [2, 3],
+    maxRank: 2,
+    prereq: [{ nodeId: "miningYield", rank: 1 }],
+    effects: [{ key: "metalRefining", op: "mul", perRankMul: 0.95 }],
+    uiHint: { color: "resource", icon: "metal", recommendTag: "" }
+  },
+  {
+    id: "startingCache",
+    name: "启程储备",
+    desc: "开局获得少量额外金属与矿石储备。",
+    category: "resource",
+    tier: 2,
+    cost: [2, 2],
+    maxRank: 2,
+    prereq: [{ nodeId: "miningYield", rank: 2 }],
+    effects: [
+      { key: "startingMetal", op: "add", perRank: 15 },
+      { key: "startingOre", op: "add", perRank: 6 },
+      { key: "unlockProtocol", protocol: "miningStart", atRank: 1 }
+    ],
+    uiHint: { color: "resource", icon: "cache", recommendTag: "解锁采矿协议" }
+  },
+  {
+    id: "hullIntegrity",
+    name: "框架强化",
+    desc: "提升所有框架与单元的最大耐久。",
+    category: "defense",
+    tier: 1,
+    cost: [1, 1, 2],
+    maxRank: 3,
+    prereq: [],
+    effects: [{ key: "hullIntegrity", op: "addPercent", perRank: 0.1 }],
+    uiHint: { color: "defense", icon: "shield", recommendTag: "新手推荐" }
+  },
+  {
+    id: "coreFortitude",
+    name: "核心加固",
+    desc: "仅提升核心舱的最大耐久。",
+    category: "defense",
+    tier: 2,
+    cost: [2, 3],
+    maxRank: 2,
+    prereq: [{ nodeId: "hullIntegrity", rank: 1 }],
+    effects: [
+      { key: "coreFortitude", op: "addPercent", perRank: 0.1 },
+      { key: "unlockProtocol", protocol: "defenseStart", atRank: 1 }
+    ],
+    uiHint: { color: "defense", icon: "core", recommendTag: "解锁防御协议" }
+  },
+  {
+    id: "buildDiscount",
+    name: "模块化设计",
+    desc: "所有设施的建造资源消耗降低。",
+    category: "defense",
+    tier: 3,
+    cost: [3, 4],
+    maxRank: 2,
+    prereq: [
+      { nodeId: "hullIntegrity", rank: 2 },
+      { nodeId: "metalRefining", rank: 1 }
+    ],
+    effects: [{ key: "buildDiscount", op: "mul", perRankMul: 0.96 }],
+    uiHint: { color: "defense", icon: "blueprint", recommendTag: "" }
+  },
+  {
+    id: "weaponCalibration",
+    name: "武器校准",
+    desc: "提升所有武器单元的伤害输出。",
+    category: "weapon",
+    tier: 1,
+    cost: [1, 1, 2],
+    maxRank: 3,
+    prereq: [],
+    effects: [
+      { key: "weaponCalibration", op: "addPercent", perRank: 0.1 },
+      { key: "unlockProtocol", protocol: "weaponStart", atRank: 2 }
+    ],
+    uiHint: { color: "weapon", icon: "turret", recommendTag: "解锁武器协议" }
+  },
+  {
+    id: "weaponFrame",
+    name: "高级武器框架",
+    desc: "解锁高级武器框架蓝图。",
+    category: "weapon",
+    tier: 3,
+    cost: [3],
+    maxRank: 1,
+    prereq: [{ nodeId: "weaponCalibration", rank: 2 }],
+    effects: [{ key: "weaponFrame", op: "flag" }],
+    uiHint: { color: "weapon", icon: "frame", recommendTag: "解锁" }
+  },
+  {
+    id: "weaponEfficiency",
+    name: "推进效率",
+    desc: "提升武器单元附带的推力效率。",
+    category: "weapon",
+    tier: 2,
+    cost: [2, 2],
+    maxRank: 2,
+    prereq: [{ nodeId: "weaponCalibration", rank: 1 }],
+    effects: [{ key: "weaponEfficiency", op: "addPercent", perRank: 0.05 }],
+    uiHint: { color: "weapon", icon: "thrust", recommendTag: "" }
+  },
+  {
+    id: "researchInsight",
+    name: "科研洞察",
+    desc: "完成任务获得的局内科研点提升。",
+    category: "exploration",
+    tier: 1,
+    cost: [1, 2],
+    maxRank: 2,
+    prereq: [],
+    effects: [{ key: "researchInsight", op: "addPercent", perRank: 0.12 }],
+    uiHint: { color: "exploration", icon: "research", recommendTag: "" }
+  },
+  {
+    id: "efficientCore",
+    name: "高效核心",
+    desc: "解锁高效核心蓝图。",
+    category: "exploration",
+    tier: 3,
+    cost: [3],
+    maxRank: 1,
+    prereq: [{ nodeId: "researchInsight", rank: 1 }],
+    effects: [{ key: "efficientCore", op: "flag" }],
+    uiHint: { color: "exploration", icon: "core-plus", recommendTag: "解锁" }
+  },
+  {
+    id: "galaxyForesight",
+    name: "星图洞察",
+    desc: "解锁星图探索开局协议与星系提示能力。",
+    category: "exploration",
+    tier: 4,
+    cost: [4],
+    maxRank: 1,
+    prereq: [
+      { nodeId: "researchInsight", rank: 2 },
+      { nodeId: "efficientCore", rank: 1 }
+    ],
+    effects: [
+      { key: "earlyHint", op: "flag" },
+      { key: "unlockProtocol", protocol: "scoutStart", atRank: 1 }
+    ],
+    uiHint: { color: "exploration", icon: "starmap", recommendTag: "长期目标" }
+  }
+];
+const META_TALENT_INDEX = Object.fromEntries(META_TALENT_TREE.map((node) => [node.id, node]));
+
+const START_PROTOCOLS = [
+  { id: "balanced", name: "标准开局", desc: "无额外补给，按基础规则开局。", unlock: null, effects: [] },
+  {
+    id: "miningStart",
+    name: "采矿起步",
+    desc: "开局获得额外金属储备，采矿设施造价降低。",
+    unlock: { nodeId: "startingCache", rank: 1 },
+    effects: [
+      { key: "startingMetal", op: "add", value: 25 },
+      { key: "startingOre", op: "add", value: 10 },
+      { key: "miningFacilityDiscount", op: "mul", value: 0.85 },
+      { key: "earlyHint", op: "flag", value: true }
+    ]
+  },
+  {
+    id: "defenseStart",
+    name: "防御起步",
+    desc: "开局核心与框架耐久增益。",
+    unlock: { nodeId: "coreFortitude", rank: 1 },
+    effects: [
+      { key: "startingHullBonus", op: "addPercent", value: 0.08 },
+      { key: "startingMetal", op: "add", value: 10 },
+      { key: "earlyHint", op: "flag", value: true }
+    ]
+  },
+  {
+    id: "weaponStart",
+    name: "武器起步",
+    desc: "武器设施造价折扣并获得少量额外等离子。",
+    unlock: { nodeId: "weaponCalibration", rank: 2 },
+    effects: [
+      { key: "weaponFacilityDiscount", op: "mul", value: 0.85 },
+      { key: "startingPlasma", op: "add", value: 3 },
+      { key: "earlyHint", op: "flag", value: true }
+    ]
+  },
+  {
+    id: "scoutStart",
+    name: "星图探索",
+    desc: "开局获得少量气体并解锁更多星图提示。",
+    unlock: { nodeId: "galaxyForesight", rank: 1 },
+    effects: [
+      { key: "startingGas", op: "add", value: 8 },
+      { key: "earlyHint", op: "flag", value: true }
+    ]
+  }
+];
+const START_PROTOCOL_INDEX = Object.fromEntries(START_PROTOCOLS.map((protocol) => [protocol.id, protocol]));
+
+const META_EFFECT_MODE = {
+  miningYield: "addPercent",
+  metalRefining: "mul",
+  startingMetal: "add",
+  startingOre: "add",
+  hullIntegrity: "addPercent",
+  coreFortitude: "addPercent",
+  buildDiscount: "mul",
+  weaponCalibration: "addPercent",
+  weaponFrame: "flag",
+  weaponEfficiency: "addPercent",
+  researchInsight: "addPercent",
+  efficientCore: "flag",
+  galaxyForesight: "flag",
+  startingGas: "add",
+  startingPlasma: "add",
+  startingHullBonus: "addPercent",
+  miningFacilityDiscount: "mul",
+  weaponFacilityDiscount: "mul",
+  earlyHint: "flag"
+};
+
 const state = {
   paused: false,
   time: 0,
@@ -905,22 +1145,375 @@ let npcIdSeed = 1;
 // v0.9.0：galaxyMap.nodes 节点 id 序列，跨关累计，run 间不重置
 let galaxyNodeIdSeed = 0;
 
-function loadMeta() {
-  const base = {
-    points: 0,
-    mining: 0,
-    hull: 0,
-    weapons: 0,
-    unlocks: {
-      weaponFrame: false,
-      efficientCore: false
-    }
-  };
-  try {
-    return { ...base, ...JSON.parse(localStorage.getItem(SAVE_KEY) || "{}") };
-  } catch {
-    return base;
+function isMetaObject(value) {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function getMetaTalentNode(talentId) {
+  return typeof talentId === "string" ? META_TALENT_INDEX[talentId] || null : null;
+}
+
+function normalizeMetaPoints(rawPoints) {
+  const points = Math.floor(Number(rawPoints));
+  return Number.isFinite(points) && points > 0 ? points : 0;
+}
+
+function createDefaultMetaTalents() {
+  const talents = {};
+  for (const node of META_TALENT_TREE) {
+    talents[node.id] = 0;
   }
+  return talents;
+}
+
+function createDefaultMetaState() {
+  return {
+    schemaVersion: META_SCHEMA_VERSION,
+    migrationVersion: META_SCHEMA_VERSION,
+    points: 0,
+    talents: createDefaultMetaTalents(),
+    unlockedProtocols: [META_DEFAULT_PROTOCOL_ID],
+    selectedStartProtocol: META_DEFAULT_PROTOCOL_ID
+  };
+}
+
+function clampMetaTalentRank(talentId, rawRank) {
+  const node = getMetaTalentNode(talentId);
+  if (!node) return 0;
+  const rank = Math.floor(Number(rawRank));
+  if (!Number.isFinite(rank)) return 0;
+  return Math.max(0, Math.min(node.maxRank, rank));
+}
+
+function sanitizeMetaTalents(rawTalents) {
+  const talents = createDefaultMetaTalents();
+  if (!isMetaObject(rawTalents)) return talents;
+  for (const node of META_TALENT_TREE) {
+    talents[node.id] = clampMetaTalentRank(node.id, rawTalents[node.id]);
+  }
+  return talents;
+}
+
+function recomputeUnlockedProtocols(metaState = state.meta) {
+  if (!isMetaObject(metaState)) {
+    return [META_DEFAULT_PROTOCOL_ID];
+  }
+  const unlocked = new Set([META_DEFAULT_PROTOCOL_ID]);
+  const talents = isMetaObject(metaState.talents) ? metaState.talents : {};
+
+  for (const node of META_TALENT_TREE) {
+    const rank = clampMetaTalentRank(node.id, talents[node.id]);
+    if (rank <= 0) continue;
+    for (const effect of node.effects || []) {
+      if (effect?.key !== "unlockProtocol" || typeof effect.protocol !== "string") continue;
+      const requiredRank = Math.max(1, Math.floor(Number(effect.atRank) || 1));
+      if (rank >= requiredRank && START_PROTOCOL_INDEX[effect.protocol]) {
+        unlocked.add(effect.protocol);
+      }
+    }
+  }
+
+  for (const protocol of START_PROTOCOLS) {
+    if (!protocol.unlock) {
+      unlocked.add(protocol.id);
+      continue;
+    }
+    const unlockNodeId = protocol.unlock.nodeId;
+    const unlockRank = Math.max(1, Math.floor(Number(protocol.unlock.rank) || 1));
+    if (getMetaTalentRank(unlockNodeId, metaState) >= unlockRank) {
+      unlocked.add(protocol.id);
+    }
+  }
+
+  const ordered = START_PROTOCOLS
+    .map((protocol) => protocol.id)
+    .filter((protocolId) => unlocked.has(protocolId));
+  if (!ordered.includes(META_DEFAULT_PROTOCOL_ID)) {
+    ordered.unshift(META_DEFAULT_PROTOCOL_ID);
+  }
+  metaState.unlockedProtocols = ordered;
+  if (!ordered.includes(metaState.selectedStartProtocol)) {
+    metaState.selectedStartProtocol = META_DEFAULT_PROTOCOL_ID;
+  }
+  return ordered.slice();
+}
+
+function ensureMetaState(rawMeta) {
+  if (!isMetaObject(rawMeta)) return createDefaultMetaState();
+  const meta = createDefaultMetaState();
+  meta.points = normalizeMetaPoints(rawMeta.points);
+  meta.talents = sanitizeMetaTalents(rawMeta.talents);
+  const selectedProtocol = typeof rawMeta.selectedStartProtocol === "string"
+    ? rawMeta.selectedStartProtocol
+    : (typeof rawMeta.selectedProtocol === "string" ? rawMeta.selectedProtocol : META_DEFAULT_PROTOCOL_ID);
+  meta.selectedStartProtocol = START_PROTOCOL_INDEX[selectedProtocol]
+    ? selectedProtocol
+    : META_DEFAULT_PROTOCOL_ID;
+  recomputeUnlockedProtocols(meta);
+  return meta;
+}
+
+function migrateMetaSave(rawMeta) {
+  if (!isMetaObject(rawMeta)) return createDefaultMetaState();
+  const declaredVersion = Math.max(
+    Math.floor(Number(rawMeta.schemaVersion) || 0),
+    Math.floor(Number(rawMeta.migrationVersion) || 0)
+  );
+  if (declaredVersion >= META_SCHEMA_VERSION || isMetaObject(rawMeta.talents)) {
+    return ensureMetaState(rawMeta);
+  }
+
+  const meta = createDefaultMetaState();
+  meta.points = normalizeMetaPoints(rawMeta.points);
+  meta.talents.miningYield = clampMetaTalentRank("miningYield", rawMeta.mining);
+  meta.talents.hullIntegrity = clampMetaTalentRank("hullIntegrity", rawMeta.hull);
+  meta.talents.weaponCalibration = clampMetaTalentRank("weaponCalibration", rawMeta.weapons);
+
+  if (isMetaObject(rawMeta.unlocks)) {
+    if (rawMeta.unlocks.weaponFrame) meta.talents.weaponFrame = 1;
+    if (rawMeta.unlocks.efficientCore) meta.talents.efficientCore = 1;
+  }
+
+  const extraTalents = sanitizeMetaTalents(rawMeta.talents);
+  for (const talentId of Object.keys(meta.talents)) {
+    meta.talents[talentId] = Math.max(meta.talents[talentId], extraTalents[talentId] || 0);
+  }
+  recomputeUnlockedProtocols(meta);
+  return meta;
+}
+
+function loadMeta() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return migrateMetaSave(parsed);
+  } catch {
+    return createDefaultMetaState();
+  }
+}
+
+function getMetaTalentRank(talentId, metaState = state.meta) {
+  if (!isMetaObject(metaState)) return 0;
+  const talents = isMetaObject(metaState.talents) ? metaState.talents : null;
+  return clampMetaTalentRank(talentId, talents ? talents[talentId] : 0);
+}
+
+function hasMetaTalent(talentId, metaState = state.meta) {
+  return getMetaTalentRank(talentId, metaState) > 0;
+}
+
+function getMetaTalentCost(node, targetRank) {
+  if (!node) return 0;
+  if (Array.isArray(node.cost) && node.cost.length > 0) {
+    const index = Math.max(0, Math.min(node.cost.length - 1, targetRank - 1));
+    const value = Math.floor(Number(node.cost[index]));
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  const value = Math.floor(Number(node.cost));
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function getMetaPurchaseState(talentId, metaState = state.meta) {
+  const node = getMetaTalentNode(talentId);
+  const points = normalizeMetaPoints(metaState?.points);
+  if (!node) {
+    return {
+      canBuy: false,
+      reason: "unknown_talent",
+      nodeId: talentId,
+      currentRank: 0,
+      maxRank: 0,
+      nextCost: 0,
+      points,
+      missingPrereq: [],
+      deficit: 0
+    };
+  }
+
+  const currentRank = getMetaTalentRank(talentId, metaState);
+  const maxRank = Math.max(0, Math.floor(Number(node.maxRank) || 0));
+  if (currentRank >= maxRank) {
+    return {
+      canBuy: false,
+      reason: "max_rank_reached",
+      nodeId: talentId,
+      currentRank,
+      maxRank,
+      nextCost: 0,
+      points,
+      missingPrereq: [],
+      deficit: 0
+    };
+  }
+
+  const missingPrereq = [];
+  for (const prereq of node.prereq || []) {
+    const requiredRank = Math.max(1, Math.floor(Number(prereq.rank) || 1));
+    const haveRank = getMetaTalentRank(prereq.nodeId, metaState);
+    if (haveRank < requiredRank) {
+      missingPrereq.push({
+        nodeId: prereq.nodeId,
+        requiredRank,
+        currentRank: haveRank
+      });
+    }
+  }
+
+  const nextCost = getMetaTalentCost(node, currentRank + 1);
+  const deficit = Math.max(0, nextCost - points);
+  if (missingPrereq.length > 0) {
+    return {
+      canBuy: false,
+      reason: "prereq_unmet",
+      nodeId: talentId,
+      currentRank,
+      maxRank,
+      nextCost,
+      points,
+      missingPrereq,
+      deficit
+    };
+  }
+  if (deficit > 0) {
+    return {
+      canBuy: false,
+      reason: "not_enough_points",
+      nodeId: talentId,
+      currentRank,
+      maxRank,
+      nextCost,
+      points,
+      missingPrereq: [],
+      deficit
+    };
+  }
+  return {
+    canBuy: true,
+    reason: "ok",
+    nodeId: talentId,
+    currentRank,
+    maxRank,
+    nextCost,
+    points,
+    missingPrereq: [],
+    deficit: 0
+  };
+}
+
+function canBuyMetaTalent(talentId, metaState = state.meta) {
+  return getMetaPurchaseState(talentId, metaState).canBuy;
+}
+
+function purchaseMetaTalent(talentId) {
+  const purchaseState = getMetaPurchaseState(talentId, state.meta);
+  if (!purchaseState.canBuy) {
+    return { ok: false, ...purchaseState };
+  }
+  state.meta = ensureMetaState(state.meta);
+  state.meta.points = Math.max(0, state.meta.points - purchaseState.nextCost);
+  state.meta.talents[talentId] = purchaseState.currentRank + 1;
+  recomputeUnlockedProtocols(state.meta);
+  saveMeta();
+  return {
+    ok: true,
+    nodeId: talentId,
+    rankAfter: state.meta.talents[talentId],
+    pointsAfter: state.meta.points,
+    cost: purchaseState.nextCost
+  };
+}
+
+function getSelectedStartProtocol(metaState = state.meta) {
+  const selected = typeof metaState?.selectedStartProtocol === "string"
+    ? metaState.selectedStartProtocol
+    : META_DEFAULT_PROTOCOL_ID;
+  const unlockedProtocols = Array.isArray(metaState?.unlockedProtocols)
+    ? metaState.unlockedProtocols
+    : [META_DEFAULT_PROTOCOL_ID];
+  if (!START_PROTOCOL_INDEX[selected]) return META_DEFAULT_PROTOCOL_ID;
+  return unlockedProtocols.includes(selected) ? selected : META_DEFAULT_PROTOCOL_ID;
+}
+
+function applyMetaEffectContribution(effect, rank, mode, totals, fromProtocol = false) {
+  if (!effect || !totals) return;
+  if (mode === "addPercent" || mode === "add") {
+    const perRank = Number(effect.perRank);
+    const value = Number(effect.value);
+    if (!fromProtocol && Number.isFinite(perRank)) {
+      totals.add += perRank * rank;
+      return;
+    }
+    if (Number.isFinite(value)) {
+      totals.add += fromProtocol ? value : value * rank;
+    }
+    return;
+  }
+  if (mode === "mul") {
+    if (!fromProtocol) {
+      const perRankMul = Number(effect.perRankMul);
+      if (Number.isFinite(perRankMul)) {
+        totals.mul *= Math.pow(perRankMul, rank);
+        return;
+      }
+      const value = Number(effect.value);
+      if (Number.isFinite(value)) {
+        totals.mul *= Math.pow(value, rank);
+      }
+      return;
+    }
+    const value = Number(effect.value);
+    if (Number.isFinite(value)) {
+      totals.mul *= value;
+    }
+    return;
+  }
+  if (mode === "flag") {
+    if (fromProtocol) {
+      totals.flag = totals.flag || effect.value !== false;
+    } else {
+      totals.flag = totals.flag || rank > 0;
+    }
+  }
+}
+
+function getMetaEffect(effectKey, context = {}) {
+  const mode = META_EFFECT_MODE[effectKey] || "add";
+  const metaState = isMetaObject(context.meta) ? context.meta : state.meta;
+  const totals = { add: 0, mul: 1, flag: false };
+
+  for (const node of META_TALENT_TREE) {
+    const rank = getMetaTalentRank(node.id, metaState);
+    if (rank <= 0) continue;
+    for (const effect of node.effects || []) {
+      if (effect?.key !== effectKey) continue;
+      applyMetaEffectContribution(effect, rank, mode, totals, false);
+    }
+  }
+
+  if (context.includeProtocol === true) {
+    const protocolId = getSelectedStartProtocol(metaState);
+    const protocol = START_PROTOCOL_INDEX[protocolId];
+    if (protocol) {
+      for (const effect of protocol.effects || []) {
+        if (effect?.key !== effectKey) continue;
+        applyMetaEffectContribution(effect, 1, mode, totals, true);
+      }
+    }
+  }
+
+  if (mode === "mul") return totals.mul;
+  if (mode === "flag") return totals.flag;
+  if (mode === "addPercent") return 1 + totals.add;
+  return totals.add;
+}
+
+function grantMetaPoints(amount) {
+  const gained = Math.max(0, Math.floor(Number(amount)));
+  if (gained <= 0) return 0;
+  state.meta = ensureMetaState(state.meta);
+  state.meta.points += gained;
+  saveMeta();
+  return gained;
 }
 
 function loadPlayerCount() {
@@ -934,6 +1527,7 @@ function loadPlayerCount() {
 
 function saveMeta() {
   try {
+    state.meta = ensureMetaState(state.meta);
     localStorage.setItem(SAVE_KEY, JSON.stringify(state.meta));
   } catch {
     showToast("浏览器阻止了存档写入，本局仍可继续游玩。");
@@ -2354,7 +2948,7 @@ function toggleResearchTree(open) {
 
 function createCell(x, y, facility) {
   const def = TYPES[facility] || TYPES.frame;
-  const metaFactor = 1 + state.meta.hull * 0.1;
+  const metaFactor = getMetaEffect("hullIntegrity");
   const baseMaxHp = (def.hp ?? def.baseStats?.maxHp ?? 0) * metaFactor;
   const frameBase = facility === "core"
     ? TYPES.core.baseStats.maxFrameHp
@@ -2392,7 +2986,9 @@ function createCell(x, y, facility) {
 function initStation() {
   const cells = state.station.cells;
   const core = createCell(0, 0, "core");
-  core.baseMaxHp = 280 * (1 + state.meta.hull * 0.1);
+  const hullFactor = getMetaEffect("hullIntegrity");
+  const coreFactor = getMetaEffect("coreFortitude");
+  core.baseMaxHp = 280 * hullFactor * coreFactor;
   core.hp = core.baseMaxHp;
   core.maxHp = core.baseMaxHp;
   core.baseMaxFrameHp = TYPES.core.baseStats.maxFrameHp;
@@ -4189,11 +4785,10 @@ function grantObjectiveReward() {
   const base = 2 + state.run.level;
   const gained = Math.floor(base * rewardMultiplier);
   state.run.totalObjectiveRewardBase += base;
-  state.meta.points += gained;
-  saveMeta();
+  grantMetaPoints(gained);
   const researchBase = resolveObjectiveResearchReward(objectiveType, level, state.run.objective?.type);
   if (researchBase > 0) {
-    const researchGain = Math.floor(researchBase * (1 + level * 0.1));
+    const researchGain = Math.floor(researchBase * (1 + level * 0.1) * getMetaEffect("researchInsight"));
     state.resources.research = (state.resources.research || 0) + researchGain;
   }
   if (state.run.objective?.type === "assault") {
@@ -4240,10 +4835,9 @@ function updateQuickRestartVisibility() {
 function endRunSettlement() {
   const { bonus } = getRunSettlementData();
   if (!state.run.settlementBonusGranted) {
-    state.meta.points += bonus;
+    grantMetaPoints(bonus);
     state.run.settlementBonus = bonus;
     state.run.settlementBonusGranted = true;
-    saveMeta();
   }
   resetObjectiveChoiceState();
   state.run.settlementShown = true;
@@ -4688,8 +5282,7 @@ function awardEndgameActivityPoints(amount) {
   if (gained <= 0) return;
   state.run.endgameActivityFraction -= gained;
   state.run.endgameActivityPoints += gained;
-  state.meta.points += gained;
-  saveMeta();
+  grantMetaPoints(gained);
 }
 
 function enemyActivityPointReward(kind) {
@@ -5002,7 +5595,7 @@ function createWreckCell(x, y, facility, rng) {
   const cell = createCell(x, y, facility);
   ensureCellUpgradeFields(cell);
   cell.hp = cell.maxHp * rngFloat(rng, 0.65, 0.9);
-  cell.frameHp = TYPES.frame.baseStats.maxFrameHp * (1 + state.meta.hull * 0.1) * rngFloat(rng, 0.8, 1.0);
+  cell.frameHp = TYPES.frame.baseStats.maxFrameHp * getMetaEffect("hullIntegrity") * rngFloat(rng, 0.8, 1.0);
   cell.reload = 0;
   cell.fire = 0;
   cell.enabled = true;
@@ -5595,7 +6188,14 @@ function refund(cost = {}) {
 
 function getBuildCost(facility) {
   const base = TYPES[facility]?.cost || {};
-  const discount = state.meta.unlocks.weaponFrame && WEAPON_TYPES.has(facility) ? 0.8 : 1;
+  let discount = getMetaEffect("metalRefining") * getMetaEffect("buildDiscount");
+  if (WEAPON_TYPES.has(facility)) {
+    discount *= hasMetaTalent("weaponFrame") ? 0.8 : 1;
+    discount *= getMetaEffect("weaponFacilityDiscount", { includeProtocol: true });
+  }
+  if (facility === "mining") {
+    discount *= getMetaEffect("miningFacilityDiscount", { includeProtocol: true });
+  }
   return Object.fromEntries(
     Object.entries(base).map(([name, value]) => [name, Math.ceil(value * discount)])
   );
@@ -6309,7 +6909,7 @@ function update(dt) {
 }
 
 function updatePowerAndFacilities(dt) {
-  state.resources.metal += (0.85 + (state.meta.unlocks.efficientCore ? 0.35 : 0)) * dt;
+  state.resources.metal += (0.85 + (getMetaEffect("efficientCore") ? 0.35 : 0)) * dt;
   state.resources.ore += 0.18 * dt;
   state.resources.gas += 0.12 * dt;
   state.resources.plasma += 0.025 * dt;
@@ -6377,7 +6977,7 @@ function updateStationPhysics(dt) {
       cell.fire = 0;
       continue;
     }
-    const thrust = getCellStat(cell, "thrust") * (1 + state.meta.weapons * 0.03);
+    const thrust = getCellStat(cell, "thrust") * getMetaEffect("weaponEfficiency");
     force.x += pushWorld.x * thrust;
     force.y += pushWorld.y * thrust;
     const r = rotate({ x: cell.x * CELL, y: cell.y * CELL }, station.angle);
@@ -6437,7 +7037,7 @@ function thrusterNozzle(cell) {
 
 function updateMiningAndResearch(dt) {
   let mined = 0;
-  const miningBonus = 1 + state.meta.mining * 0.12;
+  const miningBonus = getMetaEffect("miningYield");
   for (const cell of state.station.cells.values()) {
     if (cell.detached || !cell.active) continue;
     if (cell.facility === "mining") {
@@ -6938,7 +7538,7 @@ function updateTurret(cell, dt) {
     origin,
     dir,
     "player",
-    getCellStat(cell, "damage") * (1 + state.meta.weapons * 0.1),
+    getCellStat(cell, "damage") * getMetaEffect("weaponCalibration"),
     getCellStat(cell, "projectileSpeed")
   );
 }
@@ -7027,7 +7627,7 @@ function fireMissiles() {
     const baseProjectileSpeed = TYPES.missile.baseStats.projectileSpeed;
     const projectileAccel = TYPES.missile.baseStats.projectileAccel * (projectileSpeed / baseProjectileSpeed);
     const launchJitter = TYPES.missile.baseStats.launchJitter;
-    const damage = getCellStat(cell, "damage") * (1 + state.meta.weapons * 0.12);
+    const damage = getCellStat(cell, "damage") * getMetaEffect("weaponCalibration");
     for (let i = 0; i < projectileCount; i++) {
       state.projectiles.push({
         owner: "missile",
@@ -7325,7 +7925,7 @@ function updateRepair(dt) {
         const frameRepairRate = repairer ? getCellStat(repairer, "frameRepairRate") : TYPES.repair.baseStats.frameRepairRate;
         target.hp = Math.min(target.maxHp, target.hp + repairRate);
         target.frameHp = Math.min(
-          TYPES.frame.baseStats.maxFrameHp * (1 + state.meta.hull * 0.1),
+          TYPES.frame.baseStats.maxFrameHp * getMetaEffect("hullIntegrity"),
           target.frameHp + frameRepairRate
         );
         drone.returning = true;
@@ -8516,15 +9116,31 @@ function updateSelectedCellPanel(cell) {
 }
 
 function updateMetaUi() {
+  state.meta = ensureMetaState(state.meta);
+  const miningPct = Math.round((getMetaEffect("miningYield") - 1) * 100);
+  const hullPct = Math.round((getMetaEffect("hullIntegrity") - 1) * 100);
+  const weaponPct = Math.round((getMetaEffect("weaponCalibration") - 1) * 100);
+  const selectedProtocol = getSelectedStartProtocol();
   setHtmlIfChanged(metaStatsEl, "meta", `
     点数：${state.meta.points}
-    <br>局外加成：采集 +${state.meta.mining * 12}% / 结构 +${state.meta.hull * 10}% / 武器 +${state.meta.weapons * 10}%
+    <br>局外加成：采集 +${miningPct}% / 结构 +${hullPct}% / 武器 +${weaponPct}%
+    <br>Meta v${state.meta.schemaVersion}：协议 ${selectedProtocol}
   `);
-  document.getElementById("talentMiningBtn").disabled = state.meta.points < 1;
-  document.getElementById("talentHullBtn").disabled = state.meta.points < 1;
-  document.getElementById("talentWeaponsBtn").disabled = state.meta.points < 1;
-  document.getElementById("unlockCoreBtn").disabled = state.meta.points < 3 || state.meta.unlocks.efficientCore;
-  document.getElementById("unlockWeaponFrameBtn").disabled = state.meta.points < 3 || state.meta.unlocks.weaponFrame;
+  const miningState = getMetaPurchaseState("miningYield");
+  const hullState = getMetaPurchaseState("hullIntegrity");
+  const weaponState = getMetaPurchaseState("weaponCalibration");
+  const efficientCoreState = getMetaPurchaseState("efficientCore");
+  const weaponFrameState = getMetaPurchaseState("weaponFrame");
+  const miningBtn = document.getElementById("talentMiningBtn");
+  const hullBtn = document.getElementById("talentHullBtn");
+  const weaponBtn = document.getElementById("talentWeaponsBtn");
+  const coreBtn = document.getElementById("unlockCoreBtn");
+  const weaponFrameBtn = document.getElementById("unlockWeaponFrameBtn");
+  if (miningBtn) miningBtn.disabled = !miningState.canBuy;
+  if (hullBtn) hullBtn.disabled = !hullState.canBuy;
+  if (weaponBtn) weaponBtn.disabled = !weaponState.canBuy;
+  if (coreBtn) coreBtn.disabled = !efficientCoreState.canBuy;
+  if (weaponFrameBtn) weaponFrameBtn.disabled = !weaponFrameState.canBuy;
 }
 
 window.gameActions = {
@@ -8589,32 +9205,55 @@ window.gameActions = {
     toggleResearchTree(open);
   },
   buyTalent(type) {
-    if (state.meta.points < 1) {
-      showToast("局外点数不足。");
+    const legacyTalentMap = {
+      mining: "miningYield",
+      hull: "hullIntegrity",
+      weapons: "weaponCalibration"
+    };
+    const talentId = legacyTalentMap[type];
+    if (!talentId) {
+      showToast("未知天赋类型。");
       updateHud();
       return;
     }
-    state.meta.points--;
-    state.meta[type]++;
-    saveMeta();
-    if (type === "hull") improveStationHp(1.06);
+    const result = purchaseMetaTalent(talentId);
+    if (!result.ok) {
+      if (result.reason === "max_rank_reached") {
+        showToast("该天赋已满级。");
+      } else if (result.reason === "prereq_unmet") {
+        showToast("前置天赋未满足。");
+      } else {
+        showToast("局外点数不足。");
+      }
+      updateHud();
+      return;
+    }
     showToast("天赋已保存，会持续影响之后的局。");
     updateHud();
   },
   buyUnlock(type) {
-    if (state.meta.unlocks[type]) {
-      showToast("该改造已经解锁。");
+    const legacyUnlockMap = {
+      efficientCore: "efficientCore",
+      weaponFrame: "weaponFrame"
+    };
+    const talentId = legacyUnlockMap[type];
+    if (!talentId) {
+      showToast("未知改造类型。");
       updateHud();
       return;
     }
-    if (state.meta.points < 3) {
-      showToast("解锁需要 3 点局外点数。");
+    const result = purchaseMetaTalent(talentId);
+    if (!result.ok) {
+      if (result.reason === "max_rank_reached") {
+        showToast("该改造已经解锁。");
+      } else if (result.reason === "prereq_unmet") {
+        showToast("前置天赋未满足。");
+      } else {
+        showToast("解锁需要更多局外点数。");
+      }
       updateHud();
       return;
     }
-    state.meta.points -= 3;
-    state.meta.unlocks[type] = true;
-    saveMeta();
     createBuildUi();
     showToast("局外改造已解锁。");
     updateHud();
@@ -9060,6 +9699,75 @@ window.__gameTest = {
       wreckCount: wreck.length,
       playerCount: countPlayerFragments()
     };
+  }
+};
+
+window.__gameTest.meta = {
+  injectOldMeta(rawMeta = {}) {
+    const legacyMeta = isMetaObject(rawMeta) ? rawMeta : {};
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(legacyMeta));
+    } catch {
+      return { ok: false, reason: "save_blocked" };
+    }
+    state.meta = loadMeta();
+    saveMeta();
+    createBuildUi();
+    updateHud();
+    return this.snapshotMeta();
+  },
+  triggerMigration(rawMeta) {
+    if (arguments.length > 0) {
+      return migrateMetaSave(rawMeta);
+    }
+    state.meta = loadMeta();
+    saveMeta();
+    updateHud();
+    return this.snapshotMeta();
+  },
+  snapshotMeta() {
+    state.meta = ensureMetaState(state.meta);
+    return JSON.parse(JSON.stringify(state.meta));
+  },
+  grantPoints(amount = 1) {
+    const gained = grantMetaPoints(amount);
+    updateHud();
+    return {
+      gained,
+      points: state.meta.points
+    };
+  },
+  purchaseTalent(talentId, times = 1) {
+    const runTimes = Math.max(1, Math.floor(Number(times) || 1));
+    const results = [];
+    for (let i = 0; i < runTimes; i++) {
+      results.push(purchaseMetaTalent(talentId));
+    }
+    createBuildUi();
+    updateHud();
+    return results;
+  },
+  getEffect(effectKey, context = {}) {
+    return getMetaEffect(effectKey, context);
+  },
+  getTalentRank(talentId) {
+    return getMetaTalentRank(talentId);
+  },
+  getPurchaseState(talentId) {
+    return getMetaPurchaseState(talentId);
+  },
+  canBuyTalent(talentId) {
+    return canBuyMetaTalent(talentId);
+  },
+  getSelectedStartProtocol() {
+    return getSelectedStartProtocol();
+  },
+  resetMeta() {
+    state.meta = createDefaultMetaState();
+    saveMeta();
+    createBuildUi();
+    updateHud();
+    return this.snapshotMeta();
   }
 };
 
