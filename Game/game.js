@@ -9116,7 +9116,9 @@ function updateSelectedCellPanel(cell) {
 }
 
 function updateMetaUi() {
-  state.meta = ensureMetaState(state.meta);
+  if (!isMetaObject(state.meta) || !isMetaObject(state.meta.talents)) {
+    state.meta = ensureMetaState(state.meta);
+  }
   const miningPct = Math.round((getMetaEffect("miningYield") - 1) * 100);
   const hullPct = Math.round((getMetaEffect("hullIntegrity") - 1) * 100);
   const weaponPct = Math.round((getMetaEffect("weaponCalibration") - 1) * 100);
