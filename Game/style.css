@@ -1181,6 +1181,35 @@ h2 {
   color: #f08080;
 }
 
+.weapons-row .weapon-effectiveness-chip {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.weapons-row .weapon-effectiveness-chip.severity-good {
+  color: #9fd4a8;
+}
+
+.weapons-row .weapon-effectiveness-chip.severity-warn {
+  color: #f0b060;
+}
+
+.weapons-row .weapon-effectiveness-chip.severity-danger {
+  color: #f08080;
+}
+
+.combat-status-weapon.severity-warn {
+  color: #f0b060;
+}
+
+.combat-status-weapon.severity-danger {
+  color: #f08080;
+}
+
+.alert-weapon-effectiveness {
+  font-weight: 600;
+}
+
 .alert-threat-summary {
   font-weight: 600;
 }

@@ -764,6 +764,30 @@ const COMBAT_THREAT_SAMPLE_INTERVAL = 0.18;
 const RECENT_DAMAGE_WINDOW_SEC = 12;
 const THREAT_ALERT_COOLDOWN_SEC = 8;
 const THREAT_STATUS_ALERT_MAX = 1;
+const COMBAT_WEAPON_ALERT_MAX = 1;
+const WEAPON_EFFECTIVENESS_ALERT_COOLDOWN_SEC = 8;
+
+const WEAPON_EFFECTIVENESS_COPY = Object.freeze({
+  weapon_no_power: "炮塔缺电，无法开火",
+  weapon_no_target: "炮塔暂无可攻击目标",
+  all_turrets_los_blocked: "所有炮塔射线被遮挡",
+  missile_reloading: "导弹全部装填中",
+  missile_no_target: "导弹暂无可攻击目标",
+  missile_no_resource: "导弹齐射缺资源",
+  shield_no_power: "护盾缺电，防御失效",
+  shield_broken: "护盾充能中",
+  shield_missing: "当前没有护盾覆盖",
+  priority_target_active: "已锁定优先目标",
+  priority_target_stale: "锁敌即将过期",
+  priority_target_out_of_range: "锁敌目标超出射程"
+});
+
+const SALVO_SIZE_LABELS = Object.freeze({
+  1: "单发",
+  2: "齐射 2",
+  3: "齐射 3",
+  999: "齐射全部"
+});
 
 const THREAT_KIND_LABELS = Object.freeze({
   asteroid: "小行星",
@@ -1383,6 +1407,7 @@ const combatWindowState = {
   lastArchived: null
 };
 let threatSummaryCache = null;
+let weaponEffectivenessCache = null;
 
 let fragmentIdSeed = 1;
 let npcIdSeed = 1;
@@ -7888,6 +7913,557 @@ function getThreatSummary() {
   return snapshot;
 }
 
+function getEnemyIdentifier(enemy) {
+  if (!enemy) return null;
+  const idx = state.enemies.indexOf(enemy);
+  return idx >= 0 ? `${enemy.kind}#${idx}` : `${enemy.kind}#unknown`;
+}
+
+function isTurretLosBlockedRecent(cell) {
+  return !!(cell._losBlockedAt && state.time - cell._losBlockedAt < LOS_BLOCK_WARN_DURATION);
+}
+
+function buildTurretEffectivenessCell(cell) {
+  const cellKey = key(cell.x, cell.y);
+  const range = getCellStat(cell, "range");
+  const rangeText = `约 ${Math.floor(range)}`;
+  if (cell.detached) {
+    return {
+      cellKey,
+      statusKey: "detached",
+      targetDistance: null,
+      losAvailable: null,
+      rangeText,
+      targetKind: null,
+      targetKindLabel: null,
+      losBlockedRecent: false
+    };
+  }
+  if (!cell.enabled) {
+    return {
+      cellKey,
+      statusKey: "disabled_manual",
+      targetDistance: null,
+      losAvailable: null,
+      rangeText,
+      targetKind: null,
+      targetKindLabel: null,
+      losBlockedRecent: false
+    };
+  }
+  if (!cell.active) {
+    return {
+      cellKey,
+      statusKey: "weapon_no_power",
+      targetDistance: null,
+      losAvailable: null,
+      rangeText,
+      targetKind: null,
+      targetKindLabel: null,
+      losBlockedRecent: false
+    };
+  }
+  const origin = cellWorldPosition(cell);
+  const enemy = selectTargetReadOnly(origin, range);
+  if (!enemy) {
+    return {
+      cellKey,
+      statusKey: "weapon_no_target",
+      targetDistance: null,
+      losAvailable: null,
+      rangeText,
+      targetKind: null,
+      targetKindLabel: null,
+      losBlockedRecent: isTurretLosBlockedRecent(cell)
+    };
+  }
+  const targetDistance = Math.floor(dist(origin, enemy));
+  const losAvailable = hasLineOfSight(origin, enemy);
+  return {
+    cellKey,
+    statusKey: losAvailable ? "weapon_ready" : "weapon_los_blocked",
+    targetDistance,
+    losAvailable,
+    rangeText,
+    targetKind: enemy.kind,
+    targetKindLabel: getThreatKindLabel(enemy.kind),
+    losBlockedRecent: isTurretLosBlockedRecent(cell) || !losAvailable
+  };
+}
+
+function buildMissileEffectivenessCell(cell) {
+  const cellKey = key(cell.x, cell.y);
+  const range = getCellStat(cell, "range");
+  const rangeText = `约 ${Math.floor(range)}`;
+  if (cell.detached) {
+    return { cellKey, statusKey: "detached", reload: cell.reload || 0, targetDistance: null, rangeText, targetKind: null, targetKindLabel: null };
+  }
+  if (!cell.enabled) {
+    return { cellKey, statusKey: "disabled_manual", reload: cell.reload || 0, targetDistance: null, rangeText, targetKind: null, targetKindLabel: null };
+  }
+  if (!cell.active) {
+    return { cellKey, statusKey: "weapon_no_power", reload: cell.reload || 0, targetDistance: null, rangeText, targetKind: null, targetKindLabel: null };
+  }
+  if (cell.reload > 0) {
+    return { cellKey, statusKey: "missile_reloading", reload: cell.reload, targetDistance: null, rangeText, targetKind: null, targetKindLabel: null };
+  }
+  const origin = cellWorldPosition(cell);
+  const enemy = selectTargetReadOnly(origin, range);
+  if (!enemy) {
+    return { cellKey, statusKey: "missile_no_target", reload: 0, targetDistance: null, rangeText, targetKind: null, targetKindLabel: null };
+  }
+  return {
+    cellKey,
+    statusKey: "weapon_ready",
+    reload: 0,
+    targetDistance: Math.floor(dist(origin, enemy)),
+    rangeText,
+    targetKind: enemy.kind,
+    targetKindLabel: getThreatKindLabel(enemy.kind)
+  };
+}
+
+function computeMissileCanFireNow(readyEntries, salvoSize) {
+  const gasCost = TYPES.missile.baseStats.gasCost;
+  const metalCost = TYPES.missile.baseStats.metalCost;
+  let gas = state.resources.gas;
+  let metal = state.resources.metal;
+  let count = 0;
+  const limit = Math.min(salvoSize, readyEntries.length);
+  for (let i = 0; i < limit; i++) {
+    const { cell } = readyEntries[i];
+    const origin = cellWorldPosition(cell);
+    const enemy = selectTargetReadOnly(origin, getCellStat(cell, "range"));
+    if (!enemy) continue;
+    if (gas < gasCost || metal < metalCost) break;
+    gas -= gasCost;
+    metal -= metalCost;
+    count += 1;
+  }
+  return count;
+}
+
+function buildPriorityTargetEffectivenessSummary() {
+  const pt = state.input.priorityTarget;
+  if (!pt || !pt.enemy) return null;
+  const enemy = pt.enemy;
+  const enemyValid = enemy.hp > 0;
+  const notExpired = (state.time - pt.setAt) < PRIORITY_TARGET_LIFETIME;
+  const stationDist = dist(state.station.pos, enemy);
+  const inSightOfStation = stationDist < PRIORITY_TARGET_BREAK_DISTANCE;
+  let staleReasonKey = null;
+  if (!enemyValid || !notExpired || !inSightOfStation) {
+    staleReasonKey = "stale_target";
+  } else {
+    let anyMissileInRange = false;
+    for (const cell of state.station.cells.values()) {
+      if (cell.facility !== "missile" || cell.detached || !cell.enabled || !cell.active) continue;
+      const origin = cellWorldPosition(cell);
+      const range = getCellStat(cell, "range");
+      const candidate = getPriorityTargetCandidate(origin, range);
+      if (candidate.enemy === enemy) {
+        anyMissileInRange = true;
+        break;
+      }
+    }
+    if (!anyMissileInRange) staleReasonKey = "priority_target_out_of_range";
+  }
+  const valid = enemyValid && !staleReasonKey;
+  return {
+    enemyId: getEnemyIdentifier(enemy),
+    enemyKind: enemy.kind,
+    enemyKindLabel: getThreatKindLabel(enemy.kind),
+    valid,
+    staleReasonKey,
+    distance: enemyValid ? Math.floor(stationDist) : null,
+    setAt: pt.setAt || null,
+    expiresAt: pt.setAt ? pt.setAt + PRIORITY_TARGET_LIFETIME : null
+  };
+}
+
+function buildShieldEffectivenessSummary() {
+  const shieldCells = [...state.station.cells.values()].filter((cell) => cell.facility === "shield" && !cell.detached);
+  const total = shieldCells.length;
+  let active = 0;
+  let poweredOffCount = 0;
+  let recoveringCount = 0;
+  for (const cell of shieldCells) {
+    if (!cell.enabled) continue;
+    if (!cell.active) {
+      if ((TYPES.shield?.powerUse || 0) > 0) poweredOffCount += 1;
+      continue;
+    }
+    active += 1;
+    if ((cell.shield || 0) <= 0) recoveringCount += 1;
+  }
+  let coverageStatus = "none";
+  let statusKey = "shield_missing";
+  if (total === 0) {
+    coverageStatus = "none";
+    statusKey = "shield_missing";
+  } else if (active === 0 && poweredOffCount > 0) {
+    coverageStatus = "inactive";
+    statusKey = "shield_no_power";
+  } else if (active > 0 && recoveringCount === active) {
+    coverageStatus = "recovering";
+    statusKey = "shield_broken";
+  } else if (active > 0) {
+    coverageStatus = "active";
+    statusKey = "shield_active";
+  } else {
+    coverageStatus = "inactive";
+    statusKey = "shield_no_power";
+  }
+  return { total, active, poweredOffCount, recoveringCount, coverageStatus, statusKey };
+}
+
+function resolveWeaponEffectivenessSummary(turret, missile, shield, threatActive) {
+  const reasonKeys = [];
+  let primaryReasonKey = "ready";
+  let overallStatus = "good";
+
+  if (turret.total === 0 && missile.total === 0 && threatActive) {
+    primaryReasonKey = "weapon_no_target";
+    overallStatus = "danger";
+    reasonKeys.push("weapon_no_target");
+  } else if (turret.inactiveByPowerCount > 0 && turret.active === 0 && missile.inactiveByPowerCount > 0 && missile.active === 0 && threatActive) {
+    primaryReasonKey = "weapon_no_power";
+    overallStatus = "danger";
+    reasonKeys.push("weapon_no_power");
+  } else if (turret.total > 0 && turret.active > 0 && turret.readyCount === 0 && turret.losBlockedCount === turret.active) {
+    primaryReasonKey = "all_turrets_los_blocked";
+    overallStatus = "warn";
+    reasonKeys.push("all_turrets_los_blocked");
+  } else if (turret.inactiveByPowerCount > 0 && turret.active === 0 && (missile.active === 0 || missile.readyCount === 0) && threatActive) {
+    primaryReasonKey = "weapon_no_power";
+    overallStatus = "danger";
+    reasonKeys.push("weapon_no_power");
+  } else if (missile.total > 0 && missile.readyCount === 0 && missile.reloadingCount > 0 && threatActive) {
+    primaryReasonKey = "missile_reloading";
+    overallStatus = "warn";
+    reasonKeys.push("missile_reloading");
+  } else if (missile.readyCount > 0 && missile.canFireNow === 0 && threatActive) {
+    if (missile.noTargetCount === missile.readyCount) {
+      primaryReasonKey = "missile_no_target";
+      overallStatus = "warn";
+      reasonKeys.push("missile_no_target");
+    } else if (missile.noResourceBlock) {
+      primaryReasonKey = "missile_no_resource";
+      overallStatus = "warn";
+      reasonKeys.push("missile_no_resource");
+    }
+  } else if (turret.noTargetCount > 0 && turret.readyCount === 0 && turret.active > 0 && threatActive) {
+    primaryReasonKey = "weapon_no_target";
+    overallStatus = "warn";
+    reasonKeys.push("weapon_no_target");
+  }
+
+  if (shield.statusKey === "shield_no_power" && threatActive) {
+    reasonKeys.push("shield_no_power");
+    if (overallStatus === "good") overallStatus = "danger";
+  } else if (shield.statusKey === "shield_broken" && threatActive) {
+    reasonKeys.push("shield_broken");
+    if (overallStatus === "good") overallStatus = "warn";
+  } else if (shield.statusKey === "shield_missing" && threatActive) {
+    reasonKeys.push("shield_missing");
+    if (overallStatus === "good") overallStatus = "warn";
+  }
+
+  if (primaryReasonKey === "ready" && (turret.readyCount + missile.readyCount) > 0) {
+    reasonKeys.push("weapon_ready");
+  }
+
+  return {
+    weaponReady: turret.readyCount + missile.readyCount,
+    weaponTotal: turret.total + missile.total,
+    primaryReasonKey,
+    overallStatus,
+    reasonKeys: [...new Set(reasonKeys)]
+  };
+}
+
+function buildWeaponEffectivenessSnapshot() {
+  ensureCombatWindowState(state.time);
+  const threat = getThreatSummary();
+  const threatActive = !!threat?.active;
+
+  const turretCells = [];
+  let turretTotal = 0;
+  let turretActive = 0;
+  let turretReadyCount = 0;
+  let turretLosBlockedCount = 0;
+  let turretNoTargetCount = 0;
+  let turretInactiveByPowerCount = 0;
+
+  const missileCells = [];
+  let missileTotal = 0;
+  let missileActive = 0;
+  let missileReadyCount = 0;
+  let missileReloadingCount = 0;
+  let missileNoTargetCount = 0;
+  let missileInactiveByPowerCount = 0;
+  let nextReloadSec = null;
+
+  const readyMissileEntries = [];
+
+  for (const cell of state.station.cells.values()) {
+    if (cell.facility === "turret") {
+      if (cell.detached) continue;
+      turretTotal += 1;
+      const entry = buildTurretEffectivenessCell(cell);
+      turretCells.push(entry);
+      if (cell.enabled && cell.active) {
+        turretActive += 1;
+        if (cell.reload <= 0) turretReadyCount += 1;
+        if (entry.statusKey === "weapon_no_target") turretNoTargetCount += 1;
+        if (entry.losBlockedRecent) turretLosBlockedCount += 1;
+      } else if (cell.enabled && !cell.active && (TYPES.turret?.powerUse || 0) > 0) {
+        turretInactiveByPowerCount += 1;
+      }
+    } else if (cell.facility === "missile") {
+      if (cell.detached) continue;
+      missileTotal += 1;
+      const entry = buildMissileEffectivenessCell(cell);
+      missileCells.push(entry);
+      if (cell.enabled && cell.active) {
+        missileActive += 1;
+        if (cell.reload <= 0) {
+          missileReadyCount += 1;
+          readyMissileEntries.push({ cellKey: entry.cellKey, cell });
+          if (entry.statusKey === "missile_no_target") missileNoTargetCount += 1;
+        } else {
+          missileReloadingCount += 1;
+          nextReloadSec = nextReloadSec == null ? cell.reload : Math.min(nextReloadSec, cell.reload);
+        }
+      } else if (cell.enabled && !cell.active && (TYPES.missile?.powerUse || 0) > 0) {
+        missileInactiveByPowerCount += 1;
+      }
+    }
+  }
+
+  readyMissileEntries.sort((a, b) => (a.cellKey < b.cellKey ? -1 : a.cellKey > b.cellKey ? 1 : 0));
+  const salvoSize = state.missile.salvoSize || 1;
+  const canFireNow = computeMissileCanFireNow(readyMissileEntries, salvoSize >= 999 ? readyMissileEntries.length : salvoSize);
+  const gasCost = TYPES.missile.baseStats.gasCost;
+  const metalCost = TYPES.missile.baseStats.metalCost;
+  const noResourceBlock = missileReadyCount > 0
+    && canFireNow === 0
+    && (state.resources.gas < gasCost || state.resources.metal < metalCost);
+
+  const salvoLabel = SALVO_SIZE_LABELS[salvoSize] || String(salvoSize);
+  const shield = buildShieldEffectivenessSummary();
+  const priorityTarget = buildPriorityTargetEffectivenessSummary();
+  const turret = {
+    total: turretTotal,
+    active: turretActive,
+    readyCount: turretReadyCount,
+    losBlockedCount: turretLosBlockedCount,
+    noTargetCount: turretNoTargetCount,
+    inactiveByPowerCount: turretInactiveByPowerCount,
+    cells: turretCells
+  };
+  const missile = {
+    total: missileTotal,
+    active: missileActive,
+    readyCount: missileReadyCount,
+    reloadingCount: missileReloadingCount,
+    noTargetCount: missileNoTargetCount,
+    inactiveByPowerCount: missileInactiveByPowerCount,
+    nextReloadSec,
+    salvoSize,
+    salvoLabel,
+    canFireNow,
+    noResourceBlock,
+    cells: missileCells
+  };
+  const summary = resolveWeaponEffectivenessSummary(turret, missile, shield, threatActive);
+  const reasonKeys = [...summary.reasonKeys];
+  if (priorityTarget?.valid) reasonKeys.push("priority_target_active");
+  else if (priorityTarget?.staleReasonKey === "stale_target") reasonKeys.push("priority_target_stale");
+  else if (priorityTarget?.staleReasonKey === "priority_target_out_of_range") {
+    reasonKeys.push("priority_target_out_of_range");
+  }
+
+  return {
+    generatedAt: state.time,
+    active: threatActive,
+    turret,
+    missile,
+    priorityTarget,
+    shield,
+    summary: {
+      weaponReady: summary.weaponReady,
+      weaponTotal: summary.weaponTotal,
+      primaryReasonKey: summary.primaryReasonKey,
+      overallStatus: summary.overallStatus
+    },
+    reasonKeys: [...new Set(reasonKeys)]
+  };
+}
+
+function getWeaponEffectiveness() {
+  const now = state.time;
+  if (weaponEffectivenessCache && now < weaponEffectivenessCache.sampledAt) {
+    weaponEffectivenessCache = null;
+  }
+  if (
+    weaponEffectivenessCache
+    && now - weaponEffectivenessCache.sampledAt < COMBAT_THREAT_SAMPLE_INTERVAL
+  ) {
+    return weaponEffectivenessCache.value;
+  }
+  const snapshot = deepFreezeForDiagnostics(buildWeaponEffectivenessSnapshot());
+  weaponEffectivenessCache = { sampledAt: now, value: snapshot };
+  return snapshot;
+}
+
+function buildWeaponHudFragment(weapon = getWeaponEffectiveness()) {
+  if (!weapon?.active) return "";
+  const parts = [];
+  const { turret, missile, shield, priorityTarget, summary } = weapon;
+  if (priorityTarget?.valid) {
+    parts.push(`已锁定 ${priorityTarget.enemyKindLabel}`);
+  } else if (priorityTarget?.staleReasonKey === "priority_target_out_of_range") {
+    parts.push("锁敌超距");
+  }
+  if (missile.canFireNow > 0) {
+    parts.push(`齐射 ${missile.canFireNow}/${missile.salvoSize >= 999 ? missile.readyCount : missile.salvoSize}`);
+  } else if (summary.primaryReasonKey === "missile_reloading" && missile.nextReloadSec != null) {
+    parts.push(`导弹装填 ${Math.ceil(missile.nextReloadSec)}s`);
+  } else if (summary.primaryReasonKey === "missile_no_resource") {
+    parts.push("导弹资源不足");
+  }
+  if (summary.primaryReasonKey === "weapon_no_power") {
+    parts.push("炮塔缺电");
+  } else if (summary.primaryReasonKey === "all_turrets_los_blocked") {
+    parts.push("炮塔全部被遮挡");
+  }
+  if (shield.statusKey === "shield_no_power") {
+    parts.push("护盾缺电");
+  }
+  if (!parts.length) return "";
+  return ` · <span class="weapon-effectiveness-chip severity-${summary.overallStatus}">${parts.join(" · ")}</span>`;
+}
+
+function buildCombatWeaponSummaryHtml(weapon = getWeaponEffectiveness()) {
+  if (!weapon?.active) return "";
+  const lines = [];
+  const { turret, missile, shield, priorityTarget, summary } = weapon;
+  if (summary.weaponTotal === 0) {
+    lines.push('<div class="combat-status-line combat-status-gap">火力：当前无炮塔或导弹井</div>');
+  } else if (summary.primaryReasonKey === "ready") {
+    lines.push(`<div class="combat-status-line combat-status-weapon">火力：${summary.weaponReady}/${summary.weaponTotal} 就绪</div>`);
+  } else {
+    const copy = WEAPON_EFFECTIVENESS_COPY[summary.primaryReasonKey] || summary.primaryReasonKey;
+    lines.push(`<div class="combat-status-line combat-status-weapon severity-${summary.overallStatus}">火力：${copy}</div>`);
+  }
+  if (missile.total > 0) {
+    if (missile.canFireNow > 0) {
+      lines.push(`<div class="combat-status-line">导弹：${missile.salvoLabel} · 可发射 ${missile.canFireNow}</div>`);
+    } else if (missile.readyCount > 0 && missile.canFireNow === 0) {
+      const reason = missile.noResourceBlock ? "资源不足" : "暂无可攻击目标";
+      lines.push(`<div class="combat-status-line">导弹：就绪 ${missile.readyCount}/${missile.total} · ${reason}</div>`);
+    } else if (missile.nextReloadSec != null) {
+      lines.push(`<div class="combat-status-line">导弹：装填中 · 下一发 ${Math.ceil(missile.nextReloadSec)}s</div>`);
+    }
+  }
+  if (priorityTarget) {
+    if (priorityTarget.valid) {
+      lines.push(`<div class="combat-status-line">锁敌：${priorityTarget.enemyKindLabel} ${priorityTarget.distance}m</div>`);
+    } else if (priorityTarget.staleReasonKey === "priority_target_out_of_range") {
+      lines.push('<div class="combat-status-line">锁敌：目标已脱离射程</div>');
+    } else if (priorityTarget.staleReasonKey === "stale_target") {
+      lines.push('<div class="combat-status-line">锁敌：目标已消失或即将过期</div>');
+    }
+  }
+  if (shield.total > 0) {
+    if (shield.statusKey === "shield_active") {
+      lines.push(`<div class="combat-status-line">护盾：工作中 · ${shield.active}/${shield.total}</div>`);
+    } else if (shield.statusKey === "shield_no_power") {
+      lines.push('<div class="combat-status-line combat-status-gap">护盾：缺电失效</div>');
+    } else if (shield.statusKey === "shield_broken") {
+      lines.push('<div class="combat-status-line">护盾：充能恢复中</div>');
+    }
+  } else if (weapon.active) {
+    lines.push('<div class="combat-status-line combat-status-gap">护盾：当前无护盾设施</div>');
+  }
+  return lines.join("");
+}
+
+function buildCombatStatusSummaryHtml(threat = getThreatSummary(), weapon = getWeaponEffectiveness()) {
+  const threatHtml = buildCombatThreatSummaryHtml(threat);
+  const weaponHtml = buildCombatWeaponSummaryHtml(weapon);
+  return `${threatHtml}${weaponHtml}`;
+}
+
+function shouldSustainCombatAlert(reasonKey) {
+  return reasonKey.startsWith("threat_") || reasonKey.startsWith("weapon_alert_");
+}
+
+function consumeCombatAlertCooldown(reasonKey, now, sustained) {
+  if (sustained) {
+    designIssueAlertRuntime.activeKeys.add(reasonKey);
+    designIssueAlertRuntime.lastRaisedAt.set(reasonKey, now);
+    return true;
+  }
+  const wasActive = designIssueAlertRuntime.activeKeys.has(reasonKey)
+    || shouldSustainCombatAlert(reasonKey) && designIssueAlertRuntime.lastRaisedAt.has(reasonKey);
+  const lastRaisedAt = designIssueAlertRuntime.lastRaisedAt.get(reasonKey);
+  if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < WEAPON_EFFECTIVENESS_ALERT_COOLDOWN_SEC) {
+    return false;
+  }
+  if (!wasActive) {
+    designIssueAlertRuntime.lastRaisedAt.set(reasonKey, now);
+  }
+  designIssueAlertRuntime.activeKeys.add(reasonKey);
+  return true;
+}
+
+function buildWeaponEffectivenessAlerts(weapon = getWeaponEffectiveness()) {
+  const now = state.time;
+  if (now < designIssueAlertRuntime.lastTime) {
+    designIssueAlertRuntime.activeKeys.clear();
+    designIssueAlertRuntime.lastRaisedAt.clear();
+  }
+  designIssueAlertRuntime.lastTime = now;
+
+  if (!weapon?.active) return [];
+
+  const alerts = [];
+  const pushAlert = (reasonKey, text, level, sustained = false) => {
+    const alertKey = `weapon_alert_${reasonKey}`;
+    if (!consumeCombatAlertCooldown(alertKey, now, sustained)) return;
+    alerts.push({ level, cssClass: "alert-weapon-effectiveness", text });
+  };
+
+  const threatLevel = getThreatSummary().threatLevel;
+  const highPressure = threatLevel === "danger" || threatLevel === "critical";
+
+  if (weapon.summary.primaryReasonKey === "weapon_no_power" && highPressure) {
+    pushAlert("weapon_no_power", WEAPON_EFFECTIVENESS_COPY.weapon_no_power, "danger", true);
+  } else if (weapon.summary.primaryReasonKey === "all_turrets_los_blocked" && highPressure) {
+    pushAlert("all_turrets_los_blocked", WEAPON_EFFECTIVENESS_COPY.all_turrets_los_blocked, "warn", true);
+  } else if (weapon.summary.primaryReasonKey === "missile_no_target" && highPressure) {
+    pushAlert("missile_no_target", WEAPON_EFFECTIVENESS_COPY.missile_no_target, "warn", true);
+  } else if (weapon.summary.primaryReasonKey === "missile_no_resource" && highPressure) {
+    pushAlert("missile_no_resource", WEAPON_EFFECTIVENESS_COPY.missile_no_resource, "warn", true);
+  }
+
+  if (weapon.shield.statusKey === "shield_no_power" && highPressure) {
+    pushAlert("shield_no_power", WEAPON_EFFECTIVENESS_COPY.shield_no_power, "danger", true);
+  } else if (weapon.shield.statusKey === "shield_broken" && highPressure) {
+    pushAlert("shield_broken", WEAPON_EFFECTIVENESS_COPY.shield_broken, "warn", true);
+  } else if (weapon.shield.statusKey === "shield_missing" && threatLevel === "critical") {
+    pushAlert("shield_missing", WEAPON_EFFECTIVENESS_COPY.shield_missing, "warn", true);
+  }
+
+  if (weapon.priorityTarget?.staleReasonKey === "priority_target_out_of_range" && highPressure) {
+    pushAlert("priority_target_out_of_range", WEAPON_EFFECTIVENESS_COPY.priority_target_out_of_range, "warn", true);
+  }
+
+  return alerts.slice(0, COMBAT_WEAPON_ALERT_MAX);
+}
+
 function buildThreatHudFragment(threat = getThreatSummary()) {
   if (!threat?.active || !threat.nearest) return "";
   const nearest = threat.nearest;
@@ -7949,12 +8525,17 @@ function buildThreatSummaryAlerts(threat = getThreatSummary()) {
   }
 
   const reasonKey = `threat_${threat.threatLevel}_${threat.nearest.reasonKey || "nearest"}`;
-  const wasActive = designIssueAlertRuntime.activeKeys.has(reasonKey);
-  const lastRaisedAt = designIssueAlertRuntime.lastRaisedAt.get(reasonKey);
-  if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < THREAT_ALERT_COOLDOWN_SEC) {
-    return [];
-  }
-  if (!wasActive) {
+  const isSustainedHighThreat = threat.threatLevel === "danger" || threat.threatLevel === "critical";
+  if (!isSustainedHighThreat) {
+    const wasActive = designIssueAlertRuntime.activeKeys.has(reasonKey);
+    const lastRaisedAt = designIssueAlertRuntime.lastRaisedAt.get(reasonKey);
+    if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < THREAT_ALERT_COOLDOWN_SEC) {
+      return [];
+    }
+    if (!wasActive) {
+      designIssueAlertRuntime.lastRaisedAt.set(reasonKey, now);
+    }
+  } else {
     designIssueAlertRuntime.lastRaisedAt.set(reasonKey, now);
   }
   designIssueAlertRuntime.activeKeys.add(reasonKey);
@@ -8384,10 +8965,69 @@ function buildSelectedCellDiagnosticsHtml(diagnostics) {
   }
 
   if (weapon) {
-    const weaponCopy = SELECTED_DIAGNOSTICS_COPY[weapon.statusKey] || SELECTED_DIAGNOSTICS_COPY.weapon_boundary;
+    let weaponText = SELECTED_DIAGNOSTICS_COPY[weapon.statusKey] || SELECTED_DIAGNOSTICS_COPY.weapon_boundary;
+    let weaponSeverity = weapon.statusKey === "weapon_ready"
+      ? "ok"
+      : weapon.statusKey === "weapon_no_target" || weapon.statusKey === "weapon_los_blocked"
+        ? "warning"
+        : "critical";
+    const weaponEffectiveness = getWeaponEffectiveness();
+    const cellEntry = facility === "turret"
+      ? weaponEffectiveness.turret.cells.find((entry) => entry.cellKey === diagnostics.cellKey)
+      : weaponEffectiveness.missile.cells.find((entry) => entry.cellKey === diagnostics.cellKey);
+    if (facility === "turret" && cellEntry) {
+      if (cellEntry.statusKey === "weapon_ready" && cellEntry.targetKindLabel) {
+        weaponText = `正在瞄准 ${cellEntry.targetKindLabel} · 目标 ${cellEntry.targetDistance}m / 射程 ${cellEntry.rangeText}`;
+        weaponSeverity = "ok";
+      } else if (cellEntry.statusKey === "weapon_los_blocked" && cellEntry.targetKindLabel) {
+        weaponText = `目标 ${cellEntry.targetKindLabel} ${cellEntry.targetDistance}m · 射线被自机遮挡，不是武器损坏`;
+      } else if (cellEntry.statusKey === "weapon_no_target") {
+        weaponText = "当前无可攻击目标，等待敌人进入射程";
+      } else if (cellEntry.statusKey === "weapon_no_power") {
+        weaponText = "缺电停火，补供电或提高优先级";
+      } else if (cellEntry.statusKey === "disabled_manual") {
+        weaponText = "已手动关闭，开启后可参与战斗";
+        weaponSeverity = "warning";
+      }
+    }
+    if (facility === "missile" && cellEntry) {
+      if (cellEntry.statusKey === "weapon_ready" && cellEntry.targetKindLabel) {
+        weaponText = `目标 ${cellEntry.targetKindLabel} ${cellEntry.targetDistance}m / 射程 ${cellEntry.rangeText}`;
+        weaponSeverity = "ok";
+      } else if (cellEntry.statusKey === "missile_reloading") {
+        weaponText = `装填中，下一发 ${Math.ceil(cellEntry.reload || 0)}s 后就绪`;
+        weaponSeverity = "warning";
+      } else if (cellEntry.statusKey === "missile_no_target") {
+        weaponText = "就绪但当前无目标，等待敌人进入射程";
+        weaponSeverity = "warning";
+      } else if (cellEntry.statusKey === "weapon_no_power") {
+        weaponText = "缺电停射，补供电后恢复";
+      }
+      const { missile, priorityTarget } = weaponEffectiveness;
+      if (missile.total > 0) {
+        const salvoHint = missile.canFireNow > 0
+          ? `齐射 ${missile.salvoLabel} · 可发射 ${missile.canFireNow}`
+          : missile.readyCount > 0
+            ? `齐射 ${missile.salvoLabel} · 暂不可发射`
+            : null;
+        if (salvoHint) {
+          lines.push({ severity: missile.canFireNow > 0 ? "ok" : "warning", text: `导弹：${salvoHint}` });
+        }
+      }
+      if (priorityTarget?.valid) {
+        lines.push({
+          severity: "ok",
+          text: `锁敌：已锁定 ${priorityTarget.enemyKindLabel} · 齐射将集火该目标`
+        });
+      } else if (priorityTarget?.staleReasonKey === "priority_target_out_of_range") {
+        lines.push({ severity: "warning", text: "锁敌：目标已脱离射程" });
+      } else if (priorityTarget?.staleReasonKey === "stale_target") {
+        lines.push({ severity: "warning", text: "锁敌：目标已消失或即将过期" });
+      }
+    }
     lines.push({
-      severity: weapon.statusKey === "weapon_ready" ? "ok" : weapon.statusKey === "weapon_no_target" ? "warning" : "critical",
-      text: `火力：${weaponCopy}${weapon.rangeText ? ` · ${SELECTED_DIAGNOSTICS_COPY.weapon_boundary} ${weapon.rangeText}` : ""}`
+      severity: weaponSeverity,
+      text: `火力：${weaponText}${facility === "turret" && cellEntry?.rangeText && cellEntry.statusKey !== "weapon_ready" ? ` · 射程 ${cellEntry.rangeText}` : ""}`
     });
   }
 
@@ -8395,11 +9035,13 @@ function buildSelectedCellDiagnosticsHtml(diagnostics) {
     let shieldText = SELECTED_DIAGNOSTICS_COPY.shield_active;
     let shieldSeverity = "ok";
     if (shield.coverageStatus === "inactive") {
-      shieldText = SELECTED_DIAGNOSTICS_COPY.shield_no_power;
+      shieldText = "缺电失效，补供电后恢复拦截";
       shieldSeverity = "critical";
     } else if (shield.coverageStatus === "recovering") {
-      shieldText = SELECTED_DIAGNOSTICS_COPY.shield_broken;
+      shieldText = "护盾值耗尽，正在恢复，期间拦截能力下降";
       shieldSeverity = "warning";
+    } else {
+      shieldText = "护盾可用，可减轻部分远程伤害，不保证完全拦截";
     }
     lines.push({
       severity: shieldSeverity,
@@ -12265,6 +12907,11 @@ function buildLowNoiseDesignIssueAlerts(health = getStationDesignHealth()) {
     });
   }
 
+  for (const preservedKey of [...designIssueAlertRuntime.lastRaisedAt.keys()]) {
+    if (shouldSustainCombatAlert(preservedKey)) {
+      nextActiveKeys.add(preservedKey);
+    }
+  }
   designIssueAlertRuntime.activeKeys = nextActiveKeys;
   for (const [issueKey, lastRaisedAt] of designIssueAlertRuntime.lastRaisedAt) {
     if (now - lastRaisedAt > DESIGN_ISSUE_ALERT_COOLDOWN_SEC * 6) {
@@ -12331,6 +12978,10 @@ function buildStatusAlerts() {
   const threatAlerts = buildThreatSummaryAlerts(getThreatSummary());
   if (threatAlerts.length) {
     alerts.unshift(...threatAlerts.slice(0, THREAT_STATUS_ALERT_MAX));
+  }
+  const weaponAlerts = buildWeaponEffectivenessAlerts(getWeaponEffectiveness());
+  if (weaponAlerts.length) {
+    alerts.splice(threatAlerts.length, 0, ...weaponAlerts);
   }
   if (state.buildHint && !state.lastBuildError) {
     alerts.push({
@@ -12619,7 +13270,7 @@ function updateHud() {
   setHtmlIfChanged(
     combatStatusSummaryEl,
     "combatStatusSummary",
-    buildCombatThreatSummaryHtml(getThreatSummary())
+    buildCombatStatusSummaryHtml(getThreatSummary(), getWeaponEffectiveness())
   );
   updateSelectedCellPanel(selected);
 
@@ -12703,6 +13354,7 @@ function updateWeaponsRow() {
     html += ` <span class="hint">F=齐射 · [/]=调档 · 右键锁敌</span>`;
   }
   html += buildThreatHudFragment();
+  html += buildWeaponHudFragment();
 
   setHtmlIfChanged(weaponsRowEl, "weaponsRow", html);
 }
@@ -14346,6 +14998,9 @@ window.__gameTest.playtest = {
   getThreatSummary() {
     return safeDeepCloneForTest(getThreatSummary());
   },
+  getWeaponEffectiveness() {
+    return safeDeepCloneForTest(getWeaponEffectiveness());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
@@ -14364,6 +15019,7 @@ window.__gameTest.playtest = {
     const reachability = getResourceReachability();
     const power = getPowerMargin();
     const threat = getThreatSummary();
+    const weapon = getWeaponEffectiveness();
 
     return {
       version: "v0.11.0-playtest-readiness",
@@ -14414,7 +15070,8 @@ window.__gameTest.playtest = {
         complete: isObjectiveComplete()
       },
       combat: {
-        threat: safeDeepCloneForTest(threat)
+        threat: safeDeepCloneForTest(threat),
+        weapon: safeDeepCloneForTest(weapon)
       }
     };
   },
