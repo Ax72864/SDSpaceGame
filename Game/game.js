@@ -963,6 +963,7 @@ const META_TALENT_TREE = [
       { nodeId: "efficientCore", rank: 1 }
     ],
     effects: [
+      { key: "galaxyForesight", op: "flag" },
       { key: "earlyHint", op: "flag" },
       { key: "unlockProtocol", protocol: "scoutStart", atRank: 1 }
     ],
@@ -11319,6 +11320,7 @@ function runMetaS2RegressionSelfCheck() {
     window.__gameTest.resetRun(2202, 2, "tradeHub");
     state.meta = ensureMetaState(state.meta);
     state.meta.talents.galaxyForesight = 0;
+    const effectWithout = getMetaEffect("galaxyForesight") === true;
     const choicesWithout = window.__gameTest.generateGalaxyChoices(3);
     renderGalaxyMapCards(choicesWithout);
     const cardsEl = document.getElementById("galaxyMapPanel")?.querySelector(".galaxy-map-cards");
@@ -11326,22 +11328,26 @@ function runMetaS2RegressionSelfCheck() {
     const hintCountWithout = (cardsHtmlWithout.match(/galaxy-map-foresight/g) || []).length;
 
     state.meta.talents.galaxyForesight = 1;
+    const effectWith = getMetaEffect("galaxyForesight") === true;
     const choicesWith = window.__gameTest.generateGalaxyChoices(3);
     renderGalaxyMapCards(choicesWith);
     const cardsHtmlWith = cardsEl?.innerHTML || "";
     const hintCountWith = (cardsHtmlWith.match(/galaxy-map-foresight/g) || []).length;
     const sameChoices = JSON.stringify(choicesWithout) === JSON.stringify(choicesWith);
     const hintTitleOk = cardsHtmlWith.includes("星图洞察");
-    const fallbackHintHtml = formatGalaxyForesightHtml(
-      GALAXY_TYPES[choicesWith[0]?.galaxyType] || GALAXY_TYPES.emptyVoid
-    );
-    const fallbackHintOk = fallbackHintHtml.includes("星图洞察") && fallbackHintHtml.includes("资源倾向");
     return {
-      ok: sameChoices && hintCountWithout === 0 && ((hintCountWith > 0 && hintTitleOk) || fallbackHintOk),
+      ok: sameChoices
+        && !effectWithout
+        && effectWith
+        && hintCountWithout === 0
+        && hintCountWith > 0
+        && hintTitleOk,
       sameChoices,
+      effectWithout,
+      effectWith,
       hintCountWithout,
       hintCountWith,
-      fallbackHintOk,
+      hintTitleOk,
       choicesWithout,
       choicesWith
     };
