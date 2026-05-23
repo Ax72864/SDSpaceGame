@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>星环工站 - WebGL Prototype</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <section class="panel topbar">
+      <div class="run-header">
+        <strong>星环工站</strong>
+        <span id="runInfo">准备中</span>
+        <span id="runDanger" class="run-pill danger-safe">危险度：安全</span>
+        <span id="runProgress" class="run-progress">第 1 关 / 共 7 关</span>
+      </div>
+      <div id="resources"></div>
+      <div id="weaponsRow" class="weapons-row"></div>
+      <button id="pauseBtn" type="button">暂停</button>
+    </section>
+
+    <section class="panel build-panel">
+      <h2>建造</h2>
+      <div id="buildButtons" class="button-grid"></div>
+      <div class="hint">
+        默认「屏幕方向」：W=上、S=下、A=左、D=右；点右侧「移动模式」可切换为「朝向前方」。鼠标指向决定朝向，拖动画布可手动旋转/缩放。选设施后点网格或 Enter 建造；失败不退出建造模式，Esc 或「指针/航行」才退出。带彩色外环的天体是资源点（橙=矿石、银=金属、绿=气体、紫=等离子）；建造采矿站并驾驶进入外环即可采集。
+      </div>
+    </section>
+
+    <section class="panel status-panel">
+      <h2>引导</h2>
+      <div id="guideBox" class="guide-box">
+        <div class="guide-row"><span class="guide-label">当前目标</span><span id="currentGoal" class="guide-goal">加载中…</span></div>
+        <div class="guide-row"><span class="guide-label">下一步</span><span id="nextStep" class="guide-next">加载中…</span></div>
+      </div>
+      <h2>资源采集</h2>
+      <div id="resourceGuide" class="resource-guide" aria-live="polite"></div>
+      <div id="statusAlerts" class="status-alerts" aria-live="polite"></div>
+      <h2>星系任务</h2>
+      <div id="objective"></div>
+      <div id="objectiveChoicePanel" class="objective-choice-panel hidden" aria-live="polite">
+        <div id="objectiveChoiceAwaiting">
+          <p class="objective-choice-title">星系任务已完成</p>
+          <p class="objective-choice-hint">请选择下一步行动</p>
+          <div class="objective-choice-actions row">
+            <button id="objectiveJumpBtn" type="button">跃迁下一星系</button>
+            <button id="objectiveStayBtn" type="button">暂时停留</button>
+          </div>
+        </div>
+        <div id="objectiveDeferredActions" class="objective-deferred-actions hidden">
+          <p class="objective-choice-hint good">任务已完成，可随时跃迁</p>
+          <button id="objectiveJumpDeferredBtn" type="button">跃迁下一星系</button>
+        </div>
+      </div>
+      <div id="runSettlementPanel" class="objective-choice-panel run-settlement-panel hidden" aria-live="polite">
+        <p class="objective-choice-title">本局结算</p>
+        <p class="objective-choice-hint">守护者已击毁，是否开始新局？</p>
+        <div id="runSettlementStats" class="run-settlement-stats"></div>
+        <div class="objective-choice-actions row">
+          <button id="summaryRestartBtn" type="button">开始新局</button>
+          <button id="summaryStayBtn" type="button">留在终结星系自由游玩</button>
+        </div>
+      </div>
+
+      <details id="moreStatusPanel" class="more-status">
+        <summary class="more-status-summary">更多状态</summary>
+        <div class="more-status-body">
+          <h2>状态</h2>
+          <div id="stationStatus">
+            <div id="stationData"></div>
+            <div id="selectedCellPanel" class="selected-panel hidden">
+              <div id="selectedCellInfo"></div>
+              <div class="row">
+                <button id="toggleSelectedBtn" type="button">开关设施</button>
+                <button id="prioritySelectedBtn" type="button">优先级+10</button>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <button id="missileBtn" type="button">导弹齐射</button>
+            <button id="toggleAsyncBtn" type="button">异步敌站: 开</button>
+          </div>
+          <div class="row">
+            <button id="toggleControlModeBtn" type="button" data-mode="screen">移动: 屏幕方向</button>
+          </div>
+          <div class="row">
+            <button id="rotateLeftBtn" type="button">左旋</button>
+            <button id="rotateRightBtn" type="button">右旋</button>
+          </div>
+          <div class="row">
+            <button id="quickRestartBtn" class="hidden danger-restart-btn" type="button">再次开始新局</button>
+          </div>
+          <h2>局外天赋</h2>
+          <div id="meta">
+            <div id="metaStats"></div>
+            <div class="meta-actions">
+              <button id="talentMiningBtn" type="button">采集升级 1点</button>
+              <button id="talentHullBtn" type="button">结构升级 1点</button>
+              <button id="talentWeaponsBtn" type="button">武器升级 1点</button>
+              <button id="unlockCoreBtn" type="button">改造: 高效核心 3点</button>
+              <button id="unlockWeaponFrameBtn" type="button">解锁: 武器框架 3点</button>
+              <button id="playersBtn" type="button">联机人数缩放</button>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section id="toast" class="toast"></section>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
