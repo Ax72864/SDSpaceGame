@@ -152,6 +152,70 @@ button:disabled {
   padding: 5px 9px;
 }
 
+.weapons-row {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #ccd;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+.weapons-row .hint {
+  color: #888;
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+.weapons-row .salvo-current {
+  color: #5cf;
+  font-weight: bold;
+}
+
+.weapons-row .losblocked {
+  color: #f80;
+}
+
+.reload-bar-container {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.reload-bar {
+  height: 100%;
+  transition: width 0.1s linear, background-color 0.2s;
+}
+
+.reload-bar.reload-low { background: #660000; }
+.reload-bar.reload-mid { background: #ddaa33; }
+.reload-bar.reload-high { background: #33cc33; }
+
+.reload-bar.reload-ready {
+  background: #5588ff;
+  animation: reloadPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes reloadPulse {
+  from { opacity: 0.7; }
+  to { opacity: 1.0; }
+}
+
+.reload-label {
+  position: absolute;
+  left: 6px;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  color: white;
+  text-shadow: 0 0 2px black;
+}
+
 .build-panel {
   left: 12px;
   bottom: 12px;

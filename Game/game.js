@@ -2,6 +2,7 @@
 
 const canvas = document.getElementById("game");
 const resourcesEl = document.getElementById("resources");
+const weaponsRowEl = document.getElementById("weaponsRow");
 const buildButtonsEl = document.getElementById("buildButtons");
 const runInfoEl = document.getElementById("runInfo");
 const runDangerEl = document.getElementById("runDanger");
@@ -2951,6 +2952,23 @@ function bindInput() {
         updateBuildButtons();
         updateHud();
       }
+    } else if (
+      !(document.activeElement && document.activeElement.tagName === "INPUT") &&
+      (key === "f" || event.key === "[" || event.key === "【" || event.key === "]" || event.key === "】")
+    ) {
+      if (key === "f") {
+        const now = performance.now();
+        if (now - (state.input._fLastFireAt || 0) < F_FIRE_DEBOUNCE_MS) return;
+        state.input._fLastFireAt = now;
+        fireMissiles();
+        event.preventDefault();
+      } else if (event.key === "[" || event.key === "【") {
+        adjustSalvoSize(-1);
+        event.preventDefault();
+      } else if (event.key === "]" || event.key === "】") {
+        adjustSalvoSize(+1);
+        event.preventDefault();
+      }
     }
   });
 
@@ -4869,8 +4887,23 @@ function spawnEnemy(kind, x, y, options = {}) {
 function updateTurret(cell, dt) {
   if (cell.reload > 0) return;
   const origin = cellWorldPosition(cell);
-  const enemy = selectTarget(origin, getCellStat(cell, "range"));
-  if (!enemy || !hasLineOfSight(origin, enemy)) return;
+  const range = getCellStat(cell, "range");
+  const enemy = selectTarget(origin, range);
+  if (!enemy) {
+    cell._losBlockedPrev = false;
+    return;
+  }
+  const losOk = hasLineOfSight(origin, enemy);
+  if (!losOk) {
+    if (cell._losBlockedPrev !== true) {
+      if (!cell._losBlockedAt || state.time - cell._losBlockedAt >= LOS_BLOCK_WARN_COOLDOWN) {
+        cell._losBlockedAt = state.time;
+      }
+    }
+    cell._losBlockedPrev = true;
+    return;
+  }
+  cell._losBlockedPrev = false;
   const dir = normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
   cell.reload = getCellStat(cell, "reload");
   fireProjectile(
@@ -4914,6 +4947,17 @@ function updateShield(cell) {
       for (let i = 0; i < 5; i++) spawnParticle(projectile, [0.35, 1, 0.94, 1]);
     }
   }
+}
+
+function adjustSalvoSize(delta) {
+  const options = SALVO_SIZE_OPTIONS;
+  const current = state.missile.salvoSize || 1;
+  let idx = options.indexOf(current);
+  if (idx === -1) idx = 0;
+  idx = (idx + delta + options.length) % options.length;
+  state.missile.salvoSize = options[idx];
+  const label = state.missile.salvoSize >= 999 ? "all" : state.missile.salvoSize;
+  showToast(`齐射档位：${label}`);
 }
 
 function fireMissiles() {
@@ -6085,6 +6129,7 @@ function updateHud() {
     return `<span${powerClass}>${text}</span>`;
   });
   setHtmlIfChanged(resourcesEl, "resources", resourceSpans.join(""));
+  updateWeaponsRow();
 
   const guide = buildGuideText();
   if (state.hud.guideGoal !== guide.goal) {
@@ -6184,9 +6229,77 @@ function updateHud() {
 }
 
 function setHtmlIfChanged(element, cacheKey, html) {
+  if (!element) return;
   if (state.hud[cacheKey] === html) return;
   state.hud[cacheKey] = html;
   element.innerHTML = html;
+}
+
+function updateWeaponsRow() {
+  if (!weaponsRowEl) return;
+
+  let missileReady = 0;
+  let missileTotal = 0;
+  let nextReload = Infinity;
+  let turretReady = 0;
+  let turretTotal = 0;
+  let turretBlocked = 0;
+
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached || !cell.enabled) continue;
+    if (cell.facility === "missile") {
+      missileTotal++;
+      if (cell.reload <= 0) missileReady++;
+      else nextReload = Math.min(nextReload, cell.reload);
+    } else if (cell.facility === "turret") {
+      turretTotal++;
+      if (cell.reload <= 0) turretReady++;
+      if (cell._losBlockedAt && state.time - cell._losBlockedAt < LOS_BLOCK_WARN_DURATION) {
+        turretBlocked++;
+      }
+    }
+  }
+
+  const salvo = state.missile.salvoSize >= 999 ? "all" : state.missile.salvoSize;
+  const nextStr = nextReload === Infinity ? "-" : `${nextReload.toFixed(1)}秒`;
+
+  let html = "";
+  if (missileTotal > 0) {
+    html += `导弹井 ${missileReady}/${missileTotal} 就绪 · 齐射 <span class="salvo-current">${salvo}</span> · 下一发 ${nextStr}`;
+  }
+  if (turretTotal > 0) {
+    if (html) html += " · ";
+    html += `炮塔 ${turretReady}/${turretTotal} 工作`;
+    if (turretBlocked > 0) {
+      html += ` · <span class="losblocked">${turretBlocked} 个被自机遮挡</span>`;
+    }
+  }
+  if (html) {
+    html += ` <span class="hint">F=齐射 · [/]=调档 · 右键锁敌</span>`;
+  }
+
+  setHtmlIfChanged(weaponsRowEl, "weaponsRow", html);
+}
+
+function renderSelectedCellReloadBar(cell) {
+  if (cell.facility !== "missile" && cell.facility !== "turret") return "";
+  const baseReload = getCellStat(cell, "reload");
+  const remaining = Math.max(0, cell.reload);
+  const progress = baseReload > 0 ? 1 - remaining / baseReload : 1;
+  const percent = Math.round(progress * 100);
+
+  let colorClass = "reload-low";
+  if (percent >= 100) colorClass = "reload-ready";
+  else if (percent >= 75) colorClass = "reload-high";
+  else if (percent >= 25) colorClass = "reload-mid";
+
+  const label = percent === 100 ? "就绪" : `${percent}% (${remaining.toFixed(1)}s)`;
+  return `
+    <div class="reload-bar-container">
+      <div class="reload-bar ${colorClass}" style="width: ${percent}%;"></div>
+      <span class="reload-label">${label}</span>
+    </div>
+  `;
 }
 
 function updateSelectedCellPanel(cell) {
@@ -6242,7 +6355,9 @@ function updateSelectedCellPanel(cell) {
       }
     }
   }
-  const html = `已选：${name} ${cell.enabled ? "<span class='good'>启用</span>" : "<span class='danger'>关闭</span>"} / 优先级 ${cell.priority}${stateNote}`;
+  const infoHtml = `已选：${name} ${cell.enabled ? "<span class='good'>启用</span>" : "<span class='danger'>关闭</span>"} / 优先级 ${cell.priority}${stateNote}`;
+  const reloadHtml = renderSelectedCellReloadBar(cell);
+  const html = infoHtml + reloadHtml;
   document.getElementById("toggleSelectedBtn").disabled = cell.facility === "core";
   document.getElementById("prioritySelectedBtn").disabled = cell.facility === "core";
   if (state.hud.selected !== html) {
