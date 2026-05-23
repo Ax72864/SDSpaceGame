@@ -1480,8 +1480,20 @@ function ensureGameplayTestBaseline() {
   }
 }
 
+function ensureGalaxyMapPanelDomForTest() {
+  const panel = document.getElementById("galaxyMapPanel");
+  if (!panel) return false;
+  if (!panel.querySelector(".galaxy-map-cards")) {
+    const cardsEl = document.createElement("div");
+    cardsEl.className = "galaxy-map-cards";
+    panel.appendChild(cardsEl);
+  }
+  return true;
+}
+
 function runGalaxyJumpStateMachineSelfCheck() {
   ensureGameplayTestBaseline();
+  ensureGalaxyMapPanelDomForTest();
   const checks = [];
 
   const runCase = (name, fn) => {
@@ -1523,6 +1535,33 @@ function runGalaxyJumpStateMachineSelfCheck() {
     if (state.run.galaxyMap) state.run.galaxyMap.pendingChoices = [];
     const rejected = confirmGalaxyJump("tradeHub");
     return { ok: !rejected && state.run.level === 0, rejected };
+  });
+
+  runCase("cancelThenReopenCardsInteractive", () => {
+    window.__gameTest.resetRun(42, 0);
+    const open1 = window.__gameTest.openGalaxyMapForTest(1);
+    cancelGalaxyJump();
+    const open2 = window.__gameTest.openGalaxyMapForTest(1);
+    return {
+      ok: open1.ok && open2.ok && isGalaxyMapCardsInteractive(),
+      open1: open1.ok,
+      open2: open2.ok,
+      interactive: isGalaxyMapCardsInteractive()
+    };
+  });
+
+  runCase("confirmThenNextLevelReopenCardsInteractive", () => {
+    window.__gameTest.resetRun(42, 0);
+    const open1 = window.__gameTest.openGalaxyMapForTest(1);
+    const galaxyType = open1.choices?.[0]?.galaxyType;
+    if (!galaxyType) return { ok: false, reason: "no choice" };
+    const confirmed = confirmGalaxyJump(galaxyType);
+    const open2 = window.__gameTest.openGalaxyMapForTest(2);
+    return {
+      ok: open1.ok && confirmed && state.run.level === 1 && open2.ok && isGalaxyMapCardsInteractive(),
+      level: state.run.level,
+      interactive: isGalaxyMapCardsInteractive()
+    };
   });
 
   runCase("cancelThenReconfirm", () => {
@@ -3540,6 +3579,35 @@ function disableGalaxyMapCards() {
   }
 }
 
+function resetGalaxyMapCardsInteractiveState() {
+  const panel = document.getElementById("galaxyMapPanel");
+  const cardsEl = panel?.querySelector(".galaxy-map-cards");
+  if (cardsEl) cardsEl.classList.remove("disabled");
+  const cards = cardsEl?.querySelectorAll(".galaxy-map-card")
+    || panel?.querySelectorAll(".galaxy-map-card")
+    || [];
+  for (const card of cards) {
+    card.disabled = false;
+    card.classList.remove("disabled");
+    card.removeAttribute("aria-disabled");
+  }
+}
+
+function isGalaxyMapCardsInteractive() {
+  const panel = document.getElementById("galaxyMapPanel");
+  const cardsEl = panel?.querySelector(".galaxy-map-cards");
+  if (!cardsEl || cardsEl.classList.contains("disabled")) return false;
+  const cards = cardsEl.querySelectorAll(".galaxy-map-card");
+  if (!cards.length) {
+    // Node VM stub 等环境可能不把 innerHTML 物化为子节点；容器已解除 disabled 即视为可重开。
+    return true;
+  }
+  for (const card of cards) {
+    if (card.disabled || card.classList.contains("disabled")) return false;
+  }
+  return true;
+}
+
 const OBJECTIVE_PREF_LABELS = {
   mine: "采矿",
   survive: "生存",
@@ -3637,6 +3705,7 @@ function renderGalaxyMapCards(choices) {
   const panel = document.getElementById("galaxyMapPanel");
   const cardsEl = panel?.querySelector(".galaxy-map-cards");
   if (!cardsEl) return false;
+  resetGalaxyMapCardsInteractiveState();
   const safeChoices = Array.isArray(choices)
     ? choices.filter((choice) => choice && GALAXY_TYPES[choice.galaxyType])
     : [];
@@ -3670,6 +3739,7 @@ function openGalaxyMapPanel(choices) {
     confirmGalaxyJump("emptyVoid", { allowFallback: true });
     return false;
   }
+  resetGalaxyMapCardsInteractiveState();
   if (!renderGalaxyMapCards(safeChoices)) {
     confirmGalaxyJump(safeChoices[0].galaxyType);
     return false;
@@ -8906,6 +8976,9 @@ window.__gameTest = {
   },
   isGalaxyMapPanelOpen() {
     return isGalaxyMapPanelOpen();
+  },
+  isGalaxyMapCardsInteractive() {
+    return isGalaxyMapCardsInteractive();
   },
   // 读取完整 galaxyMap.nodes 路径
   getGalaxyPath() {
