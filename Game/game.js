@@ -648,7 +648,9 @@ const state = {
     endgameActivityPoints: 0,
     escortLowHpAlerted: false,
     hostileStationSpawnedThisGalaxy: false,
-    hostileStationAlerted: false
+    hostileStationAlerted: false,
+    encounters: [],
+    encounterCooldownThisGalaxy: new Set()
   },
   resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
   power: { available: 0, used: 0 },
@@ -697,7 +699,9 @@ const state = {
   bridgePreview: null,
   particles: [],
   fireCooldown: 0,
-  spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER
+  spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER,
+  hudCenterAlertQueue: [],
+  hudCenterAlertCurrent: null
 };
 
 let fragmentIdSeed = 1;
@@ -1023,6 +1027,20 @@ function ensureRunRuntimeState() {
   if (!state.missile || typeof state.missile !== "object") state.missile = { salvoSize: 1 };
   if (!Number.isFinite(state.missile.salvoSize) || state.missile.salvoSize <= 0) {
     state.missile.salvoSize = 1;
+  }
+  // v0.8.0：encounter 框架默认值兼容（旧存档 / 老运行态缺字段时兜底）
+  if (!Array.isArray(state.run.encounters)) state.run.encounters = [];
+  if (!(state.run.encounterCooldownThisGalaxy instanceof Set)) {
+    state.run.encounterCooldownThisGalaxy = new Set();
+  }
+  if (!Array.isArray(state.hudCenterAlertQueue)) state.hudCenterAlertQueue = [];
+  if (state.hudCenterAlertCurrent === undefined) state.hudCenterAlertCurrent = null;
+  if (Array.isArray(state.npcs)) {
+    for (const npc of state.npcs) {
+      if (!npc) continue;
+      if (npc.role == null) npc.role = "objective";
+      if (npc.encounterId === undefined) npc.encounterId = null;
+    }
   }
 }
 
@@ -2262,6 +2280,152 @@ function pickWeighted(rng, weightTable) {
   return entries[entries.length - 1][0];
 }
 
+// v0.8.0：局内随机事件（ENCOUNTER）平行注册表与常量
+// 与 OBJECTIVE_TYPES 完全独立——不复用 RNG 流（独立 xor/mul 公式保护 __gameTest 测试钩子）、
+// 不复用奖励路径（独立 applyEncounterReward 避免 meta.points / objectiveCompleteAt 副作用）、
+// 不复用 HUD alert（priority 队列由 T4 实现）。T1+T2 仅搭框架，5 种事件 make/tick 均为 noop。
+const ENCOUNTER_MAX_CONCURRENT = 3;
+const ENCOUNTER_RNG_XOR = 0xb5297a4d;
+const ENCOUNTER_RNG_MUL = 0xcc9e2d51;
+const ENCOUNTER_TRIGGER_BASE_DELAY = 60;
+const ENCOUNTER_TRIGGER_STAGGER = 30;
+
+const ENCOUNTER_LEVEL_WEIGHTS = {
+  0: { trader: 1.0 },
+  1: { trader: 1.0, distress: 0.5, derelict: 0.5, signal: 0.3 },
+  2: { trader: 0.8, distress: 0.7, ambush: 0.4, derelict: 0.6, signal: 0.4 },
+  3: { trader: 0.6, distress: 0.7, ambush: 0.6, derelict: 0.7, signal: 0.5 },
+  4: { trader: 0.5, distress: 0.6, ambush: 0.7, derelict: 0.7, signal: 0.6 },
+  5: { trader: 0.4, distress: 0.6, ambush: 0.8, derelict: 0.7, signal: 0.7 },
+  6: {}
+};
+
+const ENCOUNTER_PER_LEVEL_COUNT = {
+  0: { min: 1, max: 1 },
+  1: { min: 1, max: 2 },
+  2: { min: 2, max: 3 },
+  3: { min: 2, max: 3 },
+  4: { min: 2, max: 3 },
+  5: { min: 2, max: 3 },
+  6: { min: 0, max: 0 }
+};
+
+// 与 OBJECTIVE_EVENT_HANDLERS 同形 event → handlerName 映射，方便 notifyEncounters 派发
+const ENCOUNTER_EVENT_HANDLERS = {
+  tick: "tick",
+  mined: "onMined",
+  enemyKilled: "onEnemyKilled",
+  guardianKilled: "onGuardianKilled",
+  hostileStationKilled: "onHostileStationKilled",
+  fragmentDocked: "onFragmentDocked",
+  npcArrived: "onNpcArrived",
+  npcDestroyed: "onNpcDestroyed"
+};
+
+const ENCOUNTER_TYPE_DEFAULTS = {
+  make: () => null,
+  tick: () => {},
+  onMined: () => {},
+  onEnemyKilled: () => {},
+  onGuardianKilled: () => {},
+  onHostileStationKilled: () => {},
+  onFragmentDocked: () => {},
+  onNpcArrived: () => {},
+  onNpcDestroyed: () => {},
+  isComplete: (encounter) => encounter.completed === true,
+  isFailed: (encounter) => encounter.failed === true,
+  getDetail: () => "",
+  getHint: () => "",
+  render: () => {},
+  cssClass: "alert-encounter",
+  hudAlertClass: "alert-encounter",
+  priority: 50,
+  spawnDistanceMin: 400,
+  spawnDistanceMax: 800,
+  cooldownTurns: 1,
+  defaultExpireMs: 60000
+};
+
+// 5 种事件骨架（T1 阶段仅元数据；具体 make/tick/onXxx 留 T3 实现）
+const ENCOUNTER_TYPES = {
+  trader: {
+    ...ENCOUNTER_TYPE_DEFAULTS,
+    cssClass: "alert-encounter-trader",
+    hudAlertClass: "alert-encounter-trader",
+    priority: 50,
+    spawnDistanceMin: 400,
+    spawnDistanceMax: 600,
+    cooldownTurns: 2,
+    defaultExpireMs: 30000
+  },
+  distress: {
+    ...ENCOUNTER_TYPE_DEFAULTS,
+    cssClass: "alert-encounter-distress",
+    hudAlertClass: "alert-encounter-distress",
+    priority: 70,
+    spawnDistanceMin: 500,
+    spawnDistanceMax: 800,
+    cooldownTurns: 1,
+    defaultExpireMs: 45000
+  },
+  ambush: {
+    ...ENCOUNTER_TYPE_DEFAULTS,
+    cssClass: "alert-encounter-ambush",
+    hudAlertClass: "alert-encounter-ambush",
+    priority: 80,
+    spawnDistanceMin: 600,
+    spawnDistanceMax: 900,
+    cooldownTurns: 1,
+    defaultExpireMs: 60000
+  },
+  derelict: {
+    ...ENCOUNTER_TYPE_DEFAULTS,
+    cssClass: "alert-encounter-derelict",
+    hudAlertClass: "alert-encounter-derelict",
+    priority: 40,
+    spawnDistanceMin: 700,
+    spawnDistanceMax: 1100,
+    cooldownTurns: 1,
+    defaultExpireMs: 99999999
+  },
+  signal: {
+    ...ENCOUNTER_TYPE_DEFAULTS,
+    cssClass: "alert-encounter-signal",
+    hudAlertClass: "alert-encounter-signal",
+    priority: 30,
+    spawnDistanceMin: 800,
+    spawnDistanceMax: 1400,
+    cooldownTurns: 1,
+    defaultExpireMs: 99999999
+  }
+};
+
+let encounterIdSeed = 0;
+
+// pickWeighted 的 ENCOUNTER 版本：按 ENCOUNTER_TYPES 注册表过滤合法 type，不影响 OBJECTIVE 抽样
+function pickEncounterWeighted(rng, weightTable) {
+  if (!weightTable || typeof weightTable !== "object") return null;
+  const entries = Object.entries(weightTable).filter(
+    ([type, weight]) => ENCOUNTER_TYPES[type] && Number.isFinite(weight) && weight > 0
+  );
+  if (!entries.length) return null;
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = rng() * total;
+  for (const [type, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return type;
+  }
+  return entries[entries.length - 1][0];
+}
+
+// 独立 RNG 流：与 OBJECTIVE 公式（seed ^ 0x9e3779b9 + level * 0x85ebca6b）完全隔离，
+// 保护 __gameTest.findEscortSeed / getObjectiveType 在 v0.7.0/v0.8.0 之间稳定
+function getEncounterRng(level) {
+  const lvl = levelIndex(level);
+  const seed = (state.run.seed ^ ENCOUNTER_RNG_XOR) + lvl * ENCOUNTER_RNG_MUL;
+  return mulberry32(seed >>> 0);
+}
+
 function getObjectiveWeightTable(level) {
   const weightTable = {
     ...(OBJECTIVE_LEVEL_WEIGHTS[level] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1])
@@ -2313,6 +2477,197 @@ function notifyObjective(event, payload) {
   if (!isObjectiveComplete() && !isObjectiveFailed() && isObjectiveDefinitionComplete(objective, objectiveType)) {
     grantObjectiveReward();
   }
+}
+
+// v0.8.0：ENCOUNTER 平行事件总线
+// 与 notifyObjective 并行存在：现有 8 处 notifyObjective 调用之后追加 notifyEncounters，
+// 让 ENCOUNTER 注册表可以消费同一组事件（mined/enemyKilled/fragmentDocked/hostileStationKilled/
+// guardianKilled/tick 双路径派发；npcArrived/npcDestroyed 在 damageNpc / tickNpc 内按 npc.role 分流）。
+function notifyEncounters(event, payload) {
+  if (!Array.isArray(state.run.encounters) || state.run.encounters.length === 0) return;
+  const handlerName = ENCOUNTER_EVENT_HANDLERS[event];
+  if (!handlerName) return;
+  // 复制数组避免派发过程中 mutation（applyEncounterReward 可能改变 state.run.encounters 顺序）
+  const encounters = state.run.encounters.slice();
+  for (const encounter of encounters) {
+    if (!encounter) continue;
+    if (encounter.completed || encounter.failed || encounter.expired) continue;
+    if (encounter.state !== "active") continue;
+    const type = ENCOUNTER_TYPES[encounter.type];
+    if (!type) continue;
+    const handler = type[handlerName];
+    if (typeof handler !== "function") continue;
+    handler(encounter, payload);
+    if (!encounter.completed && !encounter.failed && type.isComplete(encounter)) {
+      encounter.completed = true;
+      encounter.state = "complete";
+      applyEncounterReward(encounter);
+    } else if (!encounter.failed && !encounter.completed && type.isFailed(encounter)) {
+      encounter.failed = true;
+      encounter.state = "failed";
+    }
+  }
+}
+
+// ENCOUNTER 独立奖励路径
+// 不调用 grantObjectiveReward / saveMeta / endRunSettlement，避免触发 meta.points、
+// objectiveCompleteAt、awaitingObjectiveChoice 等 OBJECTIVE 专属副作用；
+// 事件生成的 NPC / fragment / wreck 由各 type.make / activateEncounter 直接 push，本函数仅结算资源。
+function applyEncounterReward(encounter) {
+  if (!encounter || !encounter.encounterData) return;
+  const reward = encounter.encounterData.reward;
+  if (!reward || typeof reward !== "object") return;
+  if (Number.isFinite(reward.metal)) state.resources.metal += reward.metal;
+  if (Number.isFinite(reward.ore)) state.resources.ore += reward.ore;
+  if (Number.isFinite(reward.gas)) state.resources.gas += reward.gas;
+  if (Number.isFinite(reward.plasma)) state.resources.plasma += reward.plasma;
+  if (Number.isFinite(reward.research)) {
+    state.resources.research = (state.resources.research || 0) + reward.research;
+  }
+}
+
+// 按权重 + cooldown 滚池为本关生成 1-3 个 ENCOUNTER（stub）
+// T1+T2 阶段：只创建占位 encounter 对象、不调用 type.make()、不生成任何实体；
+// 玩家在 T3 实现前看不到任何事件（保持 v0.7.0 行为等价）。
+function seedEncountersForLevel(level) {
+  const lvl = levelIndex(level);
+  state.run.encounters = [];
+  state.run.encounterCooldownThisGalaxy = new Set();
+  if (lvl >= ENDGAME_LEVEL) return;
+
+  const counts = ENCOUNTER_PER_LEVEL_COUNT[lvl] || { min: 0, max: 0 };
+  if (counts.max <= 0) return;
+
+  const baseWeights = ENCOUNTER_LEVEL_WEIGHTS[lvl] || {};
+  const availableTypes = Object.keys(baseWeights).filter((type) => ENCOUNTER_TYPES[type]);
+  if (availableTypes.length === 0) return;
+
+  const rng = getEncounterRng(lvl);
+  const targetCount = counts.min + Math.floor(rng() * (counts.max - counts.min + 1));
+
+  for (let i = 0; i < targetCount && state.run.encounters.length < ENCOUNTER_MAX_CONCURRENT; i++) {
+    const tempWeights = {};
+    for (const type of availableTypes) {
+      const cooldownLimit = ENCOUNTER_TYPES[type].cooldownTurns ?? 1;
+      const usedCount = state.run.encounters.filter((entry) => entry.type === type).length;
+      if (usedCount >= cooldownLimit) continue;
+      tempWeights[type] = baseWeights[type];
+    }
+    if (Object.keys(tempWeights).length === 0) break;
+
+    const type = pickEncounterWeighted(rng, tempWeights);
+    if (!type) break;
+
+    const def = ENCOUNTER_TYPES[type];
+    encounterIdSeed += 1;
+    const triggerOffset = ENCOUNTER_TRIGGER_BASE_DELAY + i * ENCOUNTER_TRIGGER_STAGGER;
+    const expireSeconds = Math.max(1, (def.defaultExpireMs || 60000) / 1000);
+    const encounter = {
+      id: `enc-${lvl}-${encounterIdSeed}`,
+      type,
+      state: "pending",
+      spawnAt: state.time,
+      triggerAt: state.time + triggerOffset,
+      expireAt: null,
+      spawnPos: null,
+      npcIds: [],
+      fragmentIds: [],
+      enemyIds: [],
+      completed: false,
+      failed: false,
+      expired: false,
+      encounterData: {},
+      _defaultExpireSeconds: expireSeconds
+    };
+    state.run.encounters.push(encounter);
+    state.run.encounterCooldownThisGalaxy.add(type);
+  }
+}
+
+// 选择 encounter 在 station 周围的 spawn 位置
+// T1 阶段：仅做"与玩家距离 >= minDist"基础校验；T3 实现时补全与 enemies / npcs / 其他 encounter 的避让
+function pickEncounterSpawnPos(type, rng) {
+  const def = ENCOUNTER_TYPES[type];
+  if (!def) return null;
+  const minDist = def.spawnDistanceMin;
+  const maxDist = def.spawnDistanceMax;
+  if (!Number.isFinite(minDist) || !Number.isFinite(maxDist) || maxDist <= minDist) return null;
+  for (let retry = 0; retry < 8; retry++) {
+    const distance = minDist + rng() * (maxDist - minDist);
+    const angle = rng() * Math.PI * 2;
+    if (distance < minDist) continue;
+    return {
+      x: state.station.pos.x + Math.cos(angle) * distance,
+      y: state.station.pos.y + Math.sin(angle) * distance
+    };
+  }
+  return null;
+}
+
+// ENCOUNTER 主循环：与 updateObjective(dt) 并行；在 update() 末尾 updateObjective 之后、
+// updateCamera 之前调用（确保 objective 先于 encounter tick，camera 更新前 encounter 状态已就绪）。
+function updateEncounters(dt) {
+  processHudCenterAlertQueue(dt);
+  if (!Array.isArray(state.run.encounters) || state.run.encounters.length === 0) return;
+  for (const encounter of state.run.encounters) {
+    if (!encounter) continue;
+    if (encounter.completed || encounter.failed || encounter.expired) continue;
+    const type = ENCOUNTER_TYPES[encounter.type];
+    if (!type) continue;
+
+    if (encounter.state === "pending" && state.time >= encounter.triggerAt) {
+      activateEncounter(encounter);
+    }
+
+    if (encounter.state === "active") {
+      if (typeof type.tick === "function") type.tick(encounter, dt);
+      if (!encounter.completed && !encounter.failed && type.isComplete(encounter)) {
+        encounter.completed = true;
+        encounter.state = "complete";
+        applyEncounterReward(encounter);
+        continue;
+      }
+      if (!encounter.failed && !encounter.completed && type.isFailed(encounter)) {
+        encounter.failed = true;
+        encounter.state = "failed";
+        continue;
+      }
+      if (encounter.expireAt !== null && state.time >= encounter.expireAt) {
+        expireEncounter(encounter);
+      }
+    }
+  }
+}
+
+// 把 encounter 从 pending → active：T1 阶段仅决定 spawnPos、设 expireAt 与 state；
+// T3 将在此处调用 type.make() 生成 NPC / fragment / wreck 等实体。
+function activateEncounter(encounter) {
+  const type = ENCOUNTER_TYPES[encounter.type];
+  if (!type) return;
+  const rng = getEncounterRng(state.run.level);
+  const pos = pickEncounterSpawnPos(encounter.type, rng);
+  if (!pos) {
+    encounter.expired = true;
+    encounter.state = "expired";
+    return;
+  }
+  encounter.spawnPos = pos;
+  encounter.state = "active";
+  const expireSeconds = encounter._defaultExpireSeconds ?? (type.defaultExpireMs / 1000);
+  encounter.expireAt = Number.isFinite(expireSeconds) ? state.time + expireSeconds : null;
+  // T3：在此调用 type.make(rng, level, pos) 进一步初始化（生成 NPC / fragment 等）
+}
+
+function expireEncounter(encounter) {
+  encounter.expired = true;
+  encounter.state = "expired";
+  // T3：在此清理事件 NPC / fragment（让 NPC.arrived = true、fragment 保留至 nextLevel）
+}
+
+// HUD 中央 alert priority 队列：T1+T2 阶段 stub，避免 updateEncounters 调用报错；
+// T4 阶段实现完整 priority 抢占 + DOM 复用，与 showHostileStationAlert 合并。
+function processHudCenterAlertQueue(_dt) {
+  // intentional no-op until T4
 }
 
 function createObjective() {
@@ -2489,6 +2844,8 @@ function initGame() {
   initStation();
   initWorld();
   createObjective();
+  // v0.8.0：首关初始化时同步滚池（与 nextLevel / __gameTest.resetRun 行为一致）
+  seedEncountersForLevel(state.run.level);
   createBuildUi();
   ensureResearchTreeUi();
   bindInput();
@@ -3256,6 +3613,8 @@ function createEscortNpc(startPos, targetPos, rng, level) {
   return {
     id: ++npcIdSeed,
     kind: "friendly-cargo",
+    role: "objective",
+    encounterId: null,
     pos: { x: startPos.x, y: startPos.y },
     vel: { x: 0, y: 0 },
     angle: Math.atan2(toTarget.y, toTarget.x),
@@ -3265,6 +3624,42 @@ function createEscortNpc(startPos, targetPos, rng, level) {
     radius: NPC_RADIUS,
     hudColor: [0.35, 0.85, 0.78, 1],
     speed: rngFloat(rng, 35, 45),
+    arrived: false,
+    destroyed: false,
+    collisionCooldown: 0,
+    spawnAt: state.time
+  };
+}
+
+// v0.8.0：ENCOUNTER NPC 工厂（trader / distress-pilot / pirate-ambush）
+// 与 createEscortNpc 字段集对齐，仅在 role / encounterId / kind / 默认数值上区分；
+// T1+T2 阶段提供工厂供后续 T3 spawn 使用，本身不会被 T1+T2 自动调用（玩家看不到事件 NPC）。
+function createEncounterNpc(kind, encounterId, options = {}) {
+  const id = options.id != null ? options.id : ++npcIdSeed;
+  const radius = Number.isFinite(options.radius) ? options.radius : NPC_RADIUS;
+  const maxHp = Number.isFinite(options.maxHp)
+    ? options.maxHp
+    : Number.isFinite(options.hp) ? options.hp : 60;
+  const hp = Number.isFinite(options.hp) ? options.hp : maxHp;
+  const speed = Number.isFinite(options.speed) ? options.speed : 80;
+  const angle = Number.isFinite(options.angle) ? options.angle : 0;
+  const pos = options.pos ? { x: options.pos.x, y: options.pos.y } : { x: 0, y: 0 };
+  const vel = options.vel ? { x: options.vel.x, y: options.vel.y } : { x: 0, y: 0 };
+  const target = options.target ? { x: options.target.x, y: options.target.y } : null;
+  return {
+    id,
+    kind,
+    role: "encounter",
+    encounterId,
+    pos,
+    vel,
+    angle,
+    hp,
+    maxHp,
+    target,
+    radius,
+    hudColor: options.hudColor || [0.35, 0.85, 0.78, 1],
+    speed,
     arrived: false,
     destroyed: false,
     collisionCooldown: 0,
@@ -3302,20 +3697,51 @@ function damageNpc(npc, amount) {
   if (npc.hp <= 0) {
     npc.hp = 0;
     npc.destroyed = true;
-    notifyObjective("npcDestroyed", npc);
+    // v0.8.0：按 npc.role 分流 npcDestroyed 事件，escort objective NPC 走 notifyObjective；
+    // ENCOUNTER NPC（trader / distress-pilot / pirate-ambush）走 notifyEncounters；
+    // 两条路径不重叠，避免 escort isFailed 误判事件 NPC 死亡。
+    if (npc.role === "encounter") {
+      notifyEncounters("npcDestroyed", npc);
+    } else {
+      notifyObjective("npcDestroyed", npc);
+    }
     state.npcs = state.npcs.filter((entry) => entry.id !== npc.id);
   }
 }
 
+// v0.8.0：tickNpc 按 npc.kind 分支 AI；friendly-cargo / distress-pilot 共用原有 escort 行为，
+// trader / pirate-ambush 留 stub 给 T3。注意：kind 决定 AI，role 决定事件归属（互相独立）。
 function tickNpc(npc, dt) {
-  if (npc.arrived || npc.destroyed) return;
+  if (!npc || npc.arrived || npc.destroyed) return;
+  switch (npc.kind) {
+    case "trader":
+      tickTraderNpc(npc, dt);
+      break;
+    case "pirate-ambush":
+      tickPirateAmbushNpc(npc, dt);
+      break;
+    case "friendly-cargo":
+    case "distress-pilot":
+    default:
+      tickFriendlyCargoLikeNpc(npc, dt);
+      break;
+  }
+}
+
+// 原 tickNpc 主体（保持 v0.4.0 escort NPC 行为完全等价）；npcArrived 事件按 role 分流
+function tickFriendlyCargoLikeNpc(npc, dt) {
+  if (!npc.target) return;
   const toTarget = { x: npc.target.x - npc.pos.x, y: npc.target.y - npc.pos.y };
   const remain = length(toTarget);
   if (remain <= NPC_ARRIVE_RADIUS) {
     npc.arrived = true;
     npc.vel.x = 0;
     npc.vel.y = 0;
-    notifyObjective("npcArrived", npc);
+    if (npc.role === "encounter") {
+      notifyEncounters("npcArrived", npc);
+    } else {
+      notifyObjective("npcArrived", npc);
+    }
     return;
   }
   let dir = normalize(toTarget);
@@ -3346,6 +3772,16 @@ function tickNpc(npc, dt) {
     npc.pos.x += push.x * 48 * dt;
     npc.pos.y += push.y * 48 * dt;
   }
+}
+
+// trader 漂流商船 AI：T3 实现"平行玩家速度方向巡航 + 30s 离场"
+function tickTraderNpc(_npc, _dt) {
+  // intentional no-op until T3
+}
+
+// pirate-ambush 伪装陷阱海盗 AI：T3 实现"显形后追玩家 + 攻击"
+function tickPirateAmbushNpc(_npc, _dt) {
+  // intentional no-op until T3
 }
 
 function collideNpcWithEnemies(npc, dt) {
@@ -3419,7 +3855,11 @@ function buildNpcHudAlerts() {
   if (objective.failed) {
     return [{ level: "danger", cssClass: "alert-escort-fail", text: "护送失败 · 本关无法跃迁" }];
   }
-  const npc = state.npcs.find((entry) => entry.id === objective.npcId);
+  // v0.8.0：仅在 objective NPC（role !== "encounter"）内反查 escort npc，
+  // 防止 ENCOUNTER NPC（T3 trader / distress-pilot / pirate-ambush）污染 escort alert 通道
+  const npc = state.npcs.find(
+    (entry) => entry.id === objective.npcId && entry.role !== "encounter"
+  );
   if (!npc) return [];
   const hpPct = npc.maxHp > 0 ? npc.hp / npc.maxHp : 0;
   if (hpPct < 0.1 && !state.run.escortLowHpAlerted) {
@@ -3434,6 +3874,7 @@ function buildNpcHudAlerts() {
     cssClass: hpPct < 0.3 ? "alert-escort alert-escort-critical" : "alert-escort",
     text: `护送目标 ${direction} ${distance} px · HP ${Math.floor(hpPct * 100)}%`
   }];
+  // 注：encounter NPC 的 HUD alert 由 T4 的 buildEncounterHudAlerts() 独立返回
 }
 
 function buildFragmentFromCells(componentCells) {
@@ -4085,6 +4526,7 @@ function triggerHostileStationDeath(enemy) {
   }
   spawnEnemyWrecks(enemy);
   notifyObjective("hostileStationKilled", { enemy });
+  notifyEncounters("hostileStationKilled", { enemy });
   showHostileStationAlert("✓ 主目标已摧毁", 2000, true);
   showToast("敌方空间站已摧毁——拾取残骸强化 build。");
 }
@@ -4256,6 +4698,7 @@ function mergeFragmentToStation(fragment, anchorCell, newFrame) {
   }
 
   notifyObjective("fragmentDocked", fragment);
+  notifyEncounters("fragmentDocked", fragment);
   checkConnectivity();
   showToast(`重新接入 ${projectedCells.length} 个结构 / 含 ${facilityCount} 个设施。`);
   return true;
@@ -4280,6 +4723,7 @@ function update(dt) {
   updateRepair(dt);
   updateParticles(dt);
   updateObjective(dt);
+  updateEncounters(dt);
   updateCamera(dt);
   trackResearchGrowth(prevResearch);
 }
@@ -4446,6 +4890,7 @@ function updateMiningAndResearch(dt) {
   }
   if (mined > 0) {
     notifyObjective("mined", mined);
+    notifyEncounters("mined", mined);
     awardEndgameActivityPoints(mined * ENDGAME_ACTIVITY_POINTS.miningPerUnit);
   }
   if (state.resources.research >= 35 + state.station.techLevel * 22) {
@@ -4789,10 +5234,12 @@ function updateEnemies(dt) {
       state.run.endgame = true;
       triggerGuardianDeathEffect(enemy);
       notifyObjective("guardianKilled", enemy);
+      notifyEncounters("guardianKilled", enemy);
     } else if (enemy.kind === "hostile-station") {
       triggerHostileStationDeath(enemy);
     } else {
       notifyObjective("enemyKilled", enemy);
+      notifyEncounters("enemyKilled", enemy);
       for (let i = 0; i < 12; i++) spawnParticle(enemy, [1, 0.32, 0.18, 1]);
     }
     return false;
@@ -5368,6 +5815,7 @@ function updateFragments(dt) {
 function updateObjective(dt) {
   if (isObjectiveComplete() || isObjectiveFailed()) return;
   notifyObjective("tick", dt);
+  notifyEncounters("tick", dt);
 }
 
 function nextLevel() {
@@ -5398,7 +5846,12 @@ function nextLevel() {
   state.projectiles = [];
   state.repairDrones = [];
   state.particles = [];
+  // v0.8.0：跨关清空 encounter 状态 + HUD 中央 alert 队列（hudCenterAlertCurrent 让其自然结束）
+  state.run.encounters = [];
+  state.run.encounterCooldownThisGalaxy = new Set();
+  state.hudCenterAlertQueue = [];
   createObjective();
+  seedEncountersForLevel(state.run.level);
 
   state.resources.metal += 55;
   state.resources.ore += 25;
@@ -6621,6 +7074,11 @@ window.__gameTest = {
     state.projectiles = [];
     state.repairDrones = [];
     state.particles = [];
+    // v0.8.0：resetRun 同步清理 encounter 状态 + HUD 中央 alert 队列与当前
+    state.run.encounters = [];
+    state.run.encounterCooldownThisGalaxy = new Set();
+    state.hudCenterAlertQueue = [];
+    state.hudCenterAlertCurrent = null;
     const lvl = levelIndex(level);
     const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`);
     applyGalaxy(galaxy);
@@ -6628,6 +7086,7 @@ window.__gameTest = {
       resetCellUpgradeState(cell);
     }
     createObjective();
+    seedEncountersForLevel(lvl);
     state.run.fragmentHudCache = null;
   },
   getObjectiveType(seed, level) {
