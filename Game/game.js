@@ -1434,6 +1434,20 @@ function getSelectedStartProtocol(metaState = state.meta) {
   return unlockedProtocols.includes(selected) ? selected : META_DEFAULT_PROTOCOL_ID;
 }
 
+function selectStartProtocol(protocolId, metaState = state.meta) {
+  if (!START_PROTOCOL_INDEX[protocolId]) {
+    return { ok: false, reason: "unknown_protocol", protocolId };
+  }
+  state.meta = ensureMetaState(metaState);
+  recomputeUnlockedProtocols(state.meta);
+  if (!state.meta.unlockedProtocols.includes(protocolId)) {
+    return { ok: false, reason: "protocol_locked", protocolId };
+  }
+  state.meta.selectedStartProtocol = protocolId;
+  saveMeta();
+  return { ok: true, protocolId };
+}
+
 function applyMetaEffectContribution(effect, rank, mode, totals, fromProtocol = false) {
   if (!effect || !totals) return;
   if (mode === "addPercent" || mode === "add") {
@@ -2903,8 +2917,8 @@ function ensureResearchTreeUi() {
     </div>
   `;
   document.body.appendChild(researchTreePanelEl);
-  researchTreePanelEl.querySelector(".research-tree-close").addEventListener("click", () => toggleResearchTree(false));
-  researchTreePanelEl.querySelector(".research-tree-backdrop").addEventListener("click", () => toggleResearchTree(false));
+  researchTreePanelEl.querySelector(".research-tree-close")?.addEventListener("click", () => toggleResearchTree(false));
+  researchTreePanelEl.querySelector(".research-tree-backdrop")?.addEventListener("click", () => toggleResearchTree(false));
 }
 
 function renderResearchTreePanel() {
@@ -2942,8 +2956,550 @@ function renderResearchTreePanel() {
 function toggleResearchTree(open) {
   ensureResearchTreeUi();
   state.hud.researchTreeOpen = open;
-  if (open) renderResearchTreePanel();
+  if (open) {
+    toggleMetaPanel(false);
+    renderResearchTreePanel();
+  }
   researchTreePanelEl.classList.toggle("hidden", !open);
+}
+
+const META_CATEGORY_LABELS = {
+  all: "全部",
+  resource: "资源型",
+  defense: "防御型",
+  weapon: "武器型",
+  exploration: "探索型"
+};
+
+const META_EFFECT_LABELS = {
+  miningYield: "采集产出",
+  metalRefining: "建造金属消耗",
+  startingMetal: "开局金属",
+  startingOre: "开局矿石",
+  hullIntegrity: "框架耐久",
+  coreFortitude: "核心耐久",
+  buildDiscount: "全设施建造成本",
+  weaponCalibration: "武器伤害",
+  weaponFrame: "高级武器框架",
+  weaponEfficiency: "武器推力",
+  researchInsight: "局内科研点获得",
+  efficientCore: "高效核心蓝图",
+  galaxyForesight: "星图提示",
+  earlyHint: "早期提示",
+  unlockProtocol: "开局协议"
+};
+
+let metaPanelEl = null;
+let metaPanelBound = false;
+const metaPanelUi = {
+  open: false,
+  activeTab: "talents",
+  categoryFilter: "all"
+};
+
+function getMetaEffectLabel(effectKey) {
+  return META_EFFECT_LABELS[effectKey] || effectKey;
+}
+
+function formatMetaPercent(value) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function describeMetaNodeEffects(node, rank) {
+  if (!node || rank <= 0) return "暂无效果";
+  const parts = [];
+  for (const effect of node.effects || []) {
+    if (effect.key === "unlockProtocol") {
+      const requiredRank = Math.max(1, Math.floor(Number(effect.atRank) || 1));
+      if (rank >= requiredRank) {
+        const protocol = START_PROTOCOL_INDEX[effect.protocol];
+        parts.push(`已解锁协议：${protocol ? protocol.name : effect.protocol}`);
+      }
+      continue;
+    }
+    const mode = META_EFFECT_MODE[effect.key] || effect.op;
+    if (mode === "addPercent") {
+      const total = (Number(effect.perRank) || 0) * rank;
+      parts.push(`${getMetaEffectLabel(effect.key)} +${formatMetaPercent(total)}`);
+    } else if (mode === "mul") {
+      const mul = Math.pow(Number(effect.perRankMul) || 1, rank);
+      parts.push(`${getMetaEffectLabel(effect.key)} 约 -${formatMetaPercent(Math.max(0, 1 - mul))}`);
+    } else if (mode === "add") {
+      parts.push(`${getMetaEffectLabel(effect.key)} +${(Number(effect.perRank) || 0) * rank}`);
+    } else if (mode === "flag") {
+      parts.push(`${getMetaEffectLabel(effect.key)} 已解锁`);
+    }
+  }
+  return parts.length ? parts.join("；") : node.desc;
+}
+
+function describeMetaNodeNextEffects(node, rank) {
+  if (!node || rank >= node.maxRank) return "";
+  return describeMetaNodeEffects(node, rank + 1);
+}
+
+function formatMetaPrereqLine(prereq) {
+  const node = getMetaTalentNode(prereq.nodeId);
+  const name = node ? node.name : prereq.nodeId;
+  return `${name} ${prereq.requiredRank}级`;
+}
+
+function getMetaNodePurchaseUiState(purchaseState) {
+  if (purchaseState.canBuy) {
+    return {
+      cardClass: "available",
+      buttonText: `购买：${purchaseState.nextCost} 局外天赋点`,
+      buttonDisabled: false,
+      statusHtml: `<div class="meta-node-card__status good">可购买</div>`
+    };
+  }
+  if (purchaseState.reason === "max_rank_reached") {
+    return {
+      cardClass: "maxed",
+      buttonText: "已满级",
+      buttonDisabled: true,
+      statusHtml: `<div class="meta-node-card__status good">已满级</div>`
+    };
+  }
+  if (purchaseState.reason === "not_enough_points") {
+    return {
+      cardClass: "locked not-enough-points",
+      buttonText: `局外天赋点不足，还差 ${purchaseState.deficit} 点`,
+      buttonDisabled: true,
+      statusHtml: `<div class="meta-node-card__status warn">局外天赋点不足，还差 ${purchaseState.deficit} 点</div>`
+    };
+  }
+  if (purchaseState.reason === "prereq_unmet") {
+    const lines = (purchaseState.missingPrereq || []).map((entry) => {
+      const node = getMetaTalentNode(entry.nodeId);
+      const name = node ? node.name : entry.nodeId;
+      return `需要 ${name} ${entry.requiredRank}级（当前 ${entry.currentRank}级）`;
+    });
+    return {
+      cardClass: "locked prereq-unmet",
+      buttonText: "前置未满足",
+      buttonDisabled: true,
+      statusHtml: `<div class="meta-node-card__prereq warn">${lines.join("<br>")}</div>`
+    };
+  }
+  return {
+    cardClass: "locked",
+    buttonText: "暂不可购买",
+    buttonDisabled: true,
+    statusHtml: `<div class="meta-node-card__status warn">节点数据异常，暂不可购买</div>`
+  };
+}
+
+function getMetaDeferredImpactHint(talentId) {
+  if (talentId === "hullIntegrity" || talentId === "coreFortitude") {
+    return "影响新建框架与后续新局；当前局已有结构耐久不会立即重算。";
+  }
+  if (talentId === "startingCache") {
+    return "额外资源在下一局开局时生效，当前局不变。";
+  }
+  if (talentId === "researchInsight") {
+    return "仅提升本局任务获得的局内科研点，与局外天赋点无关。";
+  }
+  return "";
+}
+
+function getMetaPurchaseSuccessMessage(talentId) {
+  const node = getMetaTalentNode(talentId);
+  if (!node) return "局外天赋已保存，会在之后的局中持续生效。";
+  const deferredHint = getMetaDeferredImpactHint(talentId);
+  if (deferredHint) {
+    return `「${node.name}」已升级。${deferredHint}`;
+  }
+  return `「${node.name}」已升级，会在之后的局中持续生效。`;
+}
+
+function getMetaEntryBadge() {
+  let availableCount = 0;
+  let nearestDeficit = Infinity;
+  for (const node of META_TALENT_TREE) {
+    const purchaseState = getMetaPurchaseState(node.id);
+    if (purchaseState.canBuy) availableCount += 1;
+    if (purchaseState.reason === "not_enough_points" && purchaseState.deficit < nearestDeficit) {
+      nearestDeficit = purchaseState.deficit;
+    }
+  }
+  if (availableCount > 0) {
+    return { text: "有可购买", kind: "available" };
+  }
+  if (Number.isFinite(nearestDeficit) && nearestDeficit < Infinity) {
+    return { text: `还差 ${nearestDeficit} 点`, kind: "deficit" };
+  }
+  const allMaxed = META_TALENT_TREE.every((node) => getMetaPurchaseState(node.id).reason === "max_rank_reached");
+  if (allMaxed) {
+    return { text: "当前路线已满", kind: "maxed" };
+  }
+  return { text: "", kind: "none" };
+}
+
+function getMetaRecommendedTalentNames(limit = 2) {
+  const picks = [];
+  for (const node of META_TALENT_TREE) {
+    const purchaseState = getMetaPurchaseState(node.id);
+    if (!purchaseState.canBuy) continue;
+    picks.push(node.name);
+    if (picks.length >= limit) break;
+  }
+  return picks;
+}
+
+function formatProtocolImpactPreview(protocol) {
+  if (!protocol || !protocol.effects?.length) {
+    return "下一局影响：无额外补给，按基础规则开局。";
+  }
+  const parts = [];
+  for (const effect of protocol.effects) {
+    const mode = META_EFFECT_MODE[effect.key] || effect.op;
+    if (mode === "add") {
+      parts.push(`${getMetaEffectLabel(effect.key)} +${effect.value}`);
+    } else if (mode === "addPercent") {
+      parts.push(`${getMetaEffectLabel(effect.key)} +${formatMetaPercent(effect.value)}`);
+    } else if (mode === "mul") {
+      parts.push(`${getMetaEffectLabel(effect.key)} 约 -${formatMetaPercent(Math.max(0, 1 - effect.value))}`);
+    } else if (mode === "flag") {
+      parts.push(`${getMetaEffectLabel(effect.key)} 启用`);
+    }
+  }
+  return `下一局影响：${parts.join("，")}`;
+}
+
+function getProtocolUnlockHint(protocol, metaState = state.meta) {
+  if (!protocol?.unlock) return "默认可用";
+  const unlockNode = getMetaTalentNode(protocol.unlock.nodeId);
+  const nodeName = unlockNode ? unlockNode.name : protocol.unlock.nodeId;
+  const haveRank = getMetaTalentRank(protocol.unlock.nodeId, metaState);
+  const needRank = Math.max(1, Math.floor(Number(protocol.unlock.rank) || 1));
+  if (haveRank >= needRank) return "已解锁";
+  return `需要局外天赋「${nodeName}」${needRank}级（当前 ${haveRank}级）`;
+}
+
+function isMetaProtocolUnlocked(protocolId, metaState = state.meta) {
+  recomputeUnlockedProtocols(metaState);
+  return Array.isArray(metaState.unlockedProtocols) && metaState.unlockedProtocols.includes(protocolId);
+}
+
+function ensureMetaPanelUi() {
+  if (metaPanelEl) return;
+  metaPanelEl = document.createElement("div");
+  metaPanelEl.id = "metaPanel";
+  metaPanelEl.className = "meta-panel hidden";
+  metaPanelEl.setAttribute("role", "dialog");
+  metaPanelEl.setAttribute("aria-modal", "true");
+  metaPanelEl.setAttribute("aria-labelledby", "metaPanelTitle");
+  metaPanelEl.innerHTML = `
+    <div class="meta-panel-backdrop"></div>
+    <div class="meta-panel-drawer">
+      <div class="meta-panel__header">
+        <div>
+          <h2 id="metaPanelTitle">局外成长 Meta</h2>
+          <p class="meta-panel__subtitle">局外天赋点与本局科研点相互独立</p>
+        </div>
+        <button type="button" class="meta-panel-close" aria-label="关闭">×</button>
+      </div>
+      <div id="metaPointsSummary" class="meta-panel__summary"></div>
+      <div id="metaPanelTabs" class="meta-panel__tabs">
+        <button type="button" data-tab="talents" class="is-active">天赋树</button>
+        <button type="button" data-tab="protocols">开局协议</button>
+        <button type="button" data-tab="info">说明</button>
+      </div>
+      <div class="meta-panel__body">
+        <div id="metaTalentView"></div>
+        <div id="metaProtocolView" class="hidden"></div>
+        <div id="metaInfoView" class="hidden"></div>
+      </div>
+      <div id="metaResetNotice" class="meta-panel__footer">当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。</div>
+    </div>
+  `;
+  document.body.appendChild(metaPanelEl);
+  if (metaPanelBound) return;
+  metaPanelBound = true;
+  metaPanelEl.querySelector(".meta-panel-close")?.addEventListener("click", () => toggleMetaPanel(false));
+  metaPanelEl.querySelector(".meta-panel-backdrop")?.addEventListener("click", () => toggleMetaPanel(false));
+  metaPanelEl.querySelector("#metaPanelTabs")?.addEventListener("click", (event) => {
+    const tabButton = event.target.closest("button[data-tab]");
+    if (!tabButton) return;
+    metaPanelUi.activeTab = tabButton.dataset.tab || "talents";
+    renderMetaPanel();
+  });
+  metaPanelEl.addEventListener("click", (event) => {
+    const buyButton = event.target.closest(".meta-node-buy-btn[data-talent-id]");
+    if (buyButton && !buyButton.disabled) {
+      handleMetaTalentPurchase(buyButton.dataset.talentId);
+      return;
+    }
+    const protocolButton = event.target.closest(".meta-protocol-select-btn[data-protocol-id]");
+    if (protocolButton && !protocolButton.disabled) {
+      handleMetaProtocolSelect(protocolButton.dataset.protocolId);
+      return;
+    }
+    const chip = event.target.closest(".meta-category-chip[data-category]");
+    if (chip) {
+      metaPanelUi.categoryFilter = chip.dataset.category || "all";
+      renderMetaTalentView();
+    }
+  });
+}
+
+function isMetaPanelOpen() {
+  return !!(metaPanelEl && metaPanelUi.open && !metaPanelEl.classList.contains("hidden"));
+}
+
+function toggleMetaPanel(open) {
+  ensureMetaPanelUi();
+  if (open) {
+    toggleResearchTree(false);
+    if (isGalaxyMapPanelOpen()) hideGalaxyMapPanel();
+  }
+  metaPanelUi.open = !!open;
+  metaPanelEl.classList.toggle("hidden", !open);
+  metaPanelEl.classList.toggle("is-open", !!open);
+  if (open) renderMetaPanel();
+  updateMetaEntrySummary();
+}
+
+function renderMetaPanelSummary() {
+  const summaryEl = metaPanelEl?.querySelector("#metaPointsSummary");
+  if (!summaryEl) return;
+  const selectedProtocol = START_PROTOCOL_INDEX[getSelectedStartProtocol()];
+  const recommended = getMetaRecommendedTalentNames(2);
+  summaryEl.innerHTML = `
+    <div>局外天赋点：<strong>${state.meta.points}</strong></div>
+    <div>当前协议：<strong>${selectedProtocol ? selectedProtocol.name : getSelectedStartProtocol()}</strong>（协议效果将在下一局开局时应用，本任务仅预览与选择）</div>
+    ${recommended.length ? `<div>推荐：${recommended.join("、")}</div>` : ""}
+  `;
+}
+
+function renderMetaTalentView() {
+  ensureMetaPanelUi();
+  const viewEl = metaPanelEl.querySelector("#metaTalentView");
+  if (!viewEl) return;
+  const filter = metaPanelUi.categoryFilter || "all";
+  const categories = filter === "all"
+    ? ["resource", "defense", "weapon", "exploration"]
+    : [filter];
+  const filterHtml = Object.entries(META_CATEGORY_LABELS).map(([categoryId, label]) => {
+    const hasAvailable = categoryId !== "all" && META_TALENT_TREE.some((node) => {
+      return node.category === categoryId && getMetaPurchaseState(node.id).canBuy;
+    });
+    const activeClass = filter === categoryId ? " is-active" : "";
+    const availableClass = hasAvailable ? " has-available" : "";
+    return `<button type="button" class="meta-category-chip${activeClass}${availableClass}" data-category="${categoryId}">${label}</button>`;
+  }).join("");
+  let sectionsHtml = "";
+  for (const category of categories) {
+    const nodes = META_TALENT_TREE.filter((node) => node.category === category);
+    if (!nodes.length) continue;
+    const cardsHtml = nodes.map((node) => {
+      const purchaseState = getMetaPurchaseState(node.id);
+      const uiState = getMetaNodePurchaseUiState(purchaseState);
+      const currentRank = purchaseState.currentRank;
+      const currentEffect = describeMetaNodeEffects(node, currentRank);
+      const nextEffect = describeMetaNodeNextEffects(node, currentRank);
+      const deferredHint = getMetaDeferredImpactHint(node.id);
+      const costLine = purchaseState.reason === "max_rank_reached"
+        ? "已满级，无下一级消耗"
+        : `升级消耗：${purchaseState.nextCost} 局外天赋点`;
+      return `
+        <div class="meta-node-card category-${node.category} ${uiState.cardClass}" data-talent-id="${node.id}">
+          <div class="meta-node-card__head">
+            <span class="meta-node-card__name">${node.name}</span>
+            <span class="meta-node-card__route">${META_CATEGORY_LABELS[node.category] || node.category} · T${node.tier}</span>
+          </div>
+          <div class="meta-node-card__rank">等级 ${currentRank} / ${node.maxRank}</div>
+          <div class="meta-node-card__effect">当前：${currentEffect}</div>
+          ${nextEffect ? `<div class="meta-node-card__next">下级：${nextEffect}</div>` : ""}
+          <div class="meta-node-card__cost">${costLine}</div>
+          ${deferredHint ? `<div class="meta-node-card__status warn">${deferredHint}</div>` : ""}
+          ${uiState.statusHtml}
+          <button type="button" class="meta-node-buy-btn" data-talent-id="${node.id}"${uiState.buttonDisabled ? " disabled" : ""}>${uiState.buttonText}</button>
+        </div>
+      `;
+    }).join("");
+    sectionsHtml += `
+      <section class="meta-talent-section">
+        <h3 class="meta-talent-section__title">${META_CATEGORY_LABELS[category]}</h3>
+        <div class="meta-talent-grid">${cardsHtml}</div>
+      </section>
+    `;
+  }
+  viewEl.innerHTML = `
+    <div id="metaCategoryFilters" class="meta-category-filters">${filterHtml}</div>
+    <div id="metaTalentTree" class="meta-talent-tree">${sectionsHtml}</div>
+  `;
+}
+
+function renderMetaProtocolView() {
+  ensureMetaPanelUi();
+  const viewEl = metaPanelEl.querySelector("#metaProtocolView");
+  if (!viewEl) return;
+  const selectedProtocolId = getSelectedStartProtocol();
+  const cardsHtml = START_PROTOCOLS.map((protocol) => {
+    const unlocked = isMetaProtocolUnlocked(protocol.id);
+    const selected = protocol.id === selectedProtocolId;
+    const cardClass = selected ? "selected" : (unlocked ? "available" : "locked");
+    const statusText = selected
+      ? "已选择 · 下一局将使用此协议（当前局不变更）"
+      : (unlocked ? "可选择" : "未解锁");
+    const buttonText = selected ? "当前选择" : (unlocked ? "选为下一局协议" : "未解锁");
+    return `
+      <div class="meta-protocol-card ${cardClass}" data-protocol-id="${protocol.id}">
+        <div class="meta-protocol-card__name">${protocol.name}</div>
+        <div class="meta-protocol-card__status ${selected ? "good" : ""}">${statusText}</div>
+        <div class="meta-protocol-card__impact">${formatProtocolImpactPreview(protocol)}</div>
+        <div class="meta-protocol-card__unlock">${getProtocolUnlockHint(protocol)}</div>
+        <button type="button" class="meta-protocol-select-btn" data-protocol-id="${protocol.id}"${selected || !unlocked ? " disabled" : ""}>${buttonText}</button>
+      </div>
+    `;
+  }).join("");
+  viewEl.innerHTML = `
+    <div class="meta-info-block">
+      <h3>当前开局协议</h3>
+      <p>协议只影响<strong>下一局</strong>开局资源、折扣与提示；本版本不在当前局中立即应用协议效果。</p>
+    </div>
+    <div id="metaProtocolList" class="meta-protocol-list">${cardsHtml}</div>
+  `;
+}
+
+function renderMetaInfoView() {
+  ensureMetaPanelUi();
+  const viewEl = metaPanelEl.querySelector("#metaInfoView");
+  if (!viewEl) return;
+  viewEl.innerHTML = `
+    <div class="meta-info-block">
+      <h3>术语边界</h3>
+      <p><strong>局外天赋点</strong>：跨局持久点数，来自结算，用于购买 Meta 天赋节点。</p>
+      <p><strong>局内科研点</strong>：本局研发资源，用于设施升级与研发树，结算后不会变成局外天赋点。</p>
+      <p><strong>开局协议</strong>：下一局开局策略，需先解锁对应天赋节点；选择后只影响下一局。</p>
+    </div>
+    <div class="meta-info-block">
+      <h3>耐久类天赋说明</h3>
+      <p>「框架强化」「核心加固」等耐久加成主要作用于<strong>新建框架与后续新局</strong>。购买后当前局已有结构的 maxHp 不会立即重算，避免打乱进行中的战斗节奏。</p>
+    </div>
+    <div class="meta-info-block">
+      <h3>旧成长整理</h3>
+      <p>v0.10.0 已整理旧局外成长进度；旧点数保留，旧升级折算为当前天赋等级。</p>
+    </div>
+  `;
+}
+
+function renderMetaPanel() {
+  ensureMetaPanelUi();
+  renderMetaPanelSummary();
+  const tabs = metaPanelEl.querySelectorAll("#metaPanelTabs button[data-tab]");
+  for (const tab of tabs) {
+    tab.classList.toggle("is-active", tab.dataset.tab === metaPanelUi.activeTab);
+  }
+  const talentView = metaPanelEl.querySelector("#metaTalentView");
+  const protocolView = metaPanelEl.querySelector("#metaProtocolView");
+  const infoView = metaPanelEl.querySelector("#metaInfoView");
+  if (metaPanelUi.activeTab === "protocols") {
+    talentView?.classList.add("hidden");
+    protocolView?.classList.remove("hidden");
+    infoView?.classList.add("hidden");
+    renderMetaProtocolView();
+  } else if (metaPanelUi.activeTab === "info") {
+    talentView?.classList.add("hidden");
+    protocolView?.classList.add("hidden");
+    infoView?.classList.remove("hidden");
+    renderMetaInfoView();
+  } else {
+    talentView?.classList.remove("hidden");
+    protocolView?.classList.add("hidden");
+    infoView?.classList.add("hidden");
+    renderMetaTalentView();
+  }
+}
+
+function updateMetaEntrySummary() {
+  if (!metaStatsEl) return;
+  const badge = getMetaEntryBadge();
+  const selectedProtocol = START_PROTOCOL_INDEX[getSelectedStartProtocol()];
+  const badgeHtml = badge.text
+    ? `<span class="meta-entry-badge ${badge.kind}">${badge.text}</span>`
+    : "";
+  const toggleBtn = document.getElementById("metaPanelToggle");
+  if (toggleBtn) {
+    toggleBtn.textContent = isMetaPanelOpen() ? "关闭局外天赋面板" : "打开局外天赋面板";
+  }
+  setHtmlIfChanged(metaStatsEl, "meta", `
+    局外天赋点：${state.meta.points}${badgeHtml}
+    <br>下一局协议：${selectedProtocol ? selectedProtocol.name : getSelectedStartProtocol()}
+    <br><span class="warn">局内科研点与本页局外天赋点无关</span>
+  `);
+}
+
+function handleMetaTalentPurchase(talentId) {
+  const result = purchaseMetaTalent(talentId);
+  if (!result.ok) {
+    const uiState = getMetaNodePurchaseUiState(result);
+    showToast(uiState.buttonText);
+    renderMetaPanel();
+    updateMetaEntrySummary();
+    return;
+  }
+  createBuildUi();
+  showToast(getMetaPurchaseSuccessMessage(talentId));
+  renderMetaPanel();
+  updateMetaEntrySummary();
+  updateHud();
+}
+
+function handleMetaProtocolSelect(protocolId) {
+  const result = selectStartProtocol(protocolId);
+  if (!result.ok) {
+    if (result.reason === "protocol_locked") {
+      const protocol = START_PROTOCOL_INDEX[protocolId];
+      showToast(protocol ? `${getProtocolUnlockHint(protocol)}` : "该协议尚未解锁。");
+    } else {
+      showToast("无法选择该开局协议。");
+    }
+    renderMetaPanel();
+    return;
+  }
+  const protocol = START_PROTOCOL_INDEX[protocolId];
+  showToast(`已保存为下一局开局协议：${protocol ? protocol.name : protocolId}。当前局不变更。`);
+  renderMetaPanel();
+  updateMetaEntrySummary();
+}
+
+function snapshotMetaPanelState() {
+  ensureMetaPanelUi();
+  const nodes = META_TALENT_TREE.map((node) => {
+    const purchaseState = getMetaPurchaseState(node.id);
+    return {
+      id: node.id,
+      name: node.name,
+      category: node.category,
+      tier: node.tier,
+      rank: purchaseState.currentRank,
+      maxRank: purchaseState.maxRank,
+      canBuy: purchaseState.canBuy,
+      reason: purchaseState.reason,
+      nextCost: purchaseState.nextCost,
+      deficit: purchaseState.deficit
+    };
+  });
+  return {
+    open: metaPanelUi.open,
+    activeTab: metaPanelUi.activeTab,
+    categoryFilter: metaPanelUi.categoryFilter,
+    points: state.meta.points,
+    selectedProtocol: getSelectedStartProtocol(),
+    nodeCount: nodes.length,
+    nodes,
+    protocols: START_PROTOCOLS.map((protocol) => ({
+      id: protocol.id,
+      name: protocol.name,
+      unlocked: isMetaProtocolUnlocked(protocol.id),
+      selected: protocol.id === getSelectedStartProtocol(),
+      unlockHint: getProtocolUnlockHint(protocol),
+      impactPreview: formatProtocolImpactPreview(protocol)
+    }))
+  };
 }
 
 function createCell(x, y, facility) {
@@ -4328,6 +4884,7 @@ function renderGalaxyMapCards(choices) {
 function openGalaxyMapPanel(choices) {
   const panel = document.getElementById("galaxyMapPanel");
   if (!panel) return false;
+  toggleMetaPanel(false);
   const safeChoices = Array.isArray(choices)
     ? choices.filter((choice) => choice && GALAXY_TYPES[choice.galaxyType])
     : [];
@@ -4909,6 +5466,7 @@ function initGame() {
   seedEncountersForLevel(state.run.level);
   createBuildUi();
   ensureResearchTreeUi();
+  ensureMetaPanelUi();
   bindGalaxyMapPanelEvents();
   bindInput();
   syncMoreStatusPanel();
@@ -5191,11 +5749,7 @@ function createBuildUi() {
   document.getElementById("toggleControlModeBtn").addEventListener("click", toggleControlMode);
   document.getElementById("toggleSelectedBtn").addEventListener("click", () => window.gameActions.toggleSelected());
   document.getElementById("prioritySelectedBtn").addEventListener("click", () => window.gameActions.prioritySelected());
-  document.getElementById("talentMiningBtn").addEventListener("click", () => window.gameActions.buyTalent("mining"));
-  document.getElementById("talentHullBtn").addEventListener("click", () => window.gameActions.buyTalent("hull"));
-  document.getElementById("talentWeaponsBtn").addEventListener("click", () => window.gameActions.buyTalent("weapons"));
-  document.getElementById("unlockCoreBtn").addEventListener("click", () => window.gameActions.buyUnlock("efficientCore"));
-  document.getElementById("unlockWeaponFrameBtn").addEventListener("click", () => window.gameActions.buyUnlock("weaponFrame"));
+  document.getElementById("metaPanelToggle")?.addEventListener("click", () => toggleMetaPanel(!isMetaPanelOpen()));
   document.getElementById("playersBtn").addEventListener("click", () => window.gameActions.setPlayers());
   document.getElementById("objectiveJumpBtn").addEventListener("click", () => window.gameActions.jumpToNextGalaxy());
   document.getElementById("objectiveStayBtn").addEventListener("click", () => window.gameActions.stayInCurrentGalaxy());
@@ -5373,6 +5927,16 @@ function bindInput() {
       event.preventDefault();
     } else if (event.key === "Escape") {
       if (isGalaxyMapPanelOpen()) return;
+      if (isMetaPanelOpen()) {
+        toggleMetaPanel(false);
+        event.preventDefault();
+        return;
+      }
+      if (state.hud.researchTreeOpen) {
+        toggleResearchTree(false);
+        event.preventDefault();
+        return;
+      }
       state.selectedBuild = null;
       state.selectedCell = null;
       clearBuildError();
@@ -9119,30 +9683,8 @@ function updateMetaUi() {
   if (!isMetaObject(state.meta) || !isMetaObject(state.meta.talents)) {
     state.meta = ensureMetaState(state.meta);
   }
-  const miningPct = Math.round((getMetaEffect("miningYield") - 1) * 100);
-  const hullPct = Math.round((getMetaEffect("hullIntegrity") - 1) * 100);
-  const weaponPct = Math.round((getMetaEffect("weaponCalibration") - 1) * 100);
-  const selectedProtocol = getSelectedStartProtocol();
-  setHtmlIfChanged(metaStatsEl, "meta", `
-    点数：${state.meta.points}
-    <br>局外加成：采集 +${miningPct}% / 结构 +${hullPct}% / 武器 +${weaponPct}%
-    <br>Meta v${state.meta.schemaVersion}：协议 ${selectedProtocol}
-  `);
-  const miningState = getMetaPurchaseState("miningYield");
-  const hullState = getMetaPurchaseState("hullIntegrity");
-  const weaponState = getMetaPurchaseState("weaponCalibration");
-  const efficientCoreState = getMetaPurchaseState("efficientCore");
-  const weaponFrameState = getMetaPurchaseState("weaponFrame");
-  const miningBtn = document.getElementById("talentMiningBtn");
-  const hullBtn = document.getElementById("talentHullBtn");
-  const weaponBtn = document.getElementById("talentWeaponsBtn");
-  const coreBtn = document.getElementById("unlockCoreBtn");
-  const weaponFrameBtn = document.getElementById("unlockWeaponFrameBtn");
-  if (miningBtn) miningBtn.disabled = !miningState.canBuy;
-  if (hullBtn) hullBtn.disabled = !hullState.canBuy;
-  if (weaponBtn) weaponBtn.disabled = !weaponState.canBuy;
-  if (coreBtn) coreBtn.disabled = !efficientCoreState.canBuy;
-  if (weaponFrameBtn) weaponFrameBtn.disabled = !weaponFrameState.canBuy;
+  updateMetaEntrySummary();
+  if (isMetaPanelOpen()) renderMetaPanel();
 }
 
 window.gameActions = {
@@ -9205,6 +9747,15 @@ window.gameActions = {
   },
   toggleResearchTree(open) {
     toggleResearchTree(open);
+  },
+  toggleMetaPanel(open) {
+    toggleMetaPanel(open);
+  },
+  purchaseMetaTalent(talentId) {
+    handleMetaTalentPurchase(talentId);
+  },
+  selectStartProtocol(protocolId) {
+    handleMetaProtocolSelect(protocolId);
   },
   buyTalent(type) {
     const legacyTalentMap = {
@@ -9763,6 +10314,40 @@ window.__gameTest.meta = {
   },
   getSelectedStartProtocol() {
     return getSelectedStartProtocol();
+  },
+  selectProtocol(protocolId) {
+    return selectStartProtocol(protocolId);
+  },
+  renderMetaPanel(tab) {
+    if (typeof tab === "string") metaPanelUi.activeTab = tab;
+    ensureMetaPanelUi();
+    renderMetaPanel();
+    return snapshotMetaPanelState();
+  },
+  snapshotMetaPanelState() {
+    return snapshotMetaPanelState();
+  },
+  purchaseViaUi(talentId) {
+    const result = purchaseMetaTalent(talentId);
+    if (result.ok) {
+      createBuildUi();
+    }
+    renderMetaPanel();
+    updateMetaEntrySummary();
+    return {
+      result,
+      panel: snapshotMetaPanelState()
+    };
+  },
+  protocolPreviewSnapshot() {
+    return START_PROTOCOLS.map((protocol) => ({
+      id: protocol.id,
+      name: protocol.name,
+      unlocked: isMetaProtocolUnlocked(protocol.id),
+      selected: protocol.id === getSelectedStartProtocol(),
+      unlockHint: getProtocolUnlockHint(protocol),
+      impactPreview: formatProtocolImpactPreview(protocol)
+    }));
   },
   resetMeta() {
     state.meta = createDefaultMetaState();
