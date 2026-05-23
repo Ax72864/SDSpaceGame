@@ -661,8 +661,8 @@ const state = {
     escortLowHpAlerted: false,
     hostileStationSpawnedThisGalaxy: false,
     hostileStationAlerted: false,
-    encounters: [],
-    encounterCooldownThisGalaxy: new Set()
+    encounters: [], // v0.8.0：本星系随机事件列表（pending/active/complete/failed/expired）
+    encounterCooldownThisGalaxy: new Set() // v0.8.0：单星系事件冷却（按 encounter.type）
   },
   resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
   power: { available: 0, used: 0 },
@@ -712,8 +712,8 @@ const state = {
   particles: [],
   fireCooldown: 0,
   spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER,
-  hudCenterAlertQueue: [],
-  hudCenterAlertCurrent: null
+  hudCenterAlertQueue: [], // v0.8.0：中央闪烁告警队列（priority 降序）
+  hudCenterAlertCurrent: null // v0.8.0：当前正在显示的中央告警
 };
 
 let fragmentIdSeed = 1;
@@ -760,16 +760,33 @@ function showToast(message, duration = 2.8) {
   state.toastTimer = duration;
 }
 
-function showHostileStationAlert(message, durationMs = 3000, isSuccess = false) {
-  const el = document.createElement("div");
-  el.className = isSuccess ? "hud-alert success" : "hud-alert";
-  el.textContent = message;
-  document.body.appendChild(el);
-  setTimeout(() => {
-    el.style.transition = "opacity 0.5s";
-    el.style.opacity = "0";
-    setTimeout(() => el.remove(), 500);
-  }, durationMs);
+function removeHudCenterAlertDom(entry) {
+  if (!entry?.dom) return;
+  if (entry.dom.parentNode) {
+    entry.dom.parentNode.removeChild(entry.dom);
+  }
+}
+
+// 中央闪烁告警：兼容旧签名 showHostileStationAlert(text, ms, isSuccess)
+// v0.8.0 起支持 options.priority / options.cssClass，统一走 state.hudCenterAlertQueue 排队显示。
+function showHostileStationAlert(message, durationMs = 3000, isSuccess = false, options = {}) {
+  const priority = options.priority != null ? options.priority : 100;
+  const cssClass = options.cssClass || "";
+  const entry = {
+    text: message,
+    ms: durationMs || 3000,
+    isSuccess: !!isSuccess,
+    priority,
+    cssClass,
+    enqueuedAt: state.time
+  };
+  state.hudCenterAlertQueue = state.hudCenterAlertQueue || [];
+  state.hudCenterAlertQueue.push(entry);
+  state.hudCenterAlertQueue.sort((a, b) => b.priority - a.priority || a.enqueuedAt - b.enqueuedAt);
+  if (state.hudCenterAlertQueue.length > HUD_CENTER_ALERT_QUEUE_LIMIT) {
+    state.hudCenterAlertQueue.length = HUD_CENTER_ALERT_QUEUE_LIMIT;
+  }
+  processHudCenterAlertQueue(0);
 }
 
 function setBuildError(message) {
@@ -2295,12 +2312,13 @@ function pickWeighted(rng, weightTable) {
 // v0.8.0：局内随机事件（ENCOUNTER）平行注册表与常量
 // 与 OBJECTIVE_TYPES 完全独立——不复用 RNG 流（独立 xor/mul 公式保护 __gameTest 测试钩子）、
 // 不复用奖励路径（独立 applyEncounterReward 避免 meta.points / objectiveCompleteAt 副作用）、
-// 不复用 HUD alert（priority 队列由 T4 实现）。T1+T2 仅搭框架，5 种事件 make/tick 均为 noop。
+// 不复用 HUD alert（priority 队列串行显示，避免短时间多事件触发时 DOM 堆叠）。
 const ENCOUNTER_MAX_CONCURRENT = 3;
 const ENCOUNTER_RNG_XOR = 0xb5297a4d;
 const ENCOUNTER_RNG_MUL = 0xcc9e2d51;
 const ENCOUNTER_TRIGGER_BASE_DELAY = 60;
 const ENCOUNTER_TRIGGER_STAGGER = 30;
+const HUD_CENTER_ALERT_QUEUE_LIMIT = 5;
 
 const ENCOUNTER_LEVEL_WEIGHTS = {
   0: { trader: 1.0 },
@@ -2358,8 +2376,10 @@ const ENCOUNTER_TYPE_DEFAULTS = {
   defaultExpireMs: 60000
 };
 
-// 5 种事件完整实现（v0.8.0 T3）
+// ENCOUNTER_TYPES：局内随机事件注册表（与 OBJECTIVE_TYPES 平行）
+// 每个条目负责本类型的 make/tick/onXxx/isComplete/isFailed/getDetail/getHint/render。
 const ENCOUNTER_TYPES = {
+  // trader：友好商船，靠近后按 T/Y 快捷交易。
   trader: {
     ...ENCOUNTER_TYPE_DEFAULTS,
     cssClass: "alert-encounter-trader",
@@ -2390,7 +2410,10 @@ const ENCOUNTER_TYPES = {
       });
       state.npcs.push(npc);
       encounter.npcIds.push(npc.id);
-      showHostileStationAlert("贸易商船：靠近交易", 4000, false);
+      showHostileStationAlert("贸易商船：靠近交易", 4000, false, {
+        priority: 50,
+        cssClass: "alert-encounter-trader"
+      });
       encounter.encounterData = {
         tradeOption1: { cost: { metal: 50 }, reward: { plasma: 1 } },
         tradeOption2: { cost: { metal: 100 }, reward: { research: 3 } },
@@ -2434,6 +2457,7 @@ const ENCOUNTER_TYPES = {
       renderer.ring(pos, 48, 2, [0.37, 0.77, 0.38, pulse], 32);
     }
   },
+  // distress：友方遇袭，清理围困海盗可获得救援奖励。
   distress: {
     ...ENCOUNTER_TYPE_DEFAULTS,
     cssClass: "alert-encounter-distress",
@@ -2472,14 +2496,20 @@ const ENCOUNTER_TYPES = {
         };
         spawnEncounterPirate(encounter, pos, lvl, encounter.encounterData);
       }
-      showHostileStationAlert("求救信号：友方被围困！", 5000, false);
+      showHostileStationAlert("求救信号：友方被围困！", 5000, false, {
+        priority: 70,
+        cssClass: "alert-encounter-distress"
+      });
     },
     tick(encounter, dt) {
       const npc = state.npcs.find((n) => n.id === encounter.npcIds[0]);
       if (!npc || npc.destroyed) {
         if (!encounter.encounterData?.rescued) {
           encounter.failed = true;
-          showHostileStationAlert("救援失败", 3000, false);
+          showHostileStationAlert("救援失败", 3000, false, {
+            priority: 70,
+            cssClass: "alert-encounter-distress"
+          });
         }
         return;
       }
@@ -2487,7 +2517,10 @@ const ENCOUNTER_TYPES = {
       if (aliveCount === 0 && !encounter.encounterData.rescued) {
         encounter.encounterData.rescued = true;
         encounter.encounterData.reward = { metal: 120, research: 18, plasma: 5 };
-        showHostileStationAlert("救援成功！+120金属 +18科研 +5等离子", 4000, true);
+        showHostileStationAlert("救援成功！+120金属 +18科研 +5等离子", 4000, true, {
+          priority: 70,
+          cssClass: "alert-encounter-distress"
+        });
         const escapeAngle = Math.random() * Math.PI * 2;
         npc.target = {
           x: npc.pos.x + Math.cos(escapeAngle) * 1500,
@@ -2526,6 +2559,7 @@ const ENCOUNTER_TYPES = {
       renderer.ring(encounter.spawnPos, 56, 2.5, [0.36, 0.88, 0.88, pulse], 36);
     }
   },
+  // ambush：伪装求救，靠近后触发高强度海盗伏击。
   ambush: {
     ...ENCOUNTER_TYPE_DEFAULTS,
     cssClass: "alert-encounter-ambush",
@@ -2545,7 +2579,6 @@ const ENCOUNTER_TYPES = {
         speed: 20,
         radius: 18
       });
-      npc._isAmbushDecoy = true;
       state.npcs.push(npc);
       encounter.npcIds.push(npc.id);
       encounter.encounterData = {
@@ -2556,7 +2589,10 @@ const ENCOUNTER_TYPES = {
         escapeRange: 500,
         victorious: false
       };
-      showHostileStationAlert("收到求救信号...", 4000, false);
+      showHostileStationAlert("收到求救信号...", 4000, false, {
+        priority: 80,
+        cssClass: "alert-encounter-ambush"
+      });
     },
     tick(encounter, dt) {
       const data = encounter.encounterData;
@@ -2579,7 +2615,10 @@ const ENCOUNTER_TYPES = {
             };
             spawnEncounterPirate(encounter, pos, lvl, data);
           }
-          showHostileStationAlert("陷阱！海盗伏击！", 3000, false);
+          showHostileStationAlert("陷阱！海盗伏击！", 3000, false, {
+            priority: 80,
+            cssClass: "alert-encounter-ambush"
+          });
         } else if (dist > data.escapeRange + 200) {
           encounter.expired = true;
         }
@@ -2588,7 +2627,10 @@ const ENCOUNTER_TYPES = {
         if (aliveCount === 0 && !data.victorious) {
           data.victorious = true;
           data.reward = { metal: 200, research: 25, plasma: 0 };
-          showHostileStationAlert("伏击击退！+200金属 +25科研", 4000, true);
+          showHostileStationAlert("伏击击退！+200金属 +25科研", 4000, true, {
+            priority: 80,
+            cssClass: "alert-encounter-ambush"
+          });
           const wreckRng = getEncounterRng(state.run.level);
           for (let i = 0; i < 3; i++) {
             const angle = wreckRng() * Math.PI * 2;
@@ -2640,6 +2682,7 @@ const ENCOUNTER_TYPES = {
       renderer.ring(encounter.spawnPos, triggered ? 64 : 52, 2, [color[0], color[1], color[2], pulse], 32);
     }
   },
+  // derelict：沉船秘窟，生成 wreck 群供玩家自由拾荒。
   derelict: {
     ...ENCOUNTER_TYPE_DEFAULTS,
     cssClass: "alert-encounter-derelict",
@@ -2669,14 +2712,20 @@ const ENCOUNTER_TYPES = {
           encounter.fragmentIds.push(fragment.id);
         }
       }
-      showHostileStationAlert("发现沉船秘窟！", 4000, false);
+      showHostileStationAlert("发现沉船秘窟！", 4000, false, {
+        priority: 40,
+        cssClass: "alert-encounter-derelict"
+      });
     },
     tick() {},
     onFragmentDocked(encounter, fragment) {
       if (!encounter.fragmentIds.includes(fragment.id)) return;
       encounter.encounterData.wrecksDocked += 1;
       if (encounter.encounterData.wrecksDocked >= encounter.encounterData.wreckCount) {
-        showHostileStationAlert("沉船秘窟拾荒完成！", 3000, true);
+        showHostileStationAlert("沉船秘窟拾荒完成！", 3000, true, {
+          priority: 40,
+          cssClass: "alert-encounter-derelict"
+        });
       }
     },
     isComplete(encounter) {
@@ -2697,6 +2746,7 @@ const ENCOUNTER_TYPES = {
       renderer.ring(encounter.spawnPos, 90, 2, [0.7, 0.5, 1, 0.28], 40);
     }
   },
+  // signal：远距神秘信号，回收单个高价值 fragment。
   signal: {
     ...ENCOUNTER_TYPE_DEFAULTS,
     cssClass: "alert-encounter-signal",
@@ -2720,13 +2770,19 @@ const ENCOUNTER_TYPES = {
       } else {
         encounter.failed = true;
       }
-      showHostileStationAlert("神秘信号已锁定", 3000, false);
+      showHostileStationAlert("神秘信号已锁定", 3000, false, {
+        priority: 30,
+        cssClass: "alert-encounter-signal"
+      });
     },
     tick() {},
     onFragmentDocked(encounter, fragment) {
       if (!encounter.fragmentIds.includes(fragment.id)) return;
       encounter.encounterData.docked = true;
-      showHostileStationAlert("神秘信号已回收！", 3000, true);
+      showHostileStationAlert("神秘信号已回收！", 3000, true, {
+        priority: 30,
+        cssClass: "alert-encounter-signal"
+      });
     },
     isComplete(encounter) {
       return encounter.encounterData?.docked === true;
@@ -2875,9 +2931,7 @@ function applyEncounterReward(encounter) {
   }
 }
 
-// 按权重 + cooldown 滚池为本关生成 1-3 个 ENCOUNTER（stub）
-// T1+T2 阶段：只创建占位 encounter 对象、不调用 type.make()、不生成任何实体；
-// 玩家在 T3 实现前看不到任何事件（保持 v0.7.0 行为等价）。
+// 按权重 + cooldown 为本关生成 1-3 个 encounter，先进入 pending，满足 triggerAt 后再激活。
 function seedEncountersForLevel(level) {
   const lvl = levelIndex(level);
   state.run.encounters = [];
@@ -2933,8 +2987,7 @@ function seedEncountersForLevel(level) {
   }
 }
 
-// 选择 encounter 在 station 周围的 spawn 位置
-// T1 阶段：仅做"与玩家距离 >= minDist"基础校验；T3 实现时补全与 enemies / npcs / 其他 encounter 的避让
+// 选择 encounter 在 station 周围的 spawn 位置（距离范围由 ENCOUNTER_TYPES[type] 给出）。
 function pickEncounterSpawnPos(type, rng) {
   const def = ENCOUNTER_TYPES[type];
   if (!def) return null;
@@ -2953,6 +3006,7 @@ function pickEncounterSpawnPos(type, rng) {
   return null;
 }
 
+// 生成 encounter 海盗并写回反向引用，便于 onEnemyKilled 只统计当前事件目标。
 function spawnEncounterPirate(encounter, pos, level, data) {
   const enemy = spawnEnemy("pirate", pos.x, pos.y, { level });
   if (!enemy) return null;
@@ -2972,6 +3026,7 @@ function countAliveEncounterPirates(data) {
   }).length;
 }
 
+// trader 交易结算：T=基础交易，Y=高级交易。
 function performTraderTrade(encounter, optionIndex) {
   const data = encounter?.encounterData;
   if (!data || data.traded) return false;
@@ -2982,7 +3037,10 @@ function performTraderTrade(encounter, optionIndex) {
   if (option.reward.plasma) state.resources.plasma += option.reward.plasma;
   if (option.reward.research) state.resources.research = (state.resources.research || 0) + option.reward.research;
   data.traded = true;
-  showHostileStationAlert("贸易完成", 3000, true);
+  showHostileStationAlert("贸易完成", 3000, true, {
+    priority: 50,
+    cssClass: "alert-encounter-trader"
+  });
   return true;
 }
 
@@ -3035,8 +3093,7 @@ function updateEncounters(dt) {
   }
 }
 
-// 把 encounter 从 pending → active：T1 阶段仅决定 spawnPos、设 expireAt 与 state；
-// T3 将在此处调用 type.make() 生成 NPC / fragment / wreck 等实体。
+// 把 encounter 从 pending → active，并在激活时调用 type.make() 生成实体。
 function activateEncounter(encounter) {
   const type = ENCOUNTER_TYPES[encounter.type];
   if (!type) return;
@@ -3071,14 +3128,40 @@ function expireEncounter(encounter) {
       derelict: "沉船",
       signal: "信号"
     };
-    showHostileStationAlert(`${typeNames[encounter.type] || "事件"}已离开`, 2000, false);
+    showHostileStationAlert(`${typeNames[encounter.type] || "事件"}已离开`, 2000, false, {
+      priority: ENCOUNTER_TYPES[encounter.type]?.priority ?? 50,
+      cssClass: ENCOUNTER_TYPES[encounter.type]?.hudAlertClass || ""
+    });
   }
 }
 
-// HUD 中央 alert priority 队列：T1+T2 阶段 stub，避免 updateEncounters 调用报错；
-// T4 阶段实现完整 priority 抢占 + DOM 复用，与 showHostileStationAlert 合并。
+// HUD 中央告警队列：只保留 1 个可见 DOM；高优先级可抢占低优先级。
 function processHudCenterAlertQueue(_dt) {
-  // intentional no-op until T4
+  const current = state.hudCenterAlertCurrent;
+  if (current) {
+    const queueHead = state.hudCenterAlertQueue?.[0] || null;
+    const hasHigherPriority = Boolean(queueHead) && queueHead.priority > current.priority;
+    if (state.time >= current.endAt || hasHigherPriority) {
+      removeHudCenterAlertDom(current);
+      state.hudCenterAlertCurrent = null;
+    } else {
+      return;
+    }
+  }
+
+  if (!Array.isArray(state.hudCenterAlertQueue) || state.hudCenterAlertQueue.length === 0) return;
+  const next = state.hudCenterAlertQueue.shift();
+  const dom = document.createElement("div");
+  dom.className = "hud-alert"
+    + (next.isSuccess ? " success" : "")
+    + (next.cssClass ? ` ${next.cssClass}` : "");
+  dom.textContent = next.text;
+  document.body.appendChild(dom);
+  state.hudCenterAlertCurrent = {
+    ...next,
+    dom,
+    endAt: state.time + Math.max(0, next.ms) / 1000
+  };
 }
 
 function createObjective() {
@@ -3739,6 +3822,7 @@ function bindInput() {
       !(document.activeElement && document.activeElement.tagName === "INPUT") &&
       (key === "t" || key === "y")
     ) {
+      // v0.8.0 trader 快捷键：T=基础交易（50 金属 -> 1 等离子），Y=高级交易（100 金属 -> 3 科研）。
       for (const enc of state.run.encounters || []) {
         if (enc.type !== "trader" || enc.completed || enc.failed || enc.expired) continue;
         if (enc.encounterData?.playerInTradeRange) {
@@ -3862,9 +3946,7 @@ function countFragmentCells() {
 }
 
 function countPlayerFragments() {
-  return state.fragments.filter(
-    (fragment) => fragment.origin !== "wreck" && fragment.origin !== "enemy-wreck"
-  ).length;
+  return state.fragments.filter((fragment) => (fragment.origin || "player") === "player").length;
 }
 
 function countWreckFragments() {
@@ -3873,6 +3955,14 @@ function countWreckFragments() {
 
 function countEnemyWreckFragments() {
   return state.fragments.filter((fragment) => fragment.origin === "enemy-wreck").length;
+}
+
+function countDerelictFragments() {
+  return state.fragments.filter((fragment) => fragment.origin === "derelict").length;
+}
+
+function countSignalFragments() {
+  return state.fragments.filter((fragment) => fragment.origin === "signal").length;
 }
 
 function isWreckLikeOrigin(origin) {
@@ -4057,8 +4147,7 @@ function createEscortNpc(startPos, targetPos, rng, level) {
 }
 
 // v0.8.0：ENCOUNTER NPC 工厂（trader / distress-pilot / pirate-ambush）
-// 与 createEscortNpc 字段集对齐，仅在 role / encounterId / kind / 默认数值上区分；
-// T1+T2 阶段提供工厂供后续 T3 spawn 使用，本身不会被 T1+T2 自动调用（玩家看不到事件 NPC）。
+// 与 createEscortNpc 字段集对齐，仅在 role / encounterId / kind / 默认数值上区分。
 function createEncounterNpc(kind, encounterId, options = {}) {
   const id = options.id != null ? options.id : ++npcIdSeed;
   const radius = Number.isFinite(options.radius) ? options.radius : NPC_RADIUS;
@@ -4134,8 +4223,7 @@ function damageNpc(npc, amount) {
   }
 }
 
-// v0.8.0：tickNpc 按 npc.kind 分支 AI；friendly-cargo / distress-pilot 共用原有 escort 行为，
-// trader / pirate-ambush 留 stub 给 T3。注意：kind 决定 AI，role 决定事件归属（互相独立）。
+// v0.8.0：tickNpc 按 npc.kind 分支 AI。kind 决定行为，role 决定事件派发归属（objective/encounter）。
 function tickNpc(npc, dt) {
   if (!npc || npc.arrived || npc.destroyed) return;
   switch (npc.kind) {
@@ -4285,6 +4373,39 @@ function buildHostileStationHudAlerts() {
       level: hpPercent < 25 ? "danger" : hpPercent < 50 ? "warn" : "good",
       cssClass: "alert-hostile-station",
       text: `敌方空间站 HP ${hpPercent}% | 距离 ${distance}m`
+    });
+  }
+  return alerts;
+}
+
+// v0.8.0：聚合 active encounter 的 HUD 行，展示 detail + 距离 + 剩余时间 + hint。
+function buildEncounterHudAlerts() {
+  const alerts = [];
+  if (!Array.isArray(state.run.encounters) || state.run.encounters.length === 0) return alerts;
+  for (const enc of state.run.encounters) {
+    if (!enc || enc.completed || enc.failed || enc.expired) continue;
+    if (enc.state !== "active") continue;
+    const type = ENCOUNTER_TYPES[enc.type];
+    if (!type) continue;
+    const detail = type.getDetail(enc) || enc.type;
+    const hint = type.getHint(enc) || "";
+    let distText = "";
+    if (enc.spawnPos) {
+      const distance = Math.hypot(
+        state.station.pos.x - enc.spawnPos.x,
+        state.station.pos.y - enc.spawnPos.y
+      );
+      distText = ` · 距离 ${Math.round(distance)}`;
+    }
+    let timeText = "";
+    if (enc.expireAt && enc.expireAt - state.time < 99999) {
+      const remain = Math.max(0, enc.expireAt - state.time);
+      timeText = ` · ${Math.ceil(remain)}秒`;
+    }
+    alerts.push({
+      level: enc.type === "ambush" ? "danger" : enc.type === "distress" ? "warn" : "good",
+      cssClass: type.cssClass || "alert-encounter",
+      text: `${detail}${distText}${timeText}` + (hint ? ` (${hint})` : "")
     });
   }
   return alerts;
@@ -4547,9 +4668,16 @@ function getNearestFragmentHudData() {
         ? "wreck"
         : nearest.fragment.origin === "enemy-wreck"
           ? "enemy-wreck"
+          : nearest.fragment.origin === "derelict"
+            ? "derelict"
+            : nearest.fragment.origin === "signal"
+              ? "signal"
           : "player",
     playerCount: countPlayerFragments(),
-    wreckCount: countWreckFragments()
+    wreckCount: countWreckFragments(),
+    enemyWreckCount: countEnemyWreckFragments(),
+    derelictCount: countDerelictFragments(),
+    signalCount: countSignalFragments()
   };
   state.run.fragmentHudCache = { sampledAt: state.time, data };
   return data;
@@ -4561,6 +4689,8 @@ function buildFragmentHudAlerts() {
   const playerCount = countPlayerFragments();
   const wreckCount = countWreckFragments();
   const enemyWreckCount = countEnemyWreckFragments();
+  const derelictCount = countDerelictFragments();
+  const signalCount = countSignalFragments();
   if (playerCount >= FRAGMENT_HUD_WARN_COUNT) {
     alerts.push({
       level: "danger",
@@ -4571,11 +4701,21 @@ function buildFragmentHudAlerts() {
   const hud = getNearestFragmentHudData();
   if (!hud) return alerts;
   const originLabel =
-    hud.origin === "wreck" ? "古老残骸" : hud.origin === "enemy-wreck" ? "敌方残骸" : "我方残骸";
+    hud.origin === "wreck"
+      ? "古老残骸"
+      : hud.origin === "enemy-wreck"
+        ? "敌方残骸"
+        : hud.origin === "derelict"
+          ? "秘窟残骸"
+          : hud.origin === "signal"
+            ? "神秘信号"
+            : "我方残骸";
   let text = `最近${originLabel} ${hud.direction} · ${hud.distanceRounded} px · ${hud.facilityCount} 设施`;
   const segments = [];
   if (wreckCount > 0) segments.push(`古老残骸 ${wreckCount} 段`);
   if (enemyWreckCount > 0) segments.push(`敌方残骸 ${enemyWreckCount} 段`);
+  if (derelictCount > 0) segments.push(`秘窟残骸 ${derelictCount} 段`);
+  if (signalCount > 0) segments.push(`神秘信号 ${signalCount} 段`);
   if (playerCount > 0) segments.push(`我方 ${playerCount} 段`);
   if (segments.length > 1) {
     text = `${segments.join(" · ")} · ${text}`;
@@ -4583,6 +4723,10 @@ function buildFragmentHudAlerts() {
     text = `古老残骸 ×${wreckCount} · ${text}`;
   } else if (enemyWreckCount > 1) {
     text = `敌方残骸 ×${enemyWreckCount} · ${text}`;
+  } else if (derelictCount > 1) {
+    text = `秘窟残骸 ×${derelictCount} · ${text}`;
+  } else if (signalCount > 1) {
+    text = `神秘信号 ×${signalCount} · ${text}`;
   } else if (playerCount > 1) {
     text = `我方残骸 ×${playerCount} · ${text}`;
   }
@@ -4594,6 +4738,10 @@ function buildFragmentHudAlerts() {
         ? "alert-wreck"
         : hud.origin === "enemy-wreck"
           ? "alert-fragment-enemy"
+          : hud.origin === "derelict"
+            ? "alert-fragment-derelict"
+            : hud.origin === "signal"
+              ? "alert-fragment-signal"
           : "alert-fragment",
     text
   });
@@ -7114,12 +7262,13 @@ function updateHud() {
 
   const fragmentAlerts = buildFragmentHudAlerts();
   const hostileStationAlerts = buildHostileStationHudAlerts();
+  const encounterAlerts = buildEncounterHudAlerts();
   const npcAlerts = buildNpcHudAlerts();
   const alerts = buildStatusAlerts();
   const miningAlerts = buildMiningAlerts();
   const allAlerts = isObjectiveComplete()
-    ? [...fragmentAlerts, ...hostileStationAlerts, ...npcAlerts, ...alerts, ...miningAlerts]
-    : [...fragmentAlerts, ...hostileStationAlerts, ...npcAlerts, ...miningAlerts, ...alerts];
+    ? [...fragmentAlerts, ...hostileStationAlerts, ...encounterAlerts, ...npcAlerts, ...alerts, ...miningAlerts]
+    : [...fragmentAlerts, ...hostileStationAlerts, ...encounterAlerts, ...npcAlerts, ...miningAlerts, ...alerts];
   const alertsHtml = allAlerts
     .map((a) => {
       const extraClass = a.cssClass ? ` ${a.cssClass}` : "";

@@ -566,12 +566,48 @@ h2 {
   color: #8dffd2;
 }
 
+.alert-encounter-trader {
+  border-left: 3px solid #5ec460;
+  color: #5ec460;
+}
+
+.alert-encounter-distress {
+  border-left: 3px solid #ff8855;
+  color: #ff8855;
+}
+
+.alert-encounter-ambush {
+  border-left: 3px solid #ff4444;
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.alert-encounter-derelict {
+  border-left: 3px solid #bb88ff;
+  color: #bb88ff;
+}
+
+.alert-encounter-signal {
+  border-left: 3px solid #ffcc44;
+  color: #ffcc44;
+}
+
 .alert-fragment {
   color: #9ed4ff;
 }
 
 .alert-fragment-enemy {
   color: #ffd36a;
+}
+
+.alert-fragment-derelict {
+  border-left: 3px solid #bb88ff;
+  color: #bb88ff;
+}
+
+.alert-fragment-signal {
+  border-left: 3px solid #ffcc44;
+  color: #ffcc44;
 }
 
 .alert-fragment-warn {
@@ -619,9 +655,35 @@ h2 {
   animation: none;
 }
 
+.hud-alert.alert-encounter-trader {
+  color: #5ec460;
+}
+
+.hud-alert.alert-encounter-distress {
+  color: #ff8855;
+}
+
+.hud-alert.alert-encounter-ambush {
+  color: #ff4444;
+  animation: alertFlash 0.4s linear infinite;
+}
+
+.hud-alert.alert-encounter-derelict {
+  color: #bb88ff;
+}
+
+.hud-alert.alert-encounter-signal {
+  color: #ffcc44;
+}
+
 @keyframes hudAlertFlash {
   from { opacity: 0.6; }
   to { opacity: 1.0; }
+}
+
+@keyframes alertFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .alert-hostile-station {
