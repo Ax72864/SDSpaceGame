@@ -2396,8 +2396,8 @@ const ENCOUNTER_TYPES = {
       );
       const sideAngle = angle + Math.PI / 2;
       const dest = {
-        x: encounter.spawnPos.x + Math.cos(sideAngle) * 1200,
-        y: encounter.spawnPos.y + Math.sin(sideAngle) * 1200
+        x: encounter.spawnPos.x + Math.cos(sideAngle) * 2400,
+        y: encounter.spawnPos.y + Math.sin(sideAngle) * 2400
       };
       const npc = createEncounterNpc("trader", encounter.id, {
         pos: { ...encounter.spawnPos },
