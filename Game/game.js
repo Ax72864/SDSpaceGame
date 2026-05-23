@@ -14,6 +14,7 @@ const statusAlertsEl = document.getElementById("statusAlerts");
 const resourceGuideEl = document.getElementById("resourceGuide");
 const stationDataEl = document.getElementById("stationData");
 const designHealthSummaryEl = document.getElementById("designHealthSummary");
+const combatReviewSummaryEl = document.getElementById("combatReviewSummary");
 const combatStatusSummaryEl = document.getElementById("combatStatusSummary");
 const selectedCellPanelEl = document.getElementById("selectedCellPanel");
 const selectedCellInfoEl = document.getElementById("selectedCellInfo");
@@ -9080,32 +9081,34 @@ function getCombatReviewAreaLabel(role, fallbackLabel = null) {
   return getCombatRoleLabel(role);
 }
 
-function pickCombatReviewRecommendation(gapReasonKeys = [], worstArea = null) {
-  if (gapReasonKeys.includes("shield_offline_during_combat")) return "rebuild_shield";
-  if (gapReasonKeys.includes("repair_overwhelmed")) return "add_repair_station";
-  if (gapReasonKeys.includes("missile_never_fired")) return "consider_missile_salvo";
-  if (gapReasonKeys.includes("thrust_heavy_loss")) return "add_thruster_cover";
-  if (worstArea?.role === "weapon") return "reposition_weapons";
-  if (worstArea?.role === "thrust") return "add_thruster_cover";
-  if (worstArea?.role === "defense") return "rebuild_shield";
-  return "add_power_source";
-}
-
 function buildCombatReviewSnapshot() {
   const now = state.time;
   ensureCombatWindowState(now);
   pruneCombatEvents(now);
   const empty = createEmptyCombatReviewSnapshot(now);
 
-  if (isEnemyPressureLikely()) return empty;
+  if (isEnemyPressureLikely()) {
+    empty.reasonKey = "combat_active";
+    return empty;
+  }
   const archived = combatWindowState.lastArchived;
   const archivedAt = toFiniteNumber(combatWindowState.archivedAt, null);
   if (!archived) return empty;
-  if (archivedAt != null && now - archivedAt > COMBAT_REVIEW_VISIBLE_SEC) return empty;
+  if (archivedAt != null && now - archivedAt > COMBAT_REVIEW_VISIBLE_SEC) {
+    empty.reasonKey = "review_window_expired";
+    return empty;
+  }
 
   const eventCount = Math.max(0, Math.floor(toFiniteNumber(archived.eventCount, 0)));
   const durationSec = Math.max(0, toFiniteNumber(archived.durationSec, 0));
-  if (eventCount <= 0 || durationSec < COMBAT_WINDOW_MIN_RECORD_SEC) return empty;
+  if (eventCount <= 0 || durationSec < COMBAT_WINDOW_MIN_RECORD_SEC) {
+    empty.reasonKey = "review_not_ready";
+    return empty;
+  }
+
+  const weapon = getWeaponEffectiveness();
+  const repair = getRepairStatusSummary();
+  const damage = getRecentDamageSummary();
 
   const primarySources = (Array.isArray(archived.sourceStats) ? archived.sourceStats : [])
     .filter((entry) => toFiniteNumber(entry.totalDamage, 0) > 0)
@@ -9150,75 +9153,112 @@ function buildCombatReviewSnapshot() {
   const missileFiredCount = Math.max(0, Math.floor(toFiniteNumber(archived.missileFiredCount, 0)));
   const repairDispatchedCount = Math.max(0, Math.floor(toFiniteNumber(archived.repairDispatchedCount, 0)));
   const repairAppliedCount = Math.max(0, Math.floor(toFiniteNumber(archived.repairAppliedCount, 0)));
-
-  const gapCandidates = [];
-  if (stationHitCount > 0 && shieldBlockedCount <= 0) {
-    gapCandidates.push({ key: "shield_offline_during_combat", severity: "warning", reasonKey: "shield_offline_during_combat" });
-  }
-  if (stationHitCount > 0 && missileFiredCount <= 0) {
-    gapCandidates.push({ key: "missile_never_fired", severity: "warning", reasonKey: "missile_never_fired" });
-  }
-  const repairGapThreshold = Math.max(1, Math.ceil(repairDispatchedCount * 0.5));
-  if (stationHitCount >= 3 && repairAppliedCount < repairGapThreshold) {
-    gapCandidates.push({ key: "repair_overwhelmed", severity: "warning", reasonKey: "repair_overwhelmed" });
-  }
   const topArea = worstAreas[0] || null;
-  if (topArea && topArea.role === "thrust" && topArea.damageTaken >= 20) {
-    gapCandidates.push({ key: "thrust_heavy_loss", severity: "warning", reasonKey: "thrust_heavy_loss" });
+
+  const weaponGapReasonKeys = [];
+  if (weapon?.summary?.primaryReasonKey === "all_turrets_los_blocked") {
+    weaponGapReasonKeys.push("turret_los_blocked_often");
+  }
+  if (
+    stationHitCount > 0
+    && shieldBlockedCount <= 0
+    && (
+      weapon?.shield?.statusKey === "shield_no_power"
+      || weapon?.shield?.statusKey === "shield_missing"
+      || weapon?.shield?.total <= 0
+    )
+  ) {
+    weaponGapReasonKeys.push("shield_offline_during_combat");
+  }
+  if (stationHitCount > 0 && missileFiredCount <= 0 && weapon?.missile?.total > 0) {
+    weaponGapReasonKeys.push("missile_never_fired");
+  }
+  if (topArea && topArea.role === "thrust" && topArea.damageTaken >= 10) {
+    weaponGapReasonKeys.push("thrust_heavy_loss");
+  }
+
+  let repairGapReasonKey = null;
+  if (
+    repair?.summary?.reasonKey === "repair_missing"
+    || repair?.summary?.reasonKey === "repair_no_power"
+    || repair?.summary?.reasonKey === "repair_uncovered"
+  ) {
+    repairGapReasonKey = "repair_overwhelmed";
+  } else {
+    const repairGapThreshold = Math.max(1, Math.ceil(repairDispatchedCount * 0.5));
+    if (stationHitCount >= 3 && repairAppliedCount < repairGapThreshold) {
+      repairGapReasonKey = "repair_overwhelmed";
+    }
   }
 
   const seenGapReasonKeys = new Set();
   const defenseGaps = [];
-  for (const gap of gapCandidates) {
-    if (!gap || !gap.reasonKey || seenGapReasonKeys.has(gap.reasonKey)) continue;
-    seenGapReasonKeys.add(gap.reasonKey);
-    defenseGaps.push(gap);
+  const pushGap = (reasonKey, severity = "warning") => {
+    if (!reasonKey || seenGapReasonKeys.has(reasonKey)) return;
+    seenGapReasonKeys.add(reasonKey);
+    defenseGaps.push({
+      key: reasonKey,
+      severity,
+      reasonKey
+    });
+  };
+  for (const reasonKey of weaponGapReasonKeys) {
+    pushGap(reasonKey, "warning");
+  }
+  if (repairGapReasonKey) {
+    pushGap(repairGapReasonKey, getCombatReviewGapSeverity(repairGapReasonKey, repair?.summary));
   }
 
-  const recommendationReasonKey = pickCombatReviewRecommendation(
-    defenseGaps.map((entry) => entry.reasonKey),
-    topArea
-  );
+  const recommendationReasonKey = pickCombatReviewRecommendationReasonKey({
+    weaponGapReasonKey: weaponGapReasonKeys[0] || null,
+    repairGapReasonKey,
+    worstArea: topArea,
+    weapon,
+    repair
+  });
   const recommendations = recommendationReasonKey
     ? [{ key: recommendationReasonKey, reasonKey: recommendationReasonKey }]
     : [];
 
   const shortItems = [];
-  if (primarySources[0]) {
+  if (primarySources[0] && primarySources[0].totalDamage >= 5) {
     const source = primarySources[0];
-    const sourceSeverity = source.totalDamage >= 80 ? "critical" : "warning";
+    const sourceSeverity = source.totalDamage >= 20 ? "critical" : "warning";
     shortItems.push({
       kind: "source",
       severity: sourceSeverity,
-      reasonKey: getCombatReviewSourceReasonKey(source.sourceKey),
+      reasonKey: getCombatReviewSourceReasonKey(source.sourceKey, source.label),
       payload: source,
-      text: `主要伤害来自${source.label}（${Math.round(source.totalDamage)} 点/${source.hitCount} 次）。`
+      text: `主要伤害来自${source.label}（${Math.round(source.totalDamage)} 点，${source.hitCount} 次）`
     });
   }
-  if (topArea) {
-    const areaSeverity = topArea.damageTaken >= 80 ? "critical" : "warning";
+  if (topArea && (topArea.damageTaken >= 10 || getCombatReviewAreaReasonKey(topArea.role) === "worst_area_core")) {
+    const areaSeverity = topArea.damageTaken >= 18 || getCombatReviewAreaReasonKey(topArea.role) === "worst_area_core"
+      ? "critical"
+      : "warning";
     shortItems.push({
       kind: "worstArea",
       severity: areaSeverity,
       reasonKey: getCombatReviewAreaReasonKey(topArea.role),
       payload: topArea,
-      text: `损坏最重：${topArea.roleLabel}（${Math.round(topArea.damageTaken)} 点，${topArea.cellCount} 格）。`
+      text: `${topArea.roleLabel}受损最重（${Math.round(topArea.damageTaken)} 点，${topArea.cellCount} 块）`
     });
   }
   if (defenseGaps.length) {
     const gapTexts = defenseGaps.map((gap) => {
       if (gap.reasonKey === "shield_offline_during_combat") return "护盾在战斗中未有效拦截";
       if (gap.reasonKey === "missile_never_fired") return "导弹火力未参与输出";
+      if (gap.reasonKey === "turret_los_blocked_often") return "炮塔射线多次被结构遮挡";
       if (gap.reasonKey === "repair_overwhelmed") return "维修跟不上受损速度";
       if (gap.reasonKey === "thrust_heavy_loss") return "推进区受损偏重";
       return gap.reasonKey;
     });
     shortItems.push({
       kind: "gap",
-      severity: "warning",
+      severity: getCombatReviewGapSeverity(defenseGaps[0].reasonKey, repair?.summary),
       reasonKey: defenseGaps[0].reasonKey,
       payload: { reasonKeys: defenseGaps.map((entry) => entry.reasonKey) },
-      text: `短板：${gapTexts.join("；")}。`
+      text: `短板：${gapTexts.join("；")}`
     });
   }
   if (recommendationReasonKey) {
@@ -9239,19 +9279,31 @@ function buildCombatReviewSnapshot() {
       severity: "info",
       reasonKey: "no_significant_damage",
       payload: {},
-      text: "短板：本场未记录到明显受损。"
+      text: "短板：本场未记录到明显受损"
     });
   }
 
   return {
     generatedAt: now,
     hasReview: true,
+    reasonKey: "review_ready",
     windowStartedAt: toFiniteNumber(archived.startedAt, null),
     windowEndedAt: toFiniteNumber(archived.endedAt, null),
     durationSec: Math.round(durationSec * 10) / 10,
+    recentDamageSummary: {
+      reasonKey: damage?.summary?.reasonKey || "no_recent_damage",
+      damagedCellCount: Math.max(0, Math.floor(toFiniteNumber(damage?.summary?.damagedCellCount, 0))),
+      criticalDamagedCount: Math.max(0, Math.floor(toFiniteNumber(damage?.summary?.criticalDamagedCount, 0)))
+    },
+    repairSummary: {
+      reasonKey: repair?.summary?.reasonKey || "repair_no_target",
+      damagedCellCount: Math.max(0, Math.floor(toFiniteNumber(repair?.summary?.damagedCellCount, 0))),
+      activeTargetCount: Math.max(0, Math.floor(toFiniteNumber(repair?.summary?.activeTargetCount, 0)))
+    },
     primarySources,
     worstAreas,
     defenseGaps,
+    recommendation: recommendations[0] || null,
     recommendations,
     shortItems: trimmedShortItems
   };
@@ -9296,9 +9348,10 @@ function buildCombatReviewSummaryHtml(review = getCombatReview()) {
   }
   const durationText = review.durationSec > 0 ? ` · 持续 ${Math.max(1, Math.round(review.durationSec))}s` : "";
   const itemsHtml = review.shortItems.slice(0, 4).map((item) => (
-    `<div class="combat-review-item severity-${item.severity || "info"}">${getCombatReviewItemText(item)}</div>`
+    `<div class="combat-review-item severity-${item.severity || "info"}" data-kind="${item.kind || "item"}" data-reason-key="${item.reasonKey || ""}">${getCombatReviewItemText(item)}</div>`
   )).join("");
-  return `<div class="combat-review-summary"><div class="combat-review-title">战斗复盘${durationText}</div>${itemsHtml}</div>`;
+  if (!itemsHtml) return "";
+  return `<div class="combat-review-title">战斗复盘${durationText}</div>${itemsHtml}`;
 }
 
 function buildCombatDamageRepairSummaryHtml(damage = getRecentDamageSummary(), repair = getRepairStatusSummary()) {
@@ -9421,14 +9474,12 @@ function buildCombatStatusSummaryHtml(
   threat = getThreatSummary(),
   weapon = getWeaponEffectiveness(),
   damage = getRecentDamageSummary(),
-  repair = getRepairStatusSummary(),
-  review = getCombatReview()
+  repair = getRepairStatusSummary()
 ) {
   const threatHtml = buildCombatThreatSummaryHtml(threat);
   const weaponHtml = buildCombatWeaponSummaryHtml(weapon);
   const damageRepairHtml = buildCombatDamageRepairSummaryHtml(damage, repair);
-  const reviewHtml = buildCombatReviewSummaryHtml(review);
-  return `${threatHtml}${weaponHtml}${damageRepairHtml}${reviewHtml}`;
+  return `${threatHtml}${weaponHtml}${damageRepairHtml}`;
 }
 
 function shouldSustainCombatAlert(reasonKey) {
@@ -14461,6 +14512,11 @@ function updateHud() {
     designHealthSummaryEl,
     "designHealthSummary",
     buildStationDesignHealthSummaryHtml(getStationDesignHealth())
+  );
+  setHtmlIfChanged(
+    combatReviewSummaryEl,
+    "combatReviewSummary",
+    buildCombatReviewSummaryHtml(getCombatReview())
   );
   setHtmlIfChanged(
     combatStatusSummaryEl,

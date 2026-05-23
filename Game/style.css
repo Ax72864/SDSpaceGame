@@ -1222,6 +1222,10 @@ h2 {
   border-top: 1px dashed rgba(120, 160, 210, 0.2);
 }
 
+.combat-review-summary:empty {
+  display: none;
+}
+
 .combat-review-title {
   font-size: 11px;
   color: #9ecfff;
