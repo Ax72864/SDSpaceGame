@@ -3507,14 +3507,25 @@ function renderResearchTreePanel() {
   }).join("");
 }
 
-function toggleResearchTree(open) {
+function setResearchTreeOpen(open, options = {}) {
   ensureResearchTreeUi();
-  state.hud.researchTreeOpen = open;
-  if (open) {
-    toggleMetaPanel(false);
-    renderResearchTreePanel();
-  }
+  state.hud.researchTreeOpen = !!open;
+  if (open) renderResearchTreePanel();
   researchTreePanelEl.classList.toggle("hidden", !open);
+  if (!options.skipSync) syncMainPanelUiState();
+}
+
+function toggleResearchTree(open) {
+  if (open) {
+    const result = requestOpenMainPanel("researchTree");
+    if (!result.ok) return;
+    setResearchTreeOpen(true, { skipSync: true });
+    updateObjectiveChoiceUi();
+    syncMainPanelUiState();
+    return;
+  }
+  setResearchTreeOpen(false);
+  updateObjectiveChoiceUi();
 }
 
 const META_CATEGORY_LABELS = {
@@ -3802,17 +3813,100 @@ function isMetaPanelOpen() {
   return !!(metaPanelEl && metaPanelUi.open && !metaPanelEl.classList.contains("hidden"));
 }
 
-function toggleMetaPanel(open) {
+function setMetaPanelOpen(open, options = {}) {
   ensureMetaPanelUi();
-  if (open) {
-    toggleResearchTree(false);
-    if (isGalaxyMapPanelOpen()) hideGalaxyMapPanel();
-  }
   metaPanelUi.open = !!open;
   metaPanelEl.classList.toggle("hidden", !open);
   metaPanelEl.classList.toggle("is-open", !!open);
   if (open) renderMetaPanel();
   updateMetaEntrySummary();
+  if (!options.skipSync) syncMainPanelUiState();
+  if (!options.skipObjectiveRefresh && !open) updateObjectiveChoiceUi();
+}
+
+function closeMainPanel(panelId, options = {}) {
+  switch (panelId) {
+    case "runSettlement":
+      runSettlementPanelEl?.classList.add("hidden");
+      break;
+    case "galaxyMap":
+      forceHideGalaxyMapPanel({ skipSync: true });
+      break;
+    case "meta":
+      setMetaPanelOpen(false, { skipSync: true, skipObjectiveRefresh: true });
+      break;
+    case "researchTree":
+      setResearchTreeOpen(false, { skipSync: true });
+      break;
+    case "objectiveChoice":
+      document.getElementById("objectiveChoicePanel")?.classList.add("hidden");
+      break;
+    default:
+      break;
+  }
+  if (!options.skipObjectiveRefresh) updateObjectiveChoiceUi();
+  if (!options.skipSync) syncMainPanelUiState();
+}
+
+function requestOpenMainPanel(panelId, options = {}) {
+  const active = getActiveMainPanel();
+  if (active === panelId) {
+    syncMainPanelUiState();
+    return { ok: true, alreadyOpen: true };
+  }
+
+  const priority = MAIN_PANEL_PRIORITY;
+  if (active && priority[active] < priority[panelId] && !isMainPanelPeerSwap(panelId, active)) {
+    if (!options.silent) showToast(MAIN_PANEL_TOAST_BLOCKED);
+    return { ok: false, reason: "blocked_by_higher_priority", blockedBy: active };
+  }
+
+  if (active && active !== panelId) {
+    closeMainPanel(active, { skipObjectiveRefresh: true, skipSync: true });
+  }
+
+  if (panelId === "galaxyMap") {
+    if (isMetaPanelOpen()) closeMainPanel("meta", { skipObjectiveRefresh: true, skipSync: true });
+    if (state.hud?.researchTreeOpen) closeMainPanel("researchTree", { skipObjectiveRefresh: true, skipSync: true });
+  } else if (panelId === "meta") {
+    if (state.hud?.researchTreeOpen) closeMainPanel("researchTree", { skipObjectiveRefresh: true, skipSync: true });
+    if (isGalaxyMapPanelOpen()) closeMainPanel("galaxyMap", { skipObjectiveRefresh: true, skipSync: true });
+  } else if (panelId === "researchTree") {
+    if (isMetaPanelOpen()) closeMainPanel("meta", { skipObjectiveRefresh: true, skipSync: true });
+    if (isGalaxyMapPanelOpen()) closeMainPanel("galaxyMap", { skipObjectiveRefresh: true, skipSync: true });
+  } else if (panelId === "runSettlement") {
+    if (isGalaxyMapPanelOpen()) closeMainPanel("galaxyMap", { skipObjectiveRefresh: true, skipSync: true });
+    if (isMetaPanelOpen()) closeMainPanel("meta", { skipObjectiveRefresh: true, skipSync: true });
+    if (state.hud?.researchTreeOpen) closeMainPanel("researchTree", { skipObjectiveRefresh: true, skipSync: true });
+    document.getElementById("objectiveChoicePanel")?.classList.add("hidden");
+  }
+
+  if (panelId === "galaxyMap" || panelId === "meta" || panelId === "researchTree") {
+    document.getElementById("objectiveChoicePanel")?.classList.add("hidden");
+  }
+
+  syncMainPanelUiState();
+  return { ok: true, alreadyOpen: false };
+}
+
+function closePanelsForSettlement() {
+  forceHideGalaxyMapPanel({ skipSync: true });
+  setMetaPanelOpen(false, { skipSync: true, skipObjectiveRefresh: true });
+  setResearchTreeOpen(false, { skipSync: true });
+  document.getElementById("objectiveChoicePanel")?.classList.add("hidden");
+  syncMainPanelUiState();
+}
+
+function toggleMetaPanel(open) {
+  if (open) {
+    const result = requestOpenMainPanel("meta");
+    if (!result.ok) return;
+    setMetaPanelOpen(true, { skipSync: true, skipObjectiveRefresh: true });
+    updateObjectiveChoiceUi();
+    syncMainPanelUiState();
+    return;
+  }
+  setMetaPanelOpen(false);
 }
 
 function renderMetaPanelSummary() {
@@ -4154,6 +4248,61 @@ function resetObjectiveChoiceState() {
 
 function isRunSettlementPanelOpen() {
   return !!(runSettlementPanelEl && !runSettlementPanelEl.classList.contains("hidden"));
+}
+
+// v0.11.0 T2：主流程面板互斥优先级（数字越小优先级越高）
+const MAIN_PANEL_PRIORITY = {
+  runSettlement: 1,
+  galaxyMap: 2,
+  objectiveChoice: 3,
+  meta: 4,
+  researchTree: 5
+};
+
+const MAIN_PANEL_TOAST_BLOCKED = "请先关闭当前界面再进行此操作。";
+
+function countSimultaneouslyOpenMainPanels() {
+  let count = 0;
+  if (isRunSettlementPanelOpen()) count++;
+  if (isGalaxyMapPanelOpen()) count++;
+  if (isMetaPanelOpen()) count++;
+  if (state.hud?.researchTreeOpen) count++;
+  return count;
+}
+
+function getActiveMainPanel() {
+  if (isRunSettlementPanelOpen()) return "runSettlement";
+  if (isGalaxyMapPanelOpen()) return "galaxyMap";
+  if (isMetaPanelOpen()) return "meta";
+  if (state.hud?.researchTreeOpen) return "researchTree";
+  return null;
+}
+
+function isMainPanelPeerSwap(panelId, active) {
+  return (panelId === "meta" && active === "researchTree")
+    || (panelId === "researchTree" && active === "meta");
+}
+
+function syncMainPanelUiState() {
+  const hud = document.getElementById("hud");
+  const body = document.body;
+  const active = getActiveMainPanel();
+  const targets = [body, hud].filter(Boolean);
+  const objectivePanel = document.getElementById("objectiveChoicePanel");
+  const objectiveVisible = !!(objectivePanel && !objectivePanel.classList.contains("hidden"));
+
+  for (const el of targets) {
+    el.classList.toggle("ui-main-panel-open", active !== null);
+    el.classList.toggle("ui-panel-settlement-open", active === "runSettlement");
+    el.classList.toggle("ui-panel-galaxy-open", active === "galaxyMap");
+    el.classList.toggle("ui-panel-meta-open", active === "meta");
+    el.classList.toggle("ui-panel-objective-open", objectiveVisible && active === null);
+  }
+
+  metaPanelEl?.classList.toggle("is-top-panel", active === "meta");
+  researchTreePanelEl?.classList.toggle("is-top-panel", active === "researchTree");
+  document.getElementById("galaxyMapPanel")?.classList.toggle("is-top-panel", active === "galaxyMap");
+  runSettlementPanelEl?.classList.toggle("is-top-panel", active === "runSettlement");
 }
 
 function hasStableResourceHarvest() {
@@ -5442,9 +5591,17 @@ function isGalaxyMapPanelOpen() {
   return !!(panel && !panel.classList.contains("hidden"));
 }
 
-function hideGalaxyMapPanel() {
+function hideGalaxyMapPanel(options = {}) {
   const panel = document.getElementById("galaxyMapPanel");
   if (panel) panel.classList.add("hidden");
+  if (!options.skipSync) syncMainPanelUiState();
+}
+
+function forceHideGalaxyMapPanel(options = {}) {
+  hideGalaxyMapPanel({ skipSync: true });
+  disableGalaxyMapCards();
+  galaxyJumpInFlight = false;
+  if (!options.skipSync) syncMainPanelUiState();
 }
 
 function formatRiskLabel(risk) {
@@ -5551,7 +5708,8 @@ function renderGalaxyMapCards(choices) {
 function openGalaxyMapPanel(choices) {
   const panel = document.getElementById("galaxyMapPanel");
   if (!panel) return false;
-  toggleMetaPanel(false);
+  const openResult = requestOpenMainPanel("galaxyMap");
+  if (!openResult.ok) return false;
   const safeChoices = Array.isArray(choices)
     ? choices.filter((choice) => choice && GALAXY_TYPES[choice.galaxyType])
     : [];
@@ -5565,6 +5723,7 @@ function openGalaxyMapPanel(choices) {
     return false;
   }
   panel.classList.remove("hidden");
+  syncMainPanelUiState();
   return true;
 }
 
@@ -6209,11 +6368,13 @@ function endRunSettlement() {
     state.run.settlementBonus = bonus;
     state.run.settlementBonusGranted = true;
   }
+  closePanelsForSettlement();
   resetObjectiveChoiceState();
   state.run.settlementMode = "victory";
   state.run.settlementShown = true;
   updateRunSettlementPanel();
   runSettlementPanelEl?.classList.remove("hidden");
+  syncMainPanelUiState();
   updateQuickRestartVisibility();
   state.paused = true;
   document.getElementById("pauseBtn").textContent = "继续";
@@ -6225,6 +6386,8 @@ function closeSettlementForExplore() {
   state.run.settlementMode = "victory";
   state.run.endgameExplore = true;
   runSettlementPanelEl?.classList.add("hidden");
+  syncMainPanelUiState();
+  updateObjectiveChoiceUi();
   state.paused = false;
   document.getElementById("pauseBtn").textContent = "暂停";
   state.spawnTimer = Math.min(state.spawnTimer, 6);
@@ -6239,6 +6402,11 @@ function updateObjectiveChoiceUi() {
   if (!panel) return;
 
   if (state.run.endgame || state.run.objective?.type === "guardian" || state.run.settlementShown) {
+    panel.classList.add("hidden");
+    return;
+  }
+
+  if (getActiveMainPanel() !== null) {
     panel.classList.add("hidden");
     return;
   }
@@ -6289,6 +6457,7 @@ function initGame() {
   window.addEventListener("resize", syncMoreStatusPanel);
   updateControlModeUi();
   updateHud();
+  syncMainPanelUiState();
   showToast("核心已上线。默认「屏幕方向」移动（W=上）；展开右侧「更多状态」可切换移动模式。鼠标指向决定朝向。");
 }
 
@@ -6743,13 +6912,25 @@ function bindInput() {
       event.preventDefault();
     } else if (event.key === "Escape") {
       if (isGalaxyMapPanelOpen()) return;
-      if (isMetaPanelOpen()) {
+      const activeMain = getActiveMainPanel();
+      if (activeMain === "runSettlement") {
+        showToast("请通过按钮关闭结算面板。");
+        return;
+      }
+      if (activeMain === "meta") {
         toggleMetaPanel(false);
         event.preventDefault();
         return;
       }
-      if (state.hud.researchTreeOpen) {
+      if (activeMain === "researchTree") {
         toggleResearchTree(false);
+        event.preventDefault();
+        return;
+      }
+      if (state.run.awaitingObjectiveChoice && isObjectiveComplete() && !state.run.settlementShown) {
+        state.run.awaitingObjectiveChoice = false;
+        state.run.objectiveChoiceDismissed = true;
+        updateObjectiveChoiceUi();
         event.preventDefault();
         return;
       }
@@ -9449,11 +9630,13 @@ function gameOver() {
     : (hints.nearestShortfall
       ? `还差 ${hints.nearestShortfall.deficit} 点可购买「${hints.nearestShortfall.name}」。`
       : "继续完成任务可获得更多局外点数。");
+  closePanelsForSettlement();
   resetObjectiveChoiceState();
   state.run.settlementMode = "failure";
   state.run.settlementShown = true;
   updateRunSettlementPanel();
   runSettlementPanelEl?.classList.remove("hidden");
+  syncMainPanelUiState();
   updateQuickRestartVisibility();
   showToast(`核心被摧毁，本局结束。局外成长 +${hints.pointsGained}（当前 ${hints.totalPoints} 点）。${purchaseHint}`);
   state.paused = true;
@@ -11329,6 +11512,351 @@ window.__gameTest.meta = {
     createBuildUi();
     updateHud();
     return this.snapshotMeta();
+  }
+};
+
+function runPanelMutualExclusionSelfCheck() {
+  ensureGameplayTestBaseline();
+  ensureGalaxyMapPanelDomForTest();
+  ensureMetaPanelUi();
+  const checks = [];
+
+  const runCase = (name, fn) => {
+    let ok = false;
+    let detail = null;
+    try {
+      const result = fn();
+      ok = !!result?.ok;
+      detail = result;
+    } catch (error) {
+      detail = { error: error.message };
+    }
+    checks.push({ name, ok, detail });
+    return ok;
+  };
+
+  const panelSnapshot = () => ({
+    activeMainPanel: getActiveMainPanel(),
+    overlapCount: countSimultaneouslyOpenMainPanels(),
+    metaOpen: isMetaPanelOpen(),
+    galaxyOpen: isGalaxyMapPanelOpen(),
+    settlementOpen: isRunSettlementPanelOpen(),
+    researchOpen: !!state.hud?.researchTreeOpen,
+    objectiveVisible: !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden")
+  });
+
+  const resetPanels = () => {
+    runSettlementPanelEl?.classList.add("hidden");
+    forceHideGalaxyMapPanel({ skipSync: true });
+    setMetaPanelOpen(false, { skipSync: true, skipObjectiveRefresh: true });
+    setResearchTreeOpen(false, { skipSync: true });
+    state.run.settlementShown = false;
+    state.run.settlementMode = "victory";
+    state.run.awaitingObjectiveChoice = false;
+    state.run.objectiveChoiceDismissed = false;
+    state.run.galaxyChoicesShown = false;
+    syncMainPanelUiState();
+  };
+
+  runCase("metaAndGalaxyDoNotOverlap", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5101, 0);
+    toggleMetaPanel(true);
+    const openGalaxy = openGalaxyMapPanel(window.__gameTest.generateGalaxyChoices(1));
+    const snap = panelSnapshot();
+    return {
+      ok: openGalaxy && !snap.metaOpen && snap.galaxyOpen && snap.overlapCount <= 1,
+      snap
+    };
+  });
+
+  runCase("settlementClosesOtherPanels", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5102, 0);
+    toggleMetaPanel(true);
+    window.__gameTest.openGalaxyMapForTest(1);
+    state.run.totalObjectiveRewardBase = 4;
+    state.run.settlementBonusGranted = false;
+    endRunSettlement();
+    const snap = panelSnapshot();
+    return {
+      ok: snap.settlementOpen
+        && !snap.metaOpen
+        && !snap.galaxyOpen
+        && !snap.researchOpen
+        && snap.overlapCount <= 1,
+      snap
+    };
+  });
+
+  runCase("metaBlockedWhileSettlementOpen", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5103, 0);
+    state.run.totalObjectiveRewardBase = 4;
+    state.run.settlementBonusGranted = false;
+    endRunSettlement();
+    toggleMetaPanel(true);
+    const snap = panelSnapshot();
+    return {
+      ok: snap.settlementOpen && !snap.metaOpen && snap.overlapCount <= 1,
+      snap
+    };
+  });
+
+  runCase("galaxyBlockedWhileSettlementOpen", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5104, 0);
+    state.run.totalObjectiveRewardBase = 4;
+    state.run.settlementBonusGranted = false;
+    endRunSettlement();
+    const openGalaxy = openGalaxyMapPanel(window.__gameTest.generateGalaxyChoices(1));
+    const snap = panelSnapshot();
+    return {
+      ok: !openGalaxy && snap.settlementOpen && !snap.galaxyOpen && snap.overlapCount <= 1,
+      snap
+    };
+  });
+
+  runCase("objectiveChoiceStatePreservedAfterGalaxyCancel", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5105, 0);
+    state.run.objectiveCompleteAt = 1;
+    state.run.awaitingObjectiveChoice = true;
+    state.run.objectiveChoiceDismissed = false;
+    const openGalaxy = window.__gameTest.openGalaxyMapForTest(1);
+    cancelGalaxyJump();
+    const snap = panelSnapshot();
+    return {
+      ok: openGalaxy.ok
+        && state.run.awaitingObjectiveChoice
+        && !state.run.objectiveChoiceDismissed
+        && snap.overlapCount <= 1,
+      snap,
+      awaiting: state.run.awaitingObjectiveChoice
+    };
+  });
+
+  runCase("staleGalaxyConfirmStillGuarded", () => {
+    const stale = window.__gameTest.simulateStaleGalaxyConfirm("tradeHub");
+    return { ok: stale.ok, stale };
+  });
+
+  return { ok: checks.every((entry) => entry.ok), checks };
+}
+
+function runEscapeSequenceSelfCheck() {
+  ensureGameplayTestBaseline();
+  ensureGalaxyMapPanelDomForTest();
+  ensureMetaPanelUi();
+  const checks = [];
+
+  const runCase = (name, fn) => {
+    let ok = false;
+    let detail = null;
+    try {
+      const result = fn();
+      ok = !!result?.ok;
+      detail = result;
+    } catch (error) {
+      detail = { error: error.message };
+    }
+    checks.push({ name, ok, detail });
+    return ok;
+  };
+
+  const resetPanels = () => {
+    runSettlementPanelEl?.classList.add("hidden");
+    forceHideGalaxyMapPanel({ skipSync: true });
+    setMetaPanelOpen(false, { skipSync: true, skipObjectiveRefresh: true });
+    setResearchTreeOpen(false, { skipSync: true });
+    state.run.settlementShown = false;
+    state.run.settlementMode = "victory";
+    state.run.awaitingObjectiveChoice = false;
+    state.run.objectiveChoiceDismissed = false;
+    syncMainPanelUiState();
+  };
+
+  runCase("settlementEscapeIsNoOp", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5201, 0);
+    state.run.totalObjectiveRewardBase = 4;
+    state.run.settlementBonusGranted = false;
+    endRunSettlement();
+    const before = isRunSettlementPanelOpen();
+    handlePlaytestEscapeKeydown();
+    return {
+      ok: before && isRunSettlementPanelOpen(),
+      before,
+      after: isRunSettlementPanelOpen()
+    };
+  });
+
+  runCase("metaEscapeClosesMeta", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5202, 0);
+    toggleMetaPanel(true);
+    handlePlaytestEscapeKeydown();
+    return {
+      ok: !isMetaPanelOpen() && countSimultaneouslyOpenMainPanels() === 0,
+      metaOpen: isMetaPanelOpen()
+    };
+  });
+
+  runCase("objectiveChoiceEscapeDismisses", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5203, 0);
+    state.run.objectiveCompleteAt = 1;
+    state.run.awaitingObjectiveChoice = true;
+    updateObjectiveChoiceUi();
+    handlePlaytestEscapeKeydown();
+    return {
+      ok: !state.run.awaitingObjectiveChoice
+        && state.run.objectiveChoiceDismissed
+        && countSimultaneouslyOpenMainPanels() === 0,
+      awaiting: state.run.awaitingObjectiveChoice,
+      dismissed: state.run.objectiveChoiceDismissed
+    };
+  });
+
+  runCase("galaxyEscapeUsesCancelGalaxyJump", () => {
+    resetPanels();
+    window.__gameTest.resetRun(5204, 0);
+    state.run.objectiveCompleteAt = 1;
+    state.run.awaitingObjectiveChoice = true;
+    window.__gameTest.openGalaxyMapForTest(1);
+    const cancel = window.__gameTest.cancelGalaxyJump();
+    return {
+      ok: cancel.ok && !isGalaxyMapPanelOpen() && state.run.awaitingObjectiveChoice,
+      cancel
+    };
+  });
+
+  return { ok: checks.every((entry) => entry.ok), checks };
+}
+
+function handlePlaytestEscapeKeydown() {
+  if (isGalaxyMapPanelOpen()) {
+    cancelGalaxyJump();
+    return { handled: true, action: "cancelGalaxyJump" };
+  }
+  const activeMain = getActiveMainPanel();
+  if (activeMain === "runSettlement") {
+    return { handled: false, action: "settlementNoOp" };
+  }
+  if (activeMain === "meta") {
+    toggleMetaPanel(false);
+    return { handled: true, action: "closeMeta" };
+  }
+  if (activeMain === "researchTree") {
+    toggleResearchTree(false);
+    return { handled: true, action: "closeResearchTree" };
+  }
+  if (state.run.awaitingObjectiveChoice && isObjectiveComplete() && !state.run.settlementShown) {
+    state.run.awaitingObjectiveChoice = false;
+    state.run.objectiveChoiceDismissed = true;
+    updateObjectiveChoiceUi();
+    return { handled: true, action: "objectiveStay" };
+  }
+  return { handled: false, action: "default" };
+}
+
+window.__gameTest.playtest = {
+  snapshot() {
+    return {
+      version: "v0.11.0-playtest-readiness",
+      capturedAt: Date.now(),
+      panels: {
+        activeMainPanel: getActiveMainPanel(),
+        metaOpen: isMetaPanelOpen(),
+        galaxyMapOpen: isGalaxyMapPanelOpen(),
+        runSettlementOpen: isRunSettlementPanelOpen(),
+        objectiveChoiceOpen: !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden"),
+        researchTreeOpen: !!state.hud?.researchTreeOpen,
+        overlapCount: countSimultaneouslyOpenMainPanels()
+      },
+      objectiveChoice: {
+        awaiting: !!state.run.awaitingObjectiveChoice,
+        dismissed: !!state.run.objectiveChoiceDismissed,
+        complete: isObjectiveComplete()
+      }
+    };
+  },
+  describeOpenPanels() {
+    const snap = this.snapshot();
+    const open = [];
+    if (snap.panels.runSettlementOpen) open.push("runSettlement");
+    if (snap.panels.galaxyMapOpen) open.push("galaxyMap");
+    if (snap.panels.metaOpen) open.push("meta");
+    if (snap.panels.researchTreeOpen) open.push("researchTree");
+    if (snap.panels.objectiveChoiceOpen) open.push("objectiveChoice");
+    return {
+      activeMainPanel: snap.panels.activeMainPanel,
+      openPanels: open,
+      overlapCount: snap.panels.overlapCount
+    };
+  },
+  panelSnapshot() {
+    return this.snapshot().panels;
+  },
+  simulateOpenCloseSequence(steps) {
+    const sequence = Array.isArray(steps) ? steps : ["meta", "galaxy", "settlementReset"];
+    const trace = [];
+    for (const step of sequence) {
+      if (step === "meta") {
+        toggleMetaPanel(true);
+        trace.push({ step, ...this.panelSnapshot() });
+      } else if (step === "metaClose") {
+        toggleMetaPanel(false);
+        trace.push({ step, ...this.panelSnapshot() });
+      } else if (step === "galaxy") {
+        const choices = window.__gameTest.generateGalaxyChoices(levelIndex(state.run.level + 1));
+        openGalaxyMapPanel(choices);
+        trace.push({ step, ...this.panelSnapshot() });
+      } else if (step === "galaxyCancel") {
+        cancelGalaxyJump();
+        trace.push({ step, ...this.panelSnapshot() });
+      } else if (step === "settlement") {
+        state.run.totalObjectiveRewardBase = Math.max(4, state.run.totalObjectiveRewardBase || 0);
+        state.run.settlementBonusGranted = false;
+        endRunSettlement();
+        trace.push({ step, ...this.panelSnapshot() });
+      } else if (step === "settlementReset") {
+        runSettlementPanelEl?.classList.add("hidden");
+        state.run.settlementShown = false;
+        syncMainPanelUiState();
+        trace.push({ step, ...this.panelSnapshot() });
+      } else if (step === "research") {
+        toggleResearchTree(true);
+        trace.push({ step, ...this.panelSnapshot() });
+      }
+    }
+    return {
+      ok: trace.every((entry) => entry.overlapCount <= 1),
+      trace
+    };
+  },
+  simulateEscapeSequence() {
+    const trace = [];
+    const push = (label) => trace.push({ label, ...this.panelSnapshot(), ...handlePlaytestEscapeKeydown() });
+    push("escape1");
+    push("escape2");
+    push("escape3");
+    return { trace };
+  },
+  runPanelMutualExclusionSelfCheck() {
+    return runPanelMutualExclusionSelfCheck();
+  },
+  runEscapeSequenceSelfCheck() {
+    return runEscapeSequenceSelfCheck();
+  },
+  handleEscapeKeydown() {
+    return handlePlaytestEscapeKeydown();
+  },
+  getActiveMainPanel() {
+    return getActiveMainPanel();
+  },
+  countOverlap() {
+    return countSimultaneouslyOpenMainPanels();
   }
 };
 
