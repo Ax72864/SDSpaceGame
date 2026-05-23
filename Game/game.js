@@ -15727,6 +15727,47 @@ const playtestSelfCheckState = {
   total: 0,
   checks: {}
 };
+const RELEASE_READINESS_VERSION = "v0.14.0-release-candidate-playtest";
+const RELEASE_FRAME_TIMING_DEFAULT_SAMPLES = 30;
+const RELEASE_FRAME_TIMING_MIN_SAMPLES = 6;
+const RELEASE_FRAME_TIMING_MAX_SAMPLES = 120;
+const RELEASE_FRAME_TIMING_LONG_FRAME_MS = 33;
+const RELEASE_STORAGE_SIGNATURE_SLICE = 32;
+const RELEASE_TEXT_SNAPSHOT_LIMIT = 200;
+const RELEASE_MANUAL_CHECK_IDS = [
+  "P0-1.firstRun",
+  "P0-2.miningLoop",
+  "P0-3.resourceShortage",
+  "P0-4.enemyApproach",
+  "P0-5.combatAndRepair",
+  "P0-6.postCombatReview",
+  "P0-7.galaxyJump",
+  "P0-8.metaReturn"
+];
+const RELEASE_EXTRA_KEY_DOM_IDS = [
+  "runInfo",
+  "runDanger",
+  "runProgress",
+  "currentGalaxyInfoEl",
+  "galaxyPathEl",
+  "resources",
+  "weaponsRow",
+  "pauseBtn",
+  "statusAlerts",
+  "resourceGuide",
+  "objectiveJumpDeferredBtn",
+  "runSettlementStats",
+  "runSettlementMetaFeedback",
+  "designHealthSummary",
+  "combatReviewSummary",
+  "combatStatusSummary",
+  "selectedCellPanel",
+  "selectedCellInfo",
+  "selectedCellDiagnostics",
+  "summaryStayBtn",
+  "quickRestartBtn",
+  "moreStatusPanel"
+];
 
 function clonePlaytestSnapshotFallback(value, seen = new WeakMap()) {
   if (value == null || typeof value !== "object") return value;
@@ -16188,6 +16229,987 @@ function runAllPlaytestSelfChecks() {
   return summary;
 }
 
+function hashReleaseStorageValue(value) {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = ((hash * 33) ^ value.charCodeAt(i)) >>> 0;
+  }
+  return `0x${hash.toString(16).padStart(8, "0")}`;
+}
+
+function captureReleaseStorageEntrySignature(storage, key) {
+  const snapshot = captureStorageSnapshot(storage, key);
+  if (!snapshot.supported) {
+    return {
+      supported: false,
+      hasValue: false,
+      length: null,
+      head32: null,
+      tail32: null,
+      hash32: null
+    };
+  }
+  if (!snapshot.hasValue) {
+    return {
+      supported: true,
+      hasValue: false,
+      length: null,
+      head32: null,
+      tail32: null,
+      hash32: null
+    };
+  }
+  const value = String(snapshot.value ?? "");
+  return {
+    supported: true,
+    hasValue: true,
+    length: value.length,
+    head32: value.slice(0, RELEASE_STORAGE_SIGNATURE_SLICE),
+    tail32: value.slice(-RELEASE_STORAGE_SIGNATURE_SLICE),
+    hash32: hashReleaseStorageValue(value)
+  };
+}
+
+function captureReleaseStorageSignature() {
+  return {
+    capturedAt: Date.now(),
+    saveKey: SAVE_KEY,
+    corruptRawKey: META_CORRUPT_RAW_KEY,
+    save: captureReleaseStorageEntrySignature(localStorage, SAVE_KEY),
+    corruptRaw: captureReleaseStorageEntrySignature(sessionStorage, META_CORRUPT_RAW_KEY)
+  };
+}
+
+function isReleaseStorageEntryConsistent(before, after) {
+  if (!before || !after) return false;
+  return before.supported === after.supported
+    && before.hasValue === after.hasValue
+    && before.length === after.length
+    && before.hash32 === after.hash32;
+}
+
+function isReleaseStorageSignatureConsistent(before, after) {
+  if (!before || !after) return false;
+  return isReleaseStorageEntryConsistent(before.save, after.save)
+    && isReleaseStorageEntryConsistent(before.corruptRaw, after.corruptRaw);
+}
+
+function safeReleaseMatchMedia(query) {
+  if (typeof window?.matchMedia !== "function") return false;
+  try {
+    return !!window.matchMedia(query).matches;
+  } catch {
+    return false;
+  }
+}
+
+function limitReleaseText(value, maxLength = RELEASE_TEXT_SNAPSHOT_LIMIT) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1)}…`;
+}
+
+function normalizeReleaseSampleFrames(rawValue) {
+  const requested = Math.floor(Number(rawValue));
+  const safeRequested = Number.isFinite(requested) ? requested : RELEASE_FRAME_TIMING_DEFAULT_SAMPLES;
+  const effective = Math.max(RELEASE_FRAME_TIMING_MIN_SAMPLES, Math.min(RELEASE_FRAME_TIMING_MAX_SAMPLES, safeRequested));
+  return {
+    requested: safeRequested,
+    effective,
+    truncated: safeRequested > RELEASE_FRAME_TIMING_MAX_SAMPLES
+  };
+}
+
+function collectReleaseEnvironment(viewport) {
+  const nav = typeof navigator === "object" && navigator ? navigator : null;
+  const userAgent = nav?.userAgent || "";
+  const hasRequestAnimationFrame = typeof window?.requestAnimationFrame === "function";
+  const hasPerformanceNow = typeof performance?.now === "function";
+  const hasLocalStorage = captureStorageSnapshot(localStorage, SAVE_KEY).supported;
+  const hasSessionStorage = captureStorageSnapshot(sessionStorage, META_CORRUPT_RAW_KEY).supported;
+  const hasStructuredClone = typeof structuredClone === "function";
+  const hasWebGL = !!renderer?.gl;
+  const headlessReasons = [];
+  if (nav?.webdriver === true) headlessReasons.push("webdriver");
+  if (/HeadlessChrome|jsdom|node\.js|Puppeteer|Playwright/i.test(userAgent)) headlessReasons.push("ua_headless");
+  if (!hasRequestAnimationFrame) headlessReasons.push("missing_raf");
+  if ((window?.outerWidth || 0) === 0 || (window?.outerHeight || 0) === 0) headlessReasons.push("zero_outer_size");
+  if (Array.isArray(nav?.languages) && nav.languages.length === 0) headlessReasons.push("empty_languages");
+  const prefersColorScheme = safeReleaseMatchMedia("(prefers-color-scheme: dark)")
+    ? "dark"
+    : (safeReleaseMatchMedia("(prefers-color-scheme: light)") ? "light" : "unknown");
+  return {
+    capturedAt: Date.now(),
+    userAgent,
+    language: nav?.language || "",
+    platform: nav?.platform || "",
+    hardwareConcurrency: Number.isFinite(nav?.hardwareConcurrency) ? nav.hardwareConcurrency : null,
+    deviceMemoryGb: Number.isFinite(nav?.deviceMemory) ? nav.deviceMemory : null,
+    viewport: {
+      width: Number(viewport?.width) || window.innerWidth || 0,
+      height: Number(viewport?.height) || window.innerHeight || 0,
+      devicePixelRatio: Number(viewport?.devicePixelRatio) || window.devicePixelRatio || 1,
+      narrowViewport: !!viewport?.narrowViewport
+    },
+    online: nav?.onLine !== false,
+    prefersReducedMotion: safeReleaseMatchMedia("(prefers-reduced-motion: reduce)"),
+    prefersColorScheme,
+    hasRequestAnimationFrame,
+    hasPerformanceNow,
+    hasLocalStorage,
+    hasSessionStorage,
+    hasStructuredClone,
+    hasWebGL,
+    isHeadlessHint: headlessReasons.length > 0,
+    headlessReasons
+  };
+}
+
+function collectReleaseHudHooks(baseSnapshot) {
+  const keyDom = {};
+  for (const id of RELEASE_EXTRA_KEY_DOM_IDS) {
+    keyDom[id] = snapshotDomNodeState(id);
+  }
+  return {
+    available: true,
+    runInfoText: limitReleaseText(runInfoEl?.textContent || ""),
+    runDangerText: limitReleaseText(runDangerEl?.textContent || ""),
+    runProgressText: limitReleaseText(runProgressEl?.textContent || ""),
+    currentGoalText: limitReleaseText(currentGoalEl?.textContent || ""),
+    nextStepText: limitReleaseText(nextStepEl?.textContent || ""),
+    statusAlertsCount: statusAlertsEl?.children?.length || 0,
+    resourceGuideLength: Number(baseSnapshot?.guide?.resourceGuideLength) || 0,
+    weaponsRowCount: weaponsRowEl?.children?.length || 0,
+    pauseButtonText: limitReleaseText(document.getElementById("pauseBtn")?.textContent || "", 40),
+    keyDom
+  };
+}
+
+function summarizeReleasePendingChoices(rawChoices) {
+  if (!Array.isArray(rawChoices)) return [];
+  return rawChoices.map((entry) => ({
+    galaxyType: typeof entry?.galaxyType === "string" ? entry.galaxyType : null,
+    reason: typeof entry?.reason === "string" ? entry.reason : null
+  }));
+}
+
+function summarizeReleaseGalaxyPathNodes(rawNodes) {
+  if (!Array.isArray(rawNodes)) return [];
+  return rawNodes.map((node) => ({
+    id: node?.id ?? null,
+    level: Number.isFinite(node?.level) ? node.level : null,
+    galaxyType: typeof node?.galaxyType === "string" ? node.galaxyType : null,
+    visited: !!node?.visited,
+    current: !!node?.current
+  }));
+}
+
+function collectReleaseGalaxyHooks(baseSnapshot) {
+  const hasHudHook = typeof window.__gameTest?.getGalaxyHudSnapshot === "function";
+  const hasPathHook = typeof window.__gameTest?.getGalaxyPath === "function";
+  const hudSnapshot = hasHudHook ? window.__gameTest.getGalaxyHudSnapshot() : null;
+  const pathNodes = hasPathHook ? window.__gameTest.getGalaxyPath() : [];
+  const currentGalaxyType = typeof hudSnapshot?.currentGalaxyType === "string"
+    ? hudSnapshot.currentGalaxyType
+    : (typeof baseSnapshot?.objective?.currentGalaxyType === "string" ? baseSnapshot.objective.currentGalaxyType : null);
+  const knownGalaxyTypeKeys = Object.keys(GALAXY_TYPES || {});
+  return {
+    available: true,
+    currentGalaxyType,
+    knownGalaxyTypeKeys,
+    panelOpen: hasHudHook ? !!hudSnapshot?.panelOpen : isGalaxyMapPanelOpen(),
+    pendingChoices: summarizeReleasePendingChoices(hasHudHook ? hudSnapshot?.pendingChoices : state.run.galaxyMap?.pendingChoices),
+    galaxyChoicesShown: hasHudHook ? !!hudSnapshot?.galaxyChoicesShown : !!state.run.galaxyChoicesShown,
+    currentGalaxyInfoPresent: typeof hudSnapshot?.currentGalaxyInfoHtml === "string"
+      ? hudSnapshot.currentGalaxyInfoHtml.trim().length > 0
+      : false,
+    galaxyPathDotsPresent: typeof hudSnapshot?.galaxyPathDotsHtml === "string"
+      ? hudSnapshot.galaxyPathDotsHtml.trim().length > 0
+      : false,
+    galaxyMapPathNodes: summarizeReleaseGalaxyPathNodes(pathNodes),
+    hooks: {
+      getGalaxyHudSnapshot: hasHudHook,
+      getGalaxyPath: hasPathHook
+    },
+    fieldPresence: {
+      currentGalaxyType: typeof currentGalaxyType === "string" && currentGalaxyType.length > 0,
+      pendingChoices: Array.isArray(hasHudHook ? hudSnapshot?.pendingChoices : state.run.galaxyMap?.pendingChoices),
+      panelOpen: typeof (hasHudHook ? hudSnapshot?.panelOpen : false) === "boolean",
+      pathNodes: Array.isArray(pathNodes)
+    }
+  };
+}
+
+function collectReleaseBuildHooks() {
+  const hasBuildPaletteHook = typeof getBuildPaletteDiagnostics === "function";
+  const hasSelectedCellHook = typeof getSelectedCellDiagnostics === "function";
+  const hasPlacementHook = typeof resolvePlacementArgsForTest === "function";
+  const diagnostics = hasBuildPaletteHook ? getBuildPaletteDiagnostics() : null;
+  const facilities = Array.isArray(diagnostics?.facilities) ? diagnostics.facilities : [];
+  const palette = facilities.map((entry) => ({
+    type: entry?.id ?? null,
+    role: entry?.role ?? null,
+    affordable: !!entry?.affordable,
+    count: Number.isFinite(entry?.count) ? entry.count : 0,
+    powerStress: !!(entry?.powerRiskAfterBuild || entry?.powerTightAfterBuild),
+    hasReason: typeof entry?.recommendation?.reasonKey === "string" && entry.recommendation.reasonKey.length > 0
+  }));
+  const selectedCell = state.selectedCell;
+  const selectedCellKey = selectedCell && Number.isFinite(selectedCell.x) && Number.isFinite(selectedCell.y)
+    ? key(selectedCell.x, selectedCell.y)
+    : null;
+  return {
+    available: hasBuildPaletteHook,
+    selectedBuildType: typeof state.selectedBuild === "string" ? state.selectedBuild : null,
+    selectedCellKey,
+    palette,
+    paletteCount: palette.length,
+    affordableCount: palette.filter((entry) => entry.affordable).length,
+    hooks: {
+      getBuildPaletteDiagnostics: hasBuildPaletteHook,
+      getSelectedCellDiagnostics: hasSelectedCellHook,
+      getPlacementDiagnostics: hasPlacementHook
+    },
+    fieldPresence: {
+      palette: Array.isArray(diagnostics?.facilities),
+      summary: isMetaObject(diagnostics?.summary)
+    }
+  };
+}
+
+function collectReleaseMetaHooks(baseSnapshot) {
+  const summary = isMetaObject(baseSnapshot?.metaStorage?.summary)
+    ? baseSnapshot.metaStorage.summary
+    : summarizeMetaStorageForPlaytestSnapshot();
+  const toggleState = snapshotDomNodeState("metaPanelToggle");
+  return {
+    available: true,
+    panelOpen: isMetaPanelOpen(),
+    panelToggleVisible: !!toggleState.visible,
+    panelToggleExists: !!toggleState.exists,
+    activeTab: typeof metaPanelUi?.activeTab === "string" ? metaPanelUi.activeTab : null,
+    categoryFilter: typeof metaPanelUi?.categoryFilter === "string" ? metaPanelUi.categoryFilter : null,
+    points: normalizeMetaPoints(state.meta?.points),
+    talentCount: Number.isFinite(summary?.talentCount) ? summary.talentCount : 0,
+    selectedProtocol: typeof summary?.selectedProtocol === "string" ? summary.selectedProtocol : null,
+    activeProtocol: typeof summary?.activeProtocol === "string" ? summary.activeProtocol : null,
+    hasCorruptRaw: !!summary?.hasCorruptRaw,
+    hooks: {
+      summarizeMetaStorageForPlaytestSnapshot: typeof summarizeMetaStorageForPlaytestSnapshot === "function",
+      metaSnapshot: typeof window.__gameTest?.meta?.snapshotMeta === "function"
+    },
+    fieldPresence: {
+      summary: isMetaObject(summary),
+      panelToggle: !!toggleState.exists
+    }
+  };
+}
+
+function collectReleaseHookStatus(baseSnapshot, buildHooks, metaHooks, galaxyHooks) {
+  const playtestApi = window.__gameTest?.playtest;
+  const designHooks = {
+    getStationDesignHealth: typeof playtestApi?.getStationDesignHealth === "function",
+    getResourceReachability: typeof playtestApi?.getResourceReachability === "function",
+    getPowerMargin: typeof playtestApi?.getPowerMargin === "function"
+  };
+  const combatHooks = {
+    getThreatSummary: typeof playtestApi?.getThreatSummary === "function",
+    getWeaponEffectiveness: typeof playtestApi?.getWeaponEffectiveness === "function",
+    getRecentDamageSummary: typeof playtestApi?.getRecentDamageSummary === "function",
+    getRepairStatusSummary: typeof playtestApi?.getRepairStatusSummary === "function",
+    getCombatReview: typeof playtestApi?.getCombatReview === "function"
+  };
+  const designFields = {
+    health: isMetaObject(baseSnapshot?.design?.health) || Array.isArray(baseSnapshot?.design?.health),
+    reachability: isMetaObject(baseSnapshot?.design?.reachability) || Array.isArray(baseSnapshot?.design?.reachability),
+    power: isMetaObject(baseSnapshot?.design?.power) || Array.isArray(baseSnapshot?.design?.power)
+  };
+  const combatFields = {
+    threat: baseSnapshot?.combat?.threat != null,
+    weapon: baseSnapshot?.combat?.weapon != null,
+    damage: baseSnapshot?.combat?.damage != null,
+    repair: baseSnapshot?.combat?.repair != null,
+    review: baseSnapshot?.combat?.review != null
+  };
+  const buildFields = {
+    palette: Array.isArray(buildHooks?.palette),
+    selectedBuildType: "selectedBuildType" in (buildHooks || {}),
+    selectedCellKey: "selectedCellKey" in (buildHooks || {})
+  };
+  const metaFields = {
+    points: Number.isFinite(metaHooks?.points),
+    activeTab: typeof metaHooks?.activeTab === "string" || metaHooks?.activeTab == null,
+    selectedProtocol: typeof metaHooks?.selectedProtocol === "string" || metaHooks?.selectedProtocol == null
+  };
+  const galaxyFields = {
+    currentGalaxyType: typeof galaxyHooks?.currentGalaxyType === "string" || galaxyHooks?.currentGalaxyType == null,
+    pendingChoices: Array.isArray(galaxyHooks?.pendingChoices),
+    pathNodes: Array.isArray(galaxyHooks?.galaxyMapPathNodes)
+  };
+  return {
+    design: {
+      hooks: designHooks,
+      fields: designFields,
+      available: Object.values(designHooks).every(Boolean) && Object.values(designFields).every(Boolean)
+    },
+    combat: {
+      hooks: combatHooks,
+      fields: combatFields,
+      available: Object.values(combatHooks).every(Boolean) && Object.values(combatFields).every(Boolean)
+    },
+    build: {
+      hooks: { ...(buildHooks?.hooks || {}) },
+      fields: buildFields,
+      available: Object.values(buildHooks?.hooks || {}).every(Boolean) && Object.values(buildFields).every(Boolean)
+    },
+    meta: {
+      hooks: { ...(metaHooks?.hooks || {}) },
+      fields: metaFields,
+      available: Object.values(metaHooks?.hooks || {}).every(Boolean) && Object.values(metaFields).every(Boolean)
+    },
+    galaxy: {
+      hooks: { ...(galaxyHooks?.hooks || {}) },
+      fields: galaxyFields,
+      available: Object.values(galaxyHooks?.hooks || {}).every(Boolean) && Object.values(galaxyFields).every(Boolean)
+    }
+  };
+}
+
+function collectReleaseRuntimeStateSignature(baseSnapshot) {
+  const run = isMetaObject(state.run) ? state.run : {};
+  const resources = isMetaObject(baseSnapshot?.resource) ? baseSnapshot.resource : summarizeResourceForPlaytestSnapshot();
+  const priorityTarget = state.input?.priorityTarget;
+  const targetEnemy = isMetaObject(priorityTarget?.enemy) ? priorityTarget.enemy : null;
+  return {
+    capturedAt: Date.now(),
+    resources: {
+      metal: Number(resources.metal) || 0,
+      ore: Number(resources.ore) || 0,
+      gas: Number(resources.gas) || 0,
+      plasma: Number(resources.plasma) || 0,
+      research: Number(resources.research) || 0,
+      powerUsed: Number(resources.powerUsed) || 0,
+      powerAvailable: Number(resources.powerAvailable) || 0
+    },
+    enemiesCount: Array.isArray(state.enemies) ? state.enemies.length : 0,
+    projectilesCount: Array.isArray(state.projectiles) ? state.projectiles.length : 0,
+    run: {
+      level: Number.isFinite(run.level) ? run.level : null,
+      currentGalaxyType: typeof run.currentGalaxyType === "string" ? run.currentGalaxyType : null,
+      seed: Number.isFinite(run.seed) ? run.seed : null,
+      objectiveType: typeof run.objective?.type === "string" ? run.objective.type : null,
+      awaitingObjectiveChoice: !!run.awaitingObjectiveChoice
+    },
+    priorityTarget: {
+      active: !!priorityTarget,
+      enemyId: targetEnemy?.id ?? null,
+      enemyKind: typeof targetEnemy?.kind === "string" ? targetEnemy.kind : null,
+      validUntil: Number.isFinite(priorityTarget?.validUntil) ? priorityTarget.validUntil : null
+    }
+  };
+}
+
+function isReleaseRuntimeStateSignatureConsistent(before, after) {
+  if (!before || !after) return false;
+  const resourceKeys = ["metal", "ore", "gas", "plasma", "research", "powerUsed", "powerAvailable"];
+  const resourcesConsistent = resourceKeys.every((key) => before.resources?.[key] === after.resources?.[key]);
+  return resourcesConsistent
+    && before.enemiesCount === after.enemiesCount
+    && before.projectilesCount === after.projectilesCount
+    && before.run?.level === after.run?.level
+    && before.run?.currentGalaxyType === after.run?.currentGalaxyType
+    && before.run?.seed === after.run?.seed
+    && before.run?.objectiveType === after.run?.objectiveType
+    && before.run?.awaitingObjectiveChoice === after.run?.awaitingObjectiveChoice
+    && before.priorityTarget?.active === after.priorityTarget?.active
+    && before.priorityTarget?.enemyId === after.priorityTarget?.enemyId
+    && before.priorityTarget?.enemyKind === after.priorityTarget?.enemyKind
+    && before.priorityTarget?.validUntil === after.priorityTarget?.validUntil;
+}
+
+function createReleaseFrameTimingUnavailableResult(reason, requestedFrames, effectiveFrames, longFrameThresholdMs, truncated) {
+  const now = Date.now();
+  return {
+    available: false,
+    reason,
+    mode: "unavailable",
+    requestedFrames,
+    effectiveFrames,
+    durationMs: 0,
+    sampleCount: 0,
+    avgMs: null,
+    maxMs: null,
+    longFrameCount: 0,
+    longFrameThresholdMs,
+    truncated,
+    context: {
+      paused: !!state.paused,
+      capturedAt: now,
+      sampleStartedAt: now,
+      sampleEndedAt: now
+    }
+  };
+}
+
+function buildReleaseFrameTimingResult({
+  frames,
+  mode,
+  requestedFrames,
+  effectiveFrames,
+  longFrameThresholdMs,
+  truncated,
+  sampleStartedAt
+}) {
+  const sampleEndedAt = Date.now();
+  const sampleCount = frames.length;
+  const sum = frames.reduce((acc, value) => acc + value, 0);
+  const avgMs = sampleCount > 0 ? sum / sampleCount : null;
+  const maxMs = sampleCount > 0 ? Math.max(...frames) : null;
+  const longFrameCount = frames.filter((value) => value >= longFrameThresholdMs).length;
+  return {
+    available: sampleCount > 0,
+    reason: sampleCount > 0 ? null : "empty_samples",
+    mode,
+    requestedFrames,
+    effectiveFrames,
+    durationMs: Math.max(0, sampleEndedAt - sampleStartedAt),
+    sampleCount,
+    avgMs,
+    maxMs,
+    longFrameCount,
+    longFrameThresholdMs,
+    truncated,
+    context: {
+      paused: !!state.paused,
+      capturedAt: sampleEndedAt,
+      sampleStartedAt,
+      sampleEndedAt
+    }
+  };
+}
+
+function sampleReleaseFrameTiming(rawSampleFrames = RELEASE_FRAME_TIMING_DEFAULT_SAMPLES, rawLongFrameThresholdMs = RELEASE_FRAME_TIMING_LONG_FRAME_MS) {
+  const normalized = normalizeReleaseSampleFrames(rawSampleFrames);
+  const longFrameThresholdMs = Number.isFinite(Number(rawLongFrameThresholdMs))
+    ? Math.max(1, Number(rawLongFrameThresholdMs))
+    : RELEASE_FRAME_TIMING_LONG_FRAME_MS;
+  const sampleStartedAt = Date.now();
+  const hasPerformanceNow = typeof performance?.now === "function";
+  const nowFn = hasPerformanceNow ? () => performance.now() : () => Date.now();
+  if (typeof window?.requestAnimationFrame === "function") {
+    return new Promise((resolve) => {
+      const frames = [];
+      let previous = nowFn();
+      const step = (timestamp) => {
+        const now = Number.isFinite(timestamp) ? timestamp : nowFn();
+        frames.push(Math.max(0, now - previous));
+        previous = now;
+        if (frames.length >= normalized.effective) {
+          resolve(buildReleaseFrameTimingResult({
+            frames,
+            mode: "rAF",
+            requestedFrames: normalized.requested,
+            effectiveFrames: normalized.effective,
+            longFrameThresholdMs,
+            truncated: normalized.truncated,
+            sampleStartedAt
+          }));
+          return;
+        }
+        window.requestAnimationFrame(step);
+      };
+      window.requestAnimationFrame(step);
+    });
+  }
+  if (typeof setTimeout === "function") {
+    return new Promise((resolve) => {
+      const frames = [];
+      let previous = nowFn();
+      const step = () => {
+        const now = nowFn();
+        frames.push(Math.max(0, now - previous));
+        previous = now;
+        if (frames.length >= normalized.effective) {
+          resolve(buildReleaseFrameTimingResult({
+            frames,
+            mode: "timeout",
+            requestedFrames: normalized.requested,
+            effectiveFrames: normalized.effective,
+            longFrameThresholdMs,
+            truncated: normalized.truncated,
+            sampleStartedAt
+          }));
+          return;
+        }
+        setTimeout(step, 16);
+      };
+      setTimeout(step, 16);
+    });
+  }
+  return Promise.resolve(createReleaseFrameTimingUnavailableResult(
+    "frame_timing_unavailable",
+    normalized.requested,
+    normalized.effective,
+    longFrameThresholdMs,
+    normalized.truncated
+  ));
+}
+
+function createReleaseCheck({ id, label, status, severity = "info", details = {}, layer = "automatic" }) {
+  return {
+    id,
+    label,
+    layer,
+    status,
+    severity,
+    blocking: status === "fail" && severity === "blocking",
+    details,
+    capturedAt: Date.now()
+  };
+}
+
+function summarizeReleaseLayerCoverage(items) {
+  return {
+    covered: items.filter((item) => item.status !== "unknown").length,
+    uncovered: items.filter((item) => item.status === "unknown").length
+  };
+}
+
+function buildReleaseManualEvidenceItems() {
+  return RELEASE_MANUAL_CHECK_IDS.map((id) => ({
+    id: `manual.${id}`,
+    label: `人工路径 ${id}`,
+    layer: "manual",
+    source: "checklist",
+    summary: "未由自动检查覆盖，需人工/真实浏览器补证",
+    severity: "info",
+    status: "unknown",
+    blocking: false
+  }));
+}
+
+function buildReleaseEvidenceLayers(checks, environment, viewport) {
+  const automatic = checks
+    .filter((entry) => entry.layer === "automatic")
+    .map((entry) => ({
+      id: `auto.${entry.id}`,
+      label: entry.label,
+      layer: "automatic",
+      source: "snapshot",
+      summary: entry.details?.summary || `${entry.label}: ${entry.status}`,
+      severity: entry.severity,
+      status: entry.status,
+      blocking: entry.blocking
+    }));
+  const browser = [
+    {
+      id: "browser.viewport.narrow",
+      label: "窄屏证据",
+      layer: "browser",
+      source: "snapshot",
+      summary: viewport?.narrowViewport
+        ? "已记录窄屏视口命中，仍需人工确认体验"
+        : "当前快照未命中窄屏，需额外窄屏补证",
+      severity: "info",
+      status: viewport?.narrowViewport ? "pass" : "unknown",
+      blocking: false
+    },
+    {
+      id: "browser.environment.userAgent",
+      label: "浏览器环境标识",
+      layer: "browser",
+      source: "snapshot",
+      summary: environment?.userAgent ? `UA: ${environment.userAgent}` : "未获取 userAgent",
+      severity: "info",
+      status: environment?.userAgent ? "pass" : "unknown",
+      blocking: false
+    },
+    {
+      id: "browser.environment.headlessHint",
+      label: "headless 提示",
+      layer: "browser",
+      source: "snapshot",
+      summary: environment?.isHeadlessHint
+        ? `疑似 headless：${(environment.headlessReasons || []).join(", ")}`
+        : "未命中 headless 提示规则",
+      severity: environment?.isHeadlessHint ? "warn" : "info",
+      status: environment?.isHeadlessHint ? "warn" : "pass",
+      blocking: false
+    },
+    {
+      id: "browser.runtimeErrors.console",
+      label: "浏览器 Console 观察",
+      layer: "browser",
+      source: "external",
+      summary: "自动检查不覆盖 console 面板，需 PM 手工记录",
+      severity: "info",
+      status: "unknown",
+      blocking: false
+    }
+  ];
+  const manual = buildReleaseManualEvidenceItems();
+  const automaticPassed = automatic.filter((entry) => entry.status === "pass").length;
+  const automaticFailed = automatic.filter((entry) => entry.status === "fail").length;
+  const automaticUnknown = automatic.filter((entry) => entry.status === "unknown").length;
+  const browserCoverage = summarizeReleaseLayerCoverage(browser);
+  const manualCoverage = summarizeReleaseLayerCoverage(manual);
+  return {
+    layers: { automatic, browser, manual },
+    coverage: {
+      automaticPassed,
+      automaticFailed,
+      automaticUnknown,
+      browserCovered: browserCoverage.covered,
+      browserUncovered: browserCoverage.uncovered,
+      manualCovered: manualCoverage.covered,
+      manualUncovered: manualCoverage.uncovered
+    }
+  };
+}
+
+function collectReleaseReadinessSnapshot(options = {}) {
+  bindPlaytestErrorListeners();
+  const baseSnapshot = window.__gameTest?.playtest?.snapshot?.() || {
+    version: "unavailable",
+    capturedAt: Date.now(),
+    runtimeErrors: { count: playtestRuntimeErrorBuffer.length, latest: getPlaytestRuntimeErrors() },
+    keyDom: {},
+    viewport: { width: window.innerWidth || 0, height: window.innerHeight || 0, devicePixelRatio: window.devicePixelRatio || 1, narrowViewport: false },
+    metaStorage: { saveKey: SAVE_KEY, summary: summarizeMetaStorageForPlaytestSnapshot() },
+    resource: summarizeResourceForPlaytestSnapshot(),
+    design: {},
+    combat: {}
+  };
+  const storageSignature = options.storageSignature || captureReleaseStorageSignature();
+  const frameTiming = options.frameTiming || createReleaseFrameTimingUnavailableResult(
+    "call_runReleaseCandidateChecks_for_sampling",
+    RELEASE_FRAME_TIMING_DEFAULT_SAMPLES,
+    RELEASE_FRAME_TIMING_DEFAULT_SAMPLES,
+    RELEASE_FRAME_TIMING_LONG_FRAME_MS,
+    false
+  );
+  const buildHooks = collectReleaseBuildHooks();
+  const metaHooks = collectReleaseMetaHooks(baseSnapshot);
+  const galaxyHooks = collectReleaseGalaxyHooks(baseSnapshot);
+  const hudHooks = collectReleaseHudHooks(baseSnapshot);
+  const environment = collectReleaseEnvironment(baseSnapshot.viewport);
+  const hookStatus = collectReleaseHookStatus(baseSnapshot, buildHooks, metaHooks, galaxyHooks);
+  const runtimeStateSignature = collectReleaseRuntimeStateSignature(baseSnapshot);
+  const evidence = options.evidence || buildReleaseEvidenceLayers([], environment, baseSnapshot.viewport);
+  return safeDeepCloneForTest({
+    version: RELEASE_READINESS_VERSION,
+    capturedAt: Date.now(),
+    base: baseSnapshot,
+    storageSignature,
+    frameTiming,
+    environment,
+    build: buildHooks,
+    meta: metaHooks,
+    galaxy: galaxyHooks,
+    hud: hudHooks,
+    hookStatus,
+    runtimeStateSignature,
+    evidence
+  });
+}
+
+function collectReleaseReadinessMissing(domainStatus) {
+  const missingHooks = Object.entries(domainStatus?.hooks || {})
+    .filter(([, available]) => !available)
+    .map(([name]) => name);
+  const missingFields = Object.entries(domainStatus?.fields || {})
+    .filter(([, available]) => !available)
+    .map(([name]) => name);
+  return { missingHooks, missingFields };
+}
+
+function evaluateReleaseCandidateChecks({
+  snapshotBefore,
+  snapshotAfter,
+  storageBefore,
+  storageAfter,
+  runtimeBefore,
+  runtimeAfter,
+  frameTiming
+}) {
+  const checks = [];
+  const residualRisks = [];
+  const runtimeErrorCount = Number(snapshotAfter?.base?.runtimeErrors?.count) || 0;
+  checks.push(createReleaseCheck({
+    id: "runtimeErrors.empty",
+    label: "runtime errors 为空",
+    status: runtimeErrorCount === 0 ? "pass" : "fail",
+    severity: runtimeErrorCount === 0 ? "info" : "blocking",
+    details: {
+      summary: runtimeErrorCount === 0 ? "未发现新的 runtime error" : `发现 ${runtimeErrorCount} 条 runtime error`,
+      count: runtimeErrorCount
+    }
+  }));
+
+  const baseDomRequired = ["hud", "currentGoal", "nextStep", "metaPanelToggle", "galaxyMapPanel", "runSettlementPanel"];
+  const missingBaseDom = baseDomRequired.filter((id) => !snapshotAfter?.base?.keyDom?.[id]?.exists);
+  const missingExtendedDom = RELEASE_EXTRA_KEY_DOM_IDS.filter((id) => !snapshotAfter?.hud?.keyDom?.[id]?.exists);
+  const invisibleCritical = ["runInfo", "resources", "pauseBtn"].filter((id) => {
+    const state = snapshotAfter?.hud?.keyDom?.[id];
+    return state?.exists && !state?.visible;
+  });
+  const keyDomFailed = missingBaseDom.length > 0 || missingExtendedDom.length > 0 || invisibleCritical.length > 0;
+  checks.push(createReleaseCheck({
+    id: "keyDom.present",
+    label: "关键 DOM 可读",
+    status: keyDomFailed ? "fail" : "pass",
+    severity: keyDomFailed ? "blocking" : "info",
+    details: {
+      summary: keyDomFailed ? "关键 DOM 有缺失/不可见" : "关键 DOM 全部可见或存在",
+      missingBaseDom,
+      missingExtendedDom,
+      invisibleCritical
+    }
+  }));
+
+  const viewport = snapshotAfter?.base?.viewport || {};
+  const viewportValid = Number(viewport.width) > 0 && Number(viewport.height) > 0 && Number(viewport.devicePixelRatio) > 0;
+  checks.push(createReleaseCheck({
+    id: "viewport.recorded",
+    label: "viewport 已记录",
+    status: viewportValid ? "pass" : "fail",
+    severity: viewportValid ? "info" : "blocking",
+    details: {
+      summary: viewportValid ? "viewport 字段有效" : "viewport 字段缺失或非法",
+      viewport
+    }
+  }));
+
+  const domains = ["design", "combat", "build", "meta", "galaxy"];
+  for (const domain of domains) {
+    const status = snapshotAfter?.hookStatus?.[domain];
+    const missing = collectReleaseReadinessMissing(status);
+    const available = !!status?.available;
+    checks.push(createReleaseCheck({
+      id: `${domain}.hooks`,
+      label: `${domain} hooks/字段完整`,
+      status: available ? "pass" : "fail",
+      severity: available ? "info" : "blocking",
+      details: {
+        summary: available ? `${domain} hooks 与字段均可用` : `${domain} hooks/字段存在缺口`,
+        ...missing
+      }
+    }));
+  }
+
+  const saveKeyStable = snapshotAfter?.base?.metaStorage?.saveKey === SAVE_KEY;
+  const schemaVersion = Number(snapshotAfter?.base?.metaStorage?.summary?.schemaVersion);
+  const schemaStable = schemaVersion === META_SCHEMA_VERSION;
+  checks.push(createReleaseCheck({
+    id: "storage.schemaStable",
+    label: "存档 key/schema 稳定",
+    status: saveKeyStable && schemaStable ? "pass" : "fail",
+    severity: saveKeyStable && schemaStable ? "info" : "blocking",
+    details: {
+      summary: saveKeyStable && schemaStable
+        ? "SAVE_KEY 与 META_SCHEMA_VERSION 均稳定"
+        : "SAVE_KEY 或 schemaVersion 与基线不一致",
+      saveKey: snapshotAfter?.base?.metaStorage?.saveKey ?? null,
+      expectedSaveKey: SAVE_KEY,
+      schemaVersion,
+      expectedSchemaVersion: META_SCHEMA_VERSION
+    }
+  }));
+
+  const storageConsistent = isReleaseStorageSignatureConsistent(storageBefore, storageAfter);
+  checks.push(createReleaseCheck({
+    id: "storage.unchanged",
+    label: "storage signature 前后一致",
+    status: storageConsistent ? "pass" : "fail",
+    severity: storageConsistent ? "info" : "blocking",
+    details: {
+      summary: storageConsistent ? "storage signature 未变化" : "storage signature 发生变化",
+      before: storageBefore,
+      after: storageAfter
+    }
+  }));
+  if (!storageConsistent) {
+    residualRisks.push({
+      kind: "storage_mutation",
+      severity: "blocking",
+      summary: "runReleaseCandidateChecks 期间检测到 storage signature 变化",
+      details: {
+        before: storageBefore,
+        after: storageAfter
+      }
+    });
+  }
+
+  const frameTimingAvailable = !!frameTiming?.available;
+  checks.push(createReleaseCheck({
+    id: "frameTiming.available",
+    label: "frame timing 可用性",
+    status: frameTimingAvailable ? "pass" : "unknown",
+    severity: frameTimingAvailable ? "info" : "warn",
+    details: {
+      summary: frameTimingAvailable ? "frame timing 采样成功" : "frame timing 不可用，需人工补证",
+      mode: frameTiming?.mode || "unavailable",
+      reason: frameTiming?.reason || null
+    }
+  }));
+  if (!frameTimingAvailable) {
+    residualRisks.push({
+      kind: "frame_timing_unavailable",
+      severity: "warn",
+      summary: "frame timing 粗采样不可用，本次仅保留结构化快照证据",
+      details: {
+        frameTiming
+      }
+    });
+  }
+
+  const hasLongFrames = frameTimingAvailable && Number(frameTiming.longFrameCount) > 0;
+  checks.push(createReleaseCheck({
+    id: "frameTiming.longFrame",
+    label: "frame timing 长帧观察",
+    status: frameTimingAvailable ? (hasLongFrames ? "warn" : "pass") : "unknown",
+    severity: hasLongFrames ? "warn" : "info",
+    details: {
+      summary: frameTimingAvailable
+        ? (hasLongFrames ? `检测到 ${frameTiming.longFrameCount} 帧长帧` : "未检测到长帧")
+        : "未采到 frame timing",
+      sampleCount: frameTiming?.sampleCount || 0,
+      longFrameCount: frameTiming?.longFrameCount || 0,
+      thresholdMs: frameTiming?.longFrameThresholdMs || RELEASE_FRAME_TIMING_LONG_FRAME_MS
+    }
+  }));
+  if (hasLongFrames) {
+    residualRisks.push({
+      kind: "frame_long_warning",
+      severity: "warn",
+      summary: "frame timing 粗采样命中长帧，需结合人工体验判断是否阻塞",
+      details: {
+        longFrameCount: frameTiming.longFrameCount,
+        sampleCount: frameTiming.sampleCount,
+        thresholdMs: frameTiming.longFrameThresholdMs
+      }
+    });
+  }
+
+  const runtimeStateConsistent = isReleaseRuntimeStateSignatureConsistent(runtimeBefore, runtimeAfter);
+  checks.push(createReleaseCheck({
+    id: "runtimeState.signatureStable",
+    label: "运行态关键签名对比",
+    status: runtimeStateConsistent ? "pass" : "warn",
+    severity: runtimeStateConsistent ? "info" : "warn",
+    details: {
+      summary: runtimeStateConsistent
+        ? "resources/enemies/projectiles/run/priorityTarget 签名一致"
+        : "运行态签名有变化（可能来自自然帧推进）",
+      before: runtimeBefore,
+      after: runtimeAfter
+    }
+  }));
+  if (!runtimeStateConsistent) {
+    residualRisks.push({
+      kind: "runtime_state_drift",
+      severity: "warn",
+      summary: "运行态关键签名发生变化，需结合调用时机判断是否自然推进",
+      details: {
+        before: runtimeBefore,
+        after: runtimeAfter
+      }
+    });
+  }
+
+  if (snapshotAfter?.environment?.isHeadlessHint) {
+    residualRisks.push({
+      kind: "headless_hint",
+      severity: "warn",
+      summary: "当前环境疑似 headless，自动证据不能替代真实浏览器人工体验",
+      details: {
+        headlessReasons: snapshotAfter.environment.headlessReasons || []
+      }
+    });
+  }
+
+  residualRisks.push({
+    kind: "browser_uncovered",
+    severity: "info",
+    summary: "browser 层仍需 PM 补充 console 与真实浏览器路径证据",
+    details: {}
+  });
+  residualRisks.push({
+    kind: "manual_uncovered",
+    severity: "info",
+    summary: "manual 层默认未覆盖，自动检查不会标记人工通过",
+    details: {
+      checklistIds: [...RELEASE_MANUAL_CHECK_IDS]
+    }
+  });
+
+  const blockingFailed = checks.some((entry) => entry.layer === "automatic" && entry.status === "fail" && entry.severity === "blocking");
+  const ok = !blockingFailed && storageConsistent;
+  return { ok, checks, residualRisks };
+}
+
+function getReleaseReadinessSnapshot() {
+  return collectReleaseReadinessSnapshot();
+}
+
+async function runReleaseCandidateChecks(options = {}) {
+  const startedAt = Date.now();
+  bindPlaytestErrorListeners();
+  const sampleFrames = options?.sampleFrames ?? RELEASE_FRAME_TIMING_DEFAULT_SAMPLES;
+  const longFrameThresholdMs = options?.longFrameThresholdMs ?? RELEASE_FRAME_TIMING_LONG_FRAME_MS;
+  const storageSignatureBefore = captureReleaseStorageSignature();
+  const snapshotBefore = collectReleaseReadinessSnapshot({
+    storageSignature: storageSignatureBefore,
+    frameTiming: createReleaseFrameTimingUnavailableResult(
+      "pending_sampling",
+      normalizeReleaseSampleFrames(sampleFrames).requested,
+      normalizeReleaseSampleFrames(sampleFrames).effective,
+      Number.isFinite(Number(longFrameThresholdMs)) ? Number(longFrameThresholdMs) : RELEASE_FRAME_TIMING_LONG_FRAME_MS,
+      normalizeReleaseSampleFrames(sampleFrames).truncated
+    )
+  });
+  const runtimeStateSignatureBefore = snapshotBefore.runtimeStateSignature;
+  const frameTiming = await sampleReleaseFrameTiming(sampleFrames, longFrameThresholdMs);
+  const storageSignatureAfter = captureReleaseStorageSignature();
+  const snapshotAfter = collectReleaseReadinessSnapshot({
+    storageSignature: storageSignatureAfter,
+    frameTiming
+  });
+  const runtimeStateSignatureAfter = snapshotAfter.runtimeStateSignature;
+  const evaluated = evaluateReleaseCandidateChecks({
+    snapshotBefore,
+    snapshotAfter,
+    storageBefore: storageSignatureBefore,
+    storageAfter: storageSignatureAfter,
+    runtimeBefore: runtimeStateSignatureBefore,
+    runtimeAfter: runtimeStateSignatureAfter,
+    frameTiming
+  });
+  const evidence = buildReleaseEvidenceLayers(evaluated.checks, snapshotAfter.environment, snapshotAfter.base.viewport);
+  snapshotAfter.evidence = evidence;
+  const durationMs = Math.max(0, Date.now() - startedAt);
+  return safeDeepCloneForTest({
+    version: RELEASE_READINESS_VERSION,
+    capturedAt: Date.now(),
+    ok: evaluated.ok,
+    durationMs,
+    options: {
+      sampleFrames: normalizeReleaseSampleFrames(sampleFrames).requested,
+      longFrameThresholdMs: Number.isFinite(Number(longFrameThresholdMs))
+        ? Number(longFrameThresholdMs)
+        : RELEASE_FRAME_TIMING_LONG_FRAME_MS
+    },
+    checks: evaluated.checks,
+    snapshotBefore,
+    snapshotAfter,
+    residualRisks: evaluated.residualRisks,
+    notes: {
+      frameTimingMayAdvanceTime: true,
+      automaticCannotReplaceManual: true
+    }
+  });
+}
+
 function handlePlaytestEscapeKeydown() {
   if (isGalaxyMapPanelOpen()) {
     cancelGalaxyJump();
@@ -16340,6 +17362,26 @@ window.__gameTest.playtest = {
         review: safeDeepCloneForTest(review)
       }
     };
+  },
+  getReleaseReadinessSnapshot() {
+    return getReleaseReadinessSnapshot();
+  },
+  async runReleaseCandidateChecks(options = {}) {
+    return runReleaseCandidateChecks(options);
+  },
+  releaseCandidate: {
+    getSnapshot() {
+      return getReleaseReadinessSnapshot();
+    },
+    getReleaseReadinessSnapshot() {
+      return getReleaseReadinessSnapshot();
+    },
+    async runChecks(options = {}) {
+      return runReleaseCandidateChecks(options);
+    },
+    async runReleaseCandidateChecks(options = {}) {
+      return runReleaseCandidateChecks(options);
+    }
   },
   runAllSelfChecks() {
     return runAllPlaytestSelfChecks();
