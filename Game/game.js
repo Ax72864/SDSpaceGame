@@ -516,6 +516,18 @@ const ENEMY_WRECK_FACILITY_WEIGHTS = [
   ["armor", 0.15],
   ["repair", 0.10]
 ];
+// v0.8.0 derelict / signal wreck 设施权重（ADR §2.8；映射至现有 TYPES 设施）
+const DERELICT_FACILITY_WEIGHTS = [
+  ["plasma", 18], ["missile", 12], ["research", 10], ["power", 8],
+  ["turret", 5], ["shield", 6], ["armor", 5], ["mining", 6], ["processor", 5]
+];
+const SIGNAL_FACILITY_WEIGHTS = [
+  ["plasma", 22], ["missile", 6], ["research", 14], ["power", 14],
+  ["turret", 4], ["shield", 5], ["armor", 3], ["mining", 4], ["processor", 3]
+];
+const ENCOUNTER_NPC_COLOR_TRADER = [0.37, 0.77, 0.38, 1];
+const ENCOUNTER_NPC_COLOR_DISTRESS = [0.36, 0.88, 0.88, 1];
+const ENCOUNTER_NPC_COLOR_AMBUSH = [1, 0.27, 0.27, 1];
 const HOSTILE_STATION_WRECK_COUNT_BY_LEVEL = { 3: 6, 4: 9, 5: 12 };
 const HOSTILE_STATION_WRECK_SPAWN_RADIUS_MIN = 80;
 const HOSTILE_STATION_WRECK_SPAWN_RADIUS_MAX = 150;
@@ -2346,7 +2358,7 @@ const ENCOUNTER_TYPE_DEFAULTS = {
   defaultExpireMs: 60000
 };
 
-// 5 种事件骨架（T1 阶段仅元数据；具体 make/tick/onXxx 留 T3 实现）
+// 5 种事件完整实现（v0.8.0 T3）
 const ENCOUNTER_TYPES = {
   trader: {
     ...ENCOUNTER_TYPE_DEFAULTS,
@@ -2356,7 +2368,71 @@ const ENCOUNTER_TYPES = {
     spawnDistanceMin: 400,
     spawnDistanceMax: 600,
     cooldownTurns: 2,
-    defaultExpireMs: 30000
+    defaultExpireMs: 30000,
+    make(encounter, rng, level) {
+      const angle = Math.atan2(
+        state.station.pos.y - encounter.spawnPos.y,
+        state.station.pos.x - encounter.spawnPos.x
+      );
+      const sideAngle = angle + Math.PI / 2;
+      const dest = {
+        x: encounter.spawnPos.x + Math.cos(sideAngle) * 1200,
+        y: encounter.spawnPos.y + Math.sin(sideAngle) * 1200
+      };
+      const npc = createEncounterNpc("trader", encounter.id, {
+        pos: { ...encounter.spawnPos },
+        target: dest,
+        hp: 80,
+        maxHp: 80,
+        hudColor: ENCOUNTER_NPC_COLOR_TRADER,
+        speed: 80,
+        radius: 22
+      });
+      state.npcs.push(npc);
+      encounter.npcIds.push(npc.id);
+      showHostileStationAlert("贸易商船：靠近交易", 4000, false);
+      encounter.encounterData = {
+        tradeOption1: { cost: { metal: 50 }, reward: { plasma: 1 } },
+        tradeOption2: { cost: { metal: 100 }, reward: { research: 3 } },
+        traded: false,
+        tradeRangeRadius: 80,
+        playerInTradeRange: false
+      };
+    },
+    tick(encounter, dt) {
+      const npc = state.npcs.find((n) => n.id === encounter.npcIds[0]);
+      if (!npc || npc.destroyed) {
+        encounter.failed = true;
+        return;
+      }
+      if (npc.arrived) {
+        encounter.expired = true;
+        return;
+      }
+      const dist = Math.hypot(state.station.pos.x - npc.pos.x, state.station.pos.y - npc.pos.y);
+      encounter.encounterData.playerInTradeRange = dist < encounter.encounterData.tradeRangeRadius;
+    },
+    isComplete(encounter) {
+      return encounter.encounterData?.traded === true;
+    },
+    isFailed(encounter) {
+      return encounter.failed === true;
+    },
+    getDetail(encounter) {
+      if (encounter.encounterData?.traded) return "贸易已完成";
+      if (encounter.encounterData?.playerInTradeRange) return "靠近商船，按 T 交易";
+      return "贸易商船 - 接近交易";
+    },
+    getHint(encounter) {
+      return encounter.encounterData?.playerInTradeRange ? "T = 交易 · Y = 高级交易" : "";
+    },
+    render(encounter) {
+      const npc = state.npcs.find((n) => n.id === encounter.npcIds[0]);
+      const pos = npc?.pos || encounter.spawnPos;
+      if (!pos) return;
+      const pulse = 0.35 + 0.15 * Math.sin(state.time * Math.PI * 2);
+      renderer.ring(pos, 48, 2, [0.37, 0.77, 0.38, pulse], 32);
+    }
   },
   distress: {
     ...ENCOUNTER_TYPE_DEFAULTS,
@@ -2366,7 +2442,89 @@ const ENCOUNTER_TYPES = {
     spawnDistanceMin: 500,
     spawnDistanceMax: 800,
     cooldownTurns: 1,
-    defaultExpireMs: 45000
+    defaultExpireMs: 45000,
+    make(encounter, rng, level) {
+      const npc = createEncounterNpc("distress-pilot", encounter.id, {
+        pos: { ...encounter.spawnPos },
+        target: { ...encounter.spawnPos },
+        hp: 60,
+        maxHp: 60,
+        hudColor: ENCOUNTER_NPC_COLOR_DISTRESS,
+        speed: 20,
+        radius: 18
+      });
+      state.npcs.push(npc);
+      encounter.npcIds.push(npc.id);
+      const pirateCount = 4 + Math.floor(rng() * 3);
+      encounter.encounterData = {
+        pirateCount,
+        piratesKilled: 0,
+        pirateIds: [],
+        rescued: false
+      };
+      const lvl = levelIndex(level);
+      for (let i = 0; i < pirateCount; i++) {
+        const angle = (i / pirateCount) * Math.PI * 2;
+        const radius = 80 + rng() * 40;
+        const pos = {
+          x: encounter.spawnPos.x + Math.cos(angle) * radius,
+          y: encounter.spawnPos.y + Math.sin(angle) * radius
+        };
+        spawnEncounterPirate(encounter, pos, lvl, encounter.encounterData);
+      }
+      showHostileStationAlert("求救信号：友方被围困！", 5000, false);
+    },
+    tick(encounter, dt) {
+      const npc = state.npcs.find((n) => n.id === encounter.npcIds[0]);
+      if (!npc || npc.destroyed) {
+        if (!encounter.encounterData?.rescued) {
+          encounter.failed = true;
+          showHostileStationAlert("救援失败", 3000, false);
+        }
+        return;
+      }
+      const aliveCount = countAliveEncounterPirates(encounter.encounterData);
+      if (aliveCount === 0 && !encounter.encounterData.rescued) {
+        encounter.encounterData.rescued = true;
+        encounter.encounterData.reward = { metal: 120, research: 18, plasma: 5 };
+        showHostileStationAlert("救援成功！+120金属 +18科研 +5等离子", 4000, true);
+        const escapeAngle = Math.random() * Math.PI * 2;
+        npc.target = {
+          x: npc.pos.x + Math.cos(escapeAngle) * 1500,
+          y: npc.pos.y + Math.sin(escapeAngle) * 1500
+        };
+        npc.speed = 100;
+      }
+    },
+    onEnemyKilled(encounter, enemy) {
+      if (encounter.encounterData?.pirateIds?.includes(enemy)) {
+        encounter.encounterData.piratesKilled += 1;
+      }
+    },
+    onNpcDestroyed(encounter, npc) {
+      if (npc.id === encounter.npcIds[0]) {
+        encounter.failed = true;
+      }
+    },
+    isComplete(encounter) {
+      return encounter.encounterData?.rescued === true;
+    },
+    isFailed(encounter) {
+      return encounter.failed === true;
+    },
+    getDetail(encounter) {
+      if (encounter.encounterData?.rescued) return "救援完成";
+      const alive = countAliveEncounterPirates(encounter.encounterData);
+      return `救援请求：清除海盗（${alive} 剩余）`;
+    },
+    getHint(encounter) {
+      return encounter.encounterData?.rescued ? "" : "击败围困海盗";
+    },
+    render(encounter) {
+      if (!encounter.spawnPos) return;
+      const pulse = 0.4 + 0.35 * Math.sin(state.time * Math.PI * 4);
+      renderer.ring(encounter.spawnPos, 56, 2.5, [0.36, 0.88, 0.88, pulse], 36);
+    }
   },
   ambush: {
     ...ENCOUNTER_TYPE_DEFAULTS,
@@ -2376,7 +2534,111 @@ const ENCOUNTER_TYPES = {
     spawnDistanceMin: 600,
     spawnDistanceMax: 900,
     cooldownTurns: 1,
-    defaultExpireMs: 60000
+    defaultExpireMs: 60000,
+    make(encounter, rng, level) {
+      const npc = createEncounterNpc("distress-pilot", encounter.id, {
+        pos: { ...encounter.spawnPos },
+        target: { ...encounter.spawnPos },
+        hp: 60,
+        maxHp: 60,
+        hudColor: ENCOUNTER_NPC_COLOR_DISTRESS,
+        speed: 20,
+        radius: 18
+      });
+      npc._isAmbushDecoy = true;
+      state.npcs.push(npc);
+      encounter.npcIds.push(npc.id);
+      encounter.encounterData = {
+        triggered: false,
+        pirateCount: 6 + Math.floor(rng() * 3),
+        pirateIds: [],
+        triggerRange: 300,
+        escapeRange: 500,
+        victorious: false
+      };
+      showHostileStationAlert("收到求救信号...", 4000, false);
+    },
+    tick(encounter, dt) {
+      const data = encounter.encounterData;
+      if (!data) return;
+      const npc = state.npcs.find((n) => n.id === encounter.npcIds[0]);
+      if (!data.triggered) {
+        if (!npc) return;
+        const dist = Math.hypot(state.station.pos.x - npc.pos.x, state.station.pos.y - npc.pos.y);
+        if (dist < data.triggerRange) {
+          data.triggered = true;
+          npc.kind = "pirate-ambush";
+          npc.hudColor = ENCOUNTER_NPC_COLOR_AMBUSH;
+          const lvl = levelIndex(state.run.level);
+          for (let i = 0; i < data.pirateCount; i++) {
+            const angle = (i / data.pirateCount) * Math.PI * 2;
+            const radius = 100 + Math.random() * 50;
+            const pos = {
+              x: encounter.spawnPos.x + Math.cos(angle) * radius,
+              y: encounter.spawnPos.y + Math.sin(angle) * radius
+            };
+            spawnEncounterPirate(encounter, pos, lvl, data);
+          }
+          showHostileStationAlert("陷阱！海盗伏击！", 3000, false);
+        } else if (dist > data.escapeRange + 200) {
+          encounter.expired = true;
+        }
+      } else {
+        const aliveCount = countAliveEncounterPirates(data);
+        if (aliveCount === 0 && !data.victorious) {
+          data.victorious = true;
+          data.reward = { metal: 200, research: 25, plasma: 0 };
+          showHostileStationAlert("伏击击退！+200金属 +25科研", 4000, true);
+          const wreckRng = getEncounterRng(state.run.level);
+          for (let i = 0; i < 3; i++) {
+            const angle = wreckRng() * Math.PI * 2;
+            const radius = 80 + wreckRng() * 60;
+            const pos = {
+              x: encounter.spawnPos.x + Math.cos(angle) * radius,
+              y: encounter.spawnPos.y + Math.sin(angle) * radius
+            };
+            const fragment = makeWreckFragment(pos, wreckRng, {
+              weights: ENEMY_WRECK_FACILITY_WEIGHTS,
+              origin: "enemy-wreck"
+            });
+            if (fragment) {
+              state.fragments.push(fragment);
+              encounter.fragmentIds.push(fragment.id);
+            }
+          }
+        }
+      }
+    },
+    onEnemyKilled(encounter, enemy) {
+      if (encounter.encounterData?.pirateIds?.includes(enemy)) {
+        encounter.encounterData.piratesKilled = (encounter.encounterData.piratesKilled || 0) + 1;
+      }
+    },
+    isComplete(encounter) {
+      return encounter.encounterData?.victorious === true;
+    },
+    isFailed() {
+      return false;
+    },
+    getDetail(encounter) {
+      const data = encounter.encounterData;
+      if (data?.victorious) return "伏击已击退";
+      if (data?.triggered) {
+        const alive = countAliveEncounterPirates(data);
+        return `海盗伏击！${alive} 剩余`;
+      }
+      return "求救信号（疑似陷阱）";
+    },
+    getHint(encounter) {
+      return encounter.encounterData?.triggered ? "击退伏击者" : "靠近调查或远离脱险";
+    },
+    render(encounter) {
+      if (!encounter.spawnPos) return;
+      const triggered = encounter.encounterData?.triggered;
+      const color = triggered ? ENCOUNTER_NPC_COLOR_AMBUSH : ENCOUNTER_NPC_COLOR_DISTRESS;
+      const pulse = 0.35 + 0.2 * Math.sin(state.time * Math.PI * (triggered ? 6 : 2));
+      renderer.ring(encounter.spawnPos, triggered ? 64 : 52, 2, [color[0], color[1], color[2], pulse], 32);
+    }
   },
   derelict: {
     ...ENCOUNTER_TYPE_DEFAULTS,
@@ -2386,7 +2648,54 @@ const ENCOUNTER_TYPES = {
     spawnDistanceMin: 700,
     spawnDistanceMax: 1100,
     cooldownTurns: 1,
-    defaultExpireMs: 99999999
+    defaultExpireMs: 99999999,
+    make(encounter, rng, level) {
+      const lvl = levelIndex(level);
+      const wreckCount = lvl <= 1 ? 4 : (lvl <= 3 ? 5 : 6);
+      encounter.encounterData = { wreckCount, wrecksDocked: 0 };
+      for (let i = 0; i < wreckCount; i++) {
+        const angle = (i / wreckCount) * Math.PI * 2 + rng() * 0.5;
+        const radius = 80 + rng() * 40;
+        const pos = {
+          x: encounter.spawnPos.x + Math.cos(angle) * radius,
+          y: encounter.spawnPos.y + Math.sin(angle) * radius
+        };
+        const fragment = makeWreckFragment(pos, rng, {
+          weights: DERELICT_FACILITY_WEIGHTS,
+          origin: "derelict"
+        });
+        if (fragment) {
+          state.fragments.push(fragment);
+          encounter.fragmentIds.push(fragment.id);
+        }
+      }
+      showHostileStationAlert("发现沉船秘窟！", 4000, false);
+    },
+    tick() {},
+    onFragmentDocked(encounter, fragment) {
+      if (!encounter.fragmentIds.includes(fragment.id)) return;
+      encounter.encounterData.wrecksDocked += 1;
+      if (encounter.encounterData.wrecksDocked >= encounter.encounterData.wreckCount) {
+        showHostileStationAlert("沉船秘窟拾荒完成！", 3000, true);
+      }
+    },
+    isComplete(encounter) {
+      return (encounter.encounterData?.wrecksDocked || 0) >= (encounter.encounterData?.wreckCount || 0);
+    },
+    isFailed() {
+      return false;
+    },
+    getDetail(encounter) {
+      const data = encounter.encounterData || {};
+      return `沉船秘窟 ${data.wrecksDocked || 0}/${data.wreckCount || 0}`;
+    },
+    getHint() {
+      return "拾荒 wreck";
+    },
+    render(encounter) {
+      if (!encounter.spawnPos) return;
+      renderer.ring(encounter.spawnPos, 90, 2, [0.7, 0.5, 1, 0.28], 40);
+    }
   },
   signal: {
     ...ENCOUNTER_TYPE_DEFAULTS,
@@ -2396,7 +2705,47 @@ const ENCOUNTER_TYPES = {
     spawnDistanceMin: 800,
     spawnDistanceMax: 1400,
     cooldownTurns: 1,
-    defaultExpireMs: 99999999
+    defaultExpireMs: 99999999,
+    make(encounter, rng, level) {
+      const cellCount = 6 + Math.floor(rng() * 4);
+      const fragment = makeWreckFragment(encounter.spawnPos, rng, {
+        weights: SIGNAL_FACILITY_WEIGHTS,
+        origin: "signal",
+        cellCountRange: { min: cellCount, max: cellCount }
+      });
+      if (fragment) {
+        state.fragments.push(fragment);
+        encounter.fragmentIds.push(fragment.id);
+        encounter.encounterData = { docked: false };
+      } else {
+        encounter.failed = true;
+      }
+      showHostileStationAlert("神秘信号已锁定", 3000, false);
+    },
+    tick() {},
+    onFragmentDocked(encounter, fragment) {
+      if (!encounter.fragmentIds.includes(fragment.id)) return;
+      encounter.encounterData.docked = true;
+      showHostileStationAlert("神秘信号已回收！", 3000, true);
+    },
+    isComplete(encounter) {
+      return encounter.encounterData?.docked === true;
+    },
+    isFailed() {
+      return false;
+    },
+    getDetail(encounter) {
+      return encounter.encounterData?.docked ? "信号已回收" : "神秘信号 - 远距离拾荒";
+    },
+    getHint() {
+      return "飞往信号点回收 fragment";
+    },
+    render(encounter) {
+      if (!encounter.spawnPos) return;
+      const pulse = 0.45 + 0.35 * Math.sin(state.time * Math.PI * 2.5);
+      renderer.ring(encounter.spawnPos, 72, 3, [1, 0.8, 0.2, pulse], 36);
+      renderer.ring(encounter.spawnPos, 40, 1.5, [1, 0.95, 0.55, pulse * 0.8], 24);
+    }
   }
 };
 
@@ -2604,6 +2953,49 @@ function pickEncounterSpawnPos(type, rng) {
   return null;
 }
 
+function spawnEncounterPirate(encounter, pos, level, data) {
+  const enemy = spawnEnemy("pirate", pos.x, pos.y, { level });
+  if (!enemy) return null;
+  enemy._encounterId = encounter.id;
+  if (!data.pirateIds) data.pirateIds = [];
+  data.pirateIds.push(enemy);
+  if (!encounter.enemyIds) encounter.enemyIds = [];
+  encounter.enemyIds.push(enemy);
+  return enemy;
+}
+
+function countAliveEncounterPirates(data) {
+  if (!data?.pirateIds?.length) return 0;
+  return data.pirateIds.filter((enemy) => {
+    if (!enemy || enemy.hp <= 0) return false;
+    return state.enemies.includes(enemy);
+  }).length;
+}
+
+function performTraderTrade(encounter, optionIndex) {
+  const data = encounter?.encounterData;
+  if (!data || data.traded) return false;
+  const option = optionIndex === 2 ? data.tradeOption2 : data.tradeOption1;
+  if (!option) return false;
+  if (option.cost.metal && state.resources.metal < option.cost.metal) return false;
+  if (option.cost.metal) state.resources.metal -= option.cost.metal;
+  if (option.reward.plasma) state.resources.plasma += option.reward.plasma;
+  if (option.reward.research) state.resources.research = (state.resources.research || 0) + option.reward.research;
+  data.traded = true;
+  showHostileStationAlert("贸易完成", 3000, true);
+  return true;
+}
+
+function renderEncounters() {
+  if (!Array.isArray(state.run.encounters)) return;
+  for (const encounter of state.run.encounters) {
+    if (!encounter || encounter.expired) continue;
+    if (encounter.state !== "active") continue;
+    const type = ENCOUNTER_TYPES[encounter.type];
+    if (type?.render) type.render(encounter);
+  }
+}
+
 // ENCOUNTER 主循环：与 updateObjective(dt) 并行；在 update() 末尾 updateObjective 之后、
 // updateCamera 之前调用（确保 objective 先于 encounter tick，camera 更新前 encounter 状态已就绪）。
 function updateEncounters(dt) {
@@ -2621,6 +3013,10 @@ function updateEncounters(dt) {
 
     if (encounter.state === "active") {
       if (typeof type.tick === "function") type.tick(encounter, dt);
+      if (encounter.expired && !encounter.completed && !encounter.failed) {
+        expireEncounter(encounter);
+        continue;
+      }
       if (!encounter.completed && !encounter.failed && type.isComplete(encounter)) {
         encounter.completed = true;
         encounter.state = "complete";
@@ -2655,13 +3051,28 @@ function activateEncounter(encounter) {
   encounter.state = "active";
   const expireSeconds = encounter._defaultExpireSeconds ?? (type.defaultExpireMs / 1000);
   encounter.expireAt = Number.isFinite(expireSeconds) ? state.time + expireSeconds : null;
-  // T3：在此调用 type.make(rng, level, pos) 进一步初始化（生成 NPC / fragment 等）
+  if (typeof type.make === "function") {
+    type.make(encounter, rng, state.run.level);
+  }
+  state.run.encounterCooldownThisGalaxy.add(encounter.type);
 }
 
 function expireEncounter(encounter) {
+  if (!encounter || encounter.state === "expired") return;
   encounter.expired = true;
   encounter.state = "expired";
-  // T3：在此清理事件 NPC / fragment（让 NPC.arrived = true、fragment 保留至 nextLevel）
+  const npcIdSet = new Set(encounter.npcIds || []);
+  state.npcs = state.npcs.filter((npc) => !npcIdSet.has(npc.id));
+  if (!encounter.completed && !encounter.failed) {
+    const typeNames = {
+      trader: "贸易商船",
+      distress: "求救",
+      ambush: "陷阱",
+      derelict: "沉船",
+      signal: "信号"
+    };
+    showHostileStationAlert(`${typeNames[encounter.type] || "事件"}已离开`, 2000, false);
+  }
 }
 
 // HUD 中央 alert priority 队列：T1+T2 阶段 stub，避免 updateEncounters 调用报错；
@@ -3324,6 +3735,18 @@ function bindInput() {
         adjustSalvoSize(+1);
         event.preventDefault();
       }
+    } else if (
+      !(document.activeElement && document.activeElement.tagName === "INPUT") &&
+      (key === "t" || key === "y")
+    ) {
+      for (const enc of state.run.encounters || []) {
+        if (enc.type !== "trader" || enc.completed || enc.failed || enc.expired) continue;
+        if (enc.encounterData?.playerInTradeRange) {
+          performTraderTrade(enc, key === "y" ? 2 : 1);
+          event.preventDefault();
+          return;
+        }
+      }
     }
   });
 
@@ -3475,8 +3898,10 @@ function pickEnemyWreckFacility(rng) {
   return pickWreckFacilityWithWeights(rng, ENEMY_WRECK_FACILITY_WEIGHTS);
 }
 
-function buildWreckShape(rng) {
-  const cellCount = rngInt(rng, 2, 5);
+function buildWreckShape(rng, cellCountRange) {
+  const cellCount = cellCountRange
+    ? rngInt(rng, cellCountRange.min, cellCountRange.max)
+    : rngInt(rng, 2, 5);
   const cells = [{ x: 0, y: 0 }];
   const occupied = new Set(["0,0"]);
   const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
@@ -3509,7 +3934,7 @@ function makeWreckFragment(pos, rng, options = {}) {
   const pickFacility = options.weights === ENEMY_WRECK_FACILITY_WEIGHTS
     ? pickEnemyWreckFacility
     : (r) => pickWreckFacilityWithWeights(r, facilityWeights);
-  const shape = buildWreckShape(rng);
+  const shape = buildWreckShape(rng, options.cellCountRange);
   const cells = new Map();
   for (const slot of shape) {
     const facility = pickFacility(rng);
@@ -3774,14 +4199,30 @@ function tickFriendlyCargoLikeNpc(npc, dt) {
   }
 }
 
-// trader 漂流商船 AI：T3 实现"平行玩家速度方向巡航 + 30s 离场"
-function tickTraderNpc(_npc, _dt) {
-  // intentional no-op until T3
+// trader 漂流商船 AI：平行巡航，到达终点后离场
+function tickTraderNpc(npc, dt) {
+  if (!npc?.target) return;
+  const dx = npc.target.x - npc.pos.x;
+  const dy = npc.target.y - npc.pos.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 20) {
+    npc.arrived = true;
+    npc.vel.x = 0;
+    npc.vel.y = 0;
+    return;
+  }
+  npc.vel.x = (dx / d) * npc.speed;
+  npc.vel.y = (dy / d) * npc.speed;
+  npc.pos.x += npc.vel.x * dt;
+  npc.pos.y += npc.vel.y * dt;
+  npc.angle = Math.atan2(npc.vel.y, npc.vel.x);
 }
 
-// pirate-ambush 伪装陷阱海盗 AI：T3 实现"显形后追玩家 + 攻击"
-function tickPirateAmbushNpc(_npc, _dt) {
-  // intentional no-op until T3
+// pirate-ambush 伪装陷阱：显形标记，静止展示
+function tickPirateAmbushNpc(npc, dt) {
+  if (!npc || npc.destroyed) return;
+  npc.vel.x = 0;
+  npc.vel.y = 0;
 }
 
 function collideNpcWithEnemies(npc, dt) {
@@ -5920,6 +6361,7 @@ function render() {
   renderTargetAndObjective();
   renderFragments();
   renderNpcs();
+  renderEncounters();
   renderStation();
   renderBridgePreview();
   renderMiningEffects();
@@ -7189,6 +7631,40 @@ window.__gameTest = {
       pointsGain: state.meta.points - pointsBefore
     };
   },
+  getEncounters() {
+    return (state.run.encounters || []).map((enc) => ({
+      id: enc.id,
+      type: enc.type,
+      state: enc.state,
+      completed: enc.completed,
+      failed: enc.failed,
+      expired: enc.expired,
+      encounterData: enc.encounterData
+    }));
+  },
+  forceActivateEncounters() {
+    for (const enc of state.run.encounters || []) {
+      if (enc.state === "pending") {
+        enc.triggerAt = state.time;
+        activateEncounter(enc);
+      }
+    }
+    return this.getEncounters();
+  },
+  advanceEncounters(seconds = 65) {
+    const dt = 0.05;
+    const steps = Math.ceil(seconds / dt);
+    for (let i = 0; i < steps; i++) {
+      state.time += dt;
+      updateEncounters(dt);
+    }
+    return this.getEncounters();
+  },
+  tradeEncounter(encounterId, optionIndex = 1) {
+    const enc = (state.run.encounters || []).find((entry) => entry.id === encounterId);
+    if (!enc) return { ok: false, reason: "not found" };
+    return { ok: performTraderTrade(enc, optionIndex), encounter: enc.id };
+  },
   getCellStat,
   applyModification,
   unlockGlobalResearch,
@@ -7220,6 +7696,14 @@ window.__gameTest = {
       playerCount: countPlayerFragments()
     };
   }
+};
+
+window.__gameTest.performTraderTrade = function performTraderTradeForTest(encounterRef, optionIndex = 1) {
+  const enc = typeof encounterRef === "object"
+    ? encounterRef
+    : (state.run.encounters || []).find((entry) => entry.id === encounterRef);
+  if (!enc) return false;
+  return performTraderTrade(enc, optionIndex);
 };
 
 function loop(now) {
