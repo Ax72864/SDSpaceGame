@@ -694,7 +694,7 @@ const SELECTED_DIAGNOSTICS_COPY = {
   shield_no_power: "护盾缺电：补供电后恢复拦截",
   shield_broken: "护盾已被打破，正在恢复",
   armor_note: "高耐久护甲层，吸收伤害",
-  repair_active: "维修可用：会派出无人机修复最近受损设施",
+  repair_active: "维修可用：会派出无人机修复受损目标",
   repair_no_power: "维修缺电：补供电后恢复",
   repair_idle: "维修就绪：当前无受损目标",
   power_out: "产电",
@@ -715,7 +715,7 @@ const PLACEMENT_DIAGNOSTICS_COPY = {
   weapon_tip: "建议放在外缘，减少自机遮挡射线",
   shield_tip: "定向护盾需朝向主要来袭方向",
   repair_tip: "靠近核心或受损密集区，维修响应更快",
-  power_tip: "优先放在耗电设施附近，稳定供电",
+  power_tip: "先补发电或关闭低优先级耗电设施，稳定供电",
   can_place: "可放置",
   margin_after: "建后余量"
 };
@@ -7108,7 +7108,7 @@ function getSelectedCellWeaponDiagnostics(cell) {
   if (!cell.active) {
     return { losAvailable: null, rangeText, statusKey: "weapon_no_power" };
   }
-  const enemy = selectTarget(origin, range);
+  const enemy = selectTargetReadOnly(origin, range);
   if (!enemy) {
     return { losAvailable: null, rangeText, statusKey: "weapon_no_target" };
   }
@@ -10137,6 +10137,24 @@ function nearestEnemy(origin, range) {
   return best;
 }
 
+function getPriorityTargetCandidate(origin, range) {
+  const pt = state.input.priorityTarget;
+  if (!pt || !pt.enemy) return { enemy: null, stale: false };
+  const enemy = pt.enemy;
+  const enemyValid = enemy.hp > 0;
+  const notExpired = (state.time - pt.setAt) < PRIORITY_TARGET_LIFETIME;
+  const stationToEnemyDist = dist(state.station.pos, enemy);
+  const inSightOfStation = stationToEnemyDist < PRIORITY_TARGET_BREAK_DISTANCE;
+  const stale = !enemyValid || !notExpired || !inSightOfStation;
+  if (stale || dist(origin, enemy) > range) return { enemy: null, stale };
+  return { enemy, stale: false };
+}
+
+function selectTargetReadOnly(origin, range) {
+  const priority = getPriorityTargetCandidate(origin, range);
+  return priority.enemy || nearestEnemy(origin, range);
+}
+
 // v0.7.0：清除优先目标锁定
 function clearPriorityTarget() {
   state.input.priorityTarget = null;
@@ -10172,19 +10190,9 @@ function handleRightClick(world) {
 
 // v0.7.0：武器索敌统一入口；有效 priorityTarget 优先，否则 fallback nearestEnemy
 function selectTarget(origin, range) {
-  const pt = state.input.priorityTarget;
-  if (pt && pt.enemy) {
-    const enemy = pt.enemy;
-    const enemyValid = enemy.hp > 0;
-    const notExpired = (state.time - pt.setAt) < PRIORITY_TARGET_LIFETIME;
-    const stationToEnemyDist = dist(state.station.pos, enemy);
-    const inSightOfStation = stationToEnemyDist < PRIORITY_TARGET_BREAK_DISTANCE;
-    if (!enemyValid || !notExpired || !inSightOfStation) {
-      clearPriorityTarget();
-    } else if (dist(origin, enemy) <= range) {
-      return enemy;
-    }
-  }
+  const priority = getPriorityTargetCandidate(origin, range);
+  if (priority.stale) clearPriorityTarget();
+  if (priority.enemy) return priority.enemy;
   return nearestEnemy(origin, range);
 }
 
@@ -11341,8 +11349,15 @@ function buildResourceGuideHtml() {
 
   if (state.selectedBuild && state.selectedBuild !== "frame" && state.input.mouseWorld) {
     const grid = worldToGrid(state.input.mouseWorld);
+    const preview = state.placementPreview;
+    const diagnostics = preview
+      && preview.facility === state.selectedBuild
+      && preview.gridX === grid.x
+      && preview.gridY === grid.y
+      ? preview
+      : getPlacementDiagnostics(state.selectedBuild, grid.x, grid.y);
     const placementLine = buildPlacementResourceGuideLine(
-      getPlacementDiagnostics(state.selectedBuild, grid.x, grid.y)
+      diagnostics
     );
     if (placementLine) lines.push(placementLine);
   }
