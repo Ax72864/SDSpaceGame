@@ -21,6 +21,17 @@ const runSettlementStatsEl = document.getElementById("runSettlementStats");
 const quickRestartBtnEl = document.getElementById("quickRestartBtn");
 
 const CELL = 30;
+
+const PRIORITY_TARGET_LIFETIME = 12.0;
+const PRIORITY_TARGET_LOCK_RADIUS = 48;
+const PRIORITY_TARGET_BREAK_DISTANCE = 800;
+const F_FIRE_DEBOUNCE_MS = 300;
+const LOS_BLOCK_WARN_DURATION = 0.5;
+const LOS_BLOCK_WARN_COOLDOWN = 5.0;
+const PRIORITY_TARGET_RING_PULSE_PERIOD = 1.0;
+const PRIORITY_TARGET_RING_ROTATE_RATE = 1.0;
+const SALVO_SIZE_OPTIONS = [1, 2, 3, 999];
+
 const SAVE_KEY = "star-ring-station-meta-v1";
 const ASYNC_KEY = "star-ring-station-async-v1";
 const PLAYER_SCALE_KEY = "star-ring-station-players-v1";
@@ -671,7 +682,13 @@ const state = {
   input: {
     moveKeys: new Set(),
     mouseWorld: null,
-    controlMode: "screen"
+    controlMode: "screen",
+    priorityTarget: null,
+    aimingRightButton: false,
+    _fLastFireAt: 0
+  },
+  missile: {
+    salvoSize: 1
   },
   lastBuildError: "",
   buildHint: "",
@@ -993,6 +1010,17 @@ function ensureRunRuntimeState() {
       palette: GALAXY_PALETTES.sun,
       paletteKey: "sun"
     };
+  }
+  if (!state.input || typeof state.input !== "object") {
+    state.input = { moveKeys: new Set(), mouseWorld: null, controlMode: "screen" };
+  }
+  if (!(state.input.moveKeys instanceof Set)) state.input.moveKeys = new Set();
+  if (state.input.priorityTarget === undefined) state.input.priorityTarget = null;
+  if (typeof state.input.aimingRightButton !== "boolean") state.input.aimingRightButton = false;
+  if (!Number.isFinite(state.input._fLastFireAt)) state.input._fLastFireAt = 0;
+  if (!state.missile || typeof state.missile !== "object") state.missile = { salvoSize: 1 };
+  if (!Number.isFinite(state.missile.salvoSize) || state.missile.salvoSize <= 0) {
+    state.missile.salvoSize = 1;
   }
 }
 
@@ -2837,7 +2865,18 @@ function enemyActivityPointReward(kind) {
 }
 
 function bindInput() {
+  canvas.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+  });
+
   canvas.addEventListener("pointerdown", (event) => {
+    if (event.button === 2) {
+      state.input.aimingRightButton = true;
+      const world = renderer.screenToWorld({ x: event.clientX, y: event.clientY });
+      handleRightClick(world);
+      event.preventDefault();
+      return;
+    }
     canvas.setPointerCapture(event.pointerId);
     state.drag = {
       id: event.pointerId,
@@ -2867,6 +2906,11 @@ function bindInput() {
   });
 
   canvas.addEventListener("pointerup", (event) => {
+    if (event.button === 2) {
+      state.input.aimingRightButton = false;
+      event.preventDefault();
+      return;
+    }
     if (!state.drag || state.drag.id !== event.pointerId) return;
     const wasClick = !state.drag.moved;
     state.drag = null;
@@ -2877,6 +2921,7 @@ function bindInput() {
 
   canvas.addEventListener("pointercancel", () => {
     state.drag = null;
+    state.input.aimingRightButton = false;
   });
 
   window.addEventListener("keydown", (event) => {
@@ -4824,7 +4869,7 @@ function spawnEnemy(kind, x, y, options = {}) {
 function updateTurret(cell, dt) {
   if (cell.reload > 0) return;
   const origin = cellWorldPosition(cell);
-  const enemy = nearestEnemy(origin, getCellStat(cell, "range"));
+  const enemy = selectTarget(origin, getCellStat(cell, "range"));
   if (!enemy || !hasLineOfSight(origin, enemy)) return;
   const dir = normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
   cell.reload = getCellStat(cell, "reload");
@@ -4872,10 +4917,24 @@ function updateShield(cell) {
 }
 
 function fireMissiles() {
+  const readyEntries = [];
+  for (const [cellKey, cell] of state.station.cells) {
+    if (cell.facility !== "missile") continue;
+    if (!cell.active || cell.reload > 0 || cell.detached) continue;
+    readyEntries.push({ cellKey, cell });
+  }
+  if (readyEntries.length === 0) {
+    showToast("没有可发射的导弹井或目标。");
+    return;
+  }
+  readyEntries.sort((a, b) => (a.cellKey < b.cellKey ? -1 : a.cellKey > b.cellKey ? 1 : 0));
+  const salvoSize = state.missile.salvoSize || 1;
+  const toFire = readyEntries.slice(0, Math.min(salvoSize, readyEntries.length));
+
   let fired = 0;
-  for (const cell of state.station.cells.values()) {
-    if (cell.facility !== "missile" || !cell.active || cell.reload > 0 || cell.detached) continue;
-    const enemy = nearestEnemy(cellWorldPosition(cell), getCellStat(cell, "range"));
+  for (const { cell } of toFire) {
+    const origin = cellWorldPosition(cell);
+    const enemy = selectTarget(origin, getCellStat(cell, "range"));
     if (!enemy) continue;
     const gasCost = TYPES.missile.baseStats.gasCost;
     const metalCost = TYPES.missile.baseStats.metalCost;
@@ -4885,7 +4944,6 @@ function fireMissiles() {
     }
     state.resources.gas -= gasCost;
     state.resources.metal -= metalCost;
-    const origin = cellWorldPosition(cell);
     const projectileCount = Math.max(1, Math.floor(getCellStat(cell, "projectileCount")));
     const projectileSpeed = getCellStat(cell, "projectileSpeed");
     const baseProjectileSpeed = TYPES.missile.baseStats.projectileSpeed;
@@ -4924,6 +4982,53 @@ function nearestEnemy(origin, range) {
     }
   }
   return best;
+}
+
+function clearPriorityTarget() {
+  state.input.priorityTarget = null;
+}
+
+function setPriorityTarget(world) {
+  let closest = null;
+  let closestDist = Infinity;
+  for (const enemy of state.enemies) {
+    if (!enemy || enemy.hp <= 0) continue;
+    const d = dist(world, enemy);
+    if (d < PRIORITY_TARGET_LOCK_RADIUS && d < closestDist) {
+      closest = enemy;
+      closestDist = d;
+    }
+  }
+  if (closest) {
+    state.input.priorityTarget = {
+      enemy: closest,
+      setAt: state.time,
+      validUntil: state.time + PRIORITY_TARGET_LIFETIME
+    };
+  } else {
+    clearPriorityTarget();
+  }
+}
+
+function handleRightClick(world) {
+  setPriorityTarget(world);
+}
+
+function selectTarget(origin, range) {
+  const pt = state.input.priorityTarget;
+  if (pt && pt.enemy) {
+    const enemy = pt.enemy;
+    const enemyValid = enemy.hp > 0;
+    const notExpired = (state.time - pt.setAt) < PRIORITY_TARGET_LIFETIME;
+    const stationToEnemyDist = dist(state.station.pos, enemy);
+    const inSightOfStation = stationToEnemyDist < PRIORITY_TARGET_BREAK_DISTANCE;
+    if (!enemyValid || !notExpired || !inSightOfStation) {
+      clearPriorityTarget();
+    } else if (dist(origin, enemy) <= range) {
+      return enemy;
+    }
+  }
+  return nearestEnemy(origin, range);
 }
 
 function fireProjectile(origin, dir, owner, damage, speed) {
@@ -5536,7 +5641,7 @@ function renderShield(cell, p, angle) {
 }
 
 function shieldDirection(cell, origin = cellWorldPosition(cell), angle = state.station.angle) {
-  const enemy = nearestEnemy(origin, 420);
+  const enemy = selectTarget(origin, 420);
   if (enemy) return normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
   return rotate(thrusterNozzle(cell), angle);
 }
@@ -6310,6 +6415,10 @@ window.__gameTest = {
     state.run.escortLowHpAlerted = false;
     state.run.hostileStationSpawnedThisGalaxy = false;
     state.run.hostileStationAlerted = false;
+    state.input.priorityTarget = null;
+    state.input.aimingRightButton = false;
+    state.input._fLastFireAt = 0;
+    state.missile.salvoSize = 1;
     state.meta.points = 0;
     state.resources.research = 0;
     state.station.hullMod = 1;
