@@ -766,6 +766,8 @@ const THREAT_ALERT_COOLDOWN_SEC = 8;
 const THREAT_STATUS_ALERT_MAX = 1;
 const COMBAT_WEAPON_ALERT_MAX = 1;
 const WEAPON_EFFECTIVENESS_ALERT_COOLDOWN_SEC = 8;
+const COMBAT_REVIEW_SAMPLE_INTERVAL = 0.18;
+const COMBAT_REVIEW_VISIBLE_SEC = 12;
 
 const WEAPON_EFFECTIVENESS_COPY = Object.freeze({
   weapon_no_power: "炮塔缺电，无法开火",
@@ -801,9 +803,27 @@ const DAMAGE_SOURCE_LABELS = Object.freeze({
 const DAMAGE_SOURCE_REASON_KEYS = Object.freeze({
   pirate: "station_under_pirate_fire",
   asteroid: "station_under_asteroid_impact",
+  station: "station_under_hostile_station_fire",
+  guardian: "station_under_hostile_station_fire",
   "hostile-station": "station_under_hostile_station_fire",
-  enemy_fire: "station_under_pirate_fire",
+  enemy_fire: "station_under_hostile_station_fire",
   collision: "station_under_asteroid_impact"
+});
+
+const DAMAGE_SOURCE_KEY_ALIASES = Object.freeze({
+  station_under_asteroid_impact: "asteroid",
+  asteroid_collision_risk: "asteroid",
+  main_damage_asteroid: "asteroid",
+  station_under_pirate_fire: "pirate",
+  pirate_closing: "pirate",
+  main_damage_pirate: "pirate",
+  station_under_hostile_station_fire: "station",
+  hostile_station_pressure: "hostile-station",
+  boss_in_weapon_range: "hostile-station",
+  guardian_pressure: "guardian",
+  main_damage_guardian: "guardian",
+  main_damage_hostile_station: "hostile-station",
+  main_damage_station: "station"
 });
 
 const SALVO_SIZE_LABELS = Object.freeze({
@@ -841,6 +861,33 @@ const THREAT_DIRECTION_ARROWS = Object.freeze({
   downLeft: "↙",
   left: "←",
   upLeft: "↖"
+});
+
+const COMBAT_REVIEW_SOURCE_REASON_KEYS = Object.freeze({
+  pirate: "main_damage_pirate",
+  asteroid: "main_damage_asteroid",
+  station: "main_damage_station",
+  guardian: "main_damage_guardian",
+  "hostile-station": "main_damage_hostile_station",
+  enemy_fire: "main_damage_station"
+});
+
+const COMBAT_REVIEW_AREA_REASON_KEYS = Object.freeze({
+  core: "worst_area_core",
+  thrust: "worst_area_thrust",
+  weapon: "worst_area_weapon",
+  defense: "worst_area_defense",
+  power: "worst_area_power",
+  mining: "worst_area_mining"
+});
+
+const COMBAT_REVIEW_RECOMMENDATION_COPY = Object.freeze({
+  rebuild_shield: "可考虑补充或修复护盾覆盖。",
+  add_power_source: "可考虑增加发电，优先恢复关键战斗设施。",
+  consider_missile_salvo: "可考虑在高压阶段更早使用导弹齐射。",
+  add_thruster_cover: "可考虑为推进器增加掩护，降低撞击损伤。",
+  add_repair_station: "可考虑增加维修站覆盖，缩短抢修路径。",
+  reposition_weapons: "可考虑调整武器布局，减少射线遮挡。"
 });
 
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
@@ -1434,6 +1481,7 @@ let threatSummaryCache = null;
 let weaponEffectivenessCache = null;
 let recentDamageSummaryCache = null;
 let repairStatusSummaryCache = null;
+let combatReviewCache = null;
 
 let fragmentIdSeed = 1;
 let npcIdSeed = 1;
@@ -7629,15 +7677,105 @@ function isEnemyPressureLikely() {
   return hasCombatEncounter || (state.run.endgame && !state.run.guardianDefeated);
 }
 
+function createEmptyCombatAggregate(startedAt = state.time) {
+  const safeStart = toFiniteNumber(startedAt, toFiniteNumber(state.time, 0));
+  return {
+    startedAt: safeStart,
+    lastEventAt: safeStart,
+    eventCount: 0,
+    stationHitCount: 0,
+    shieldBlockedCount: 0,
+    missileSalvoCount: 0,
+    missileFiredCount: 0,
+    repairDispatchedCount: 0,
+    repairAppliedCount: 0,
+    repairHealed: 0,
+    sourceStats: Object.create(null),
+    roleStats: Object.create(null)
+  };
+}
+
+function archiveCombatWindow(now = state.time) {
+  const safeNow = toFiniteNumber(now, toFiniteNumber(state.time, 0));
+  const current = combatWindowState.current;
+  const startedAt = current && Number.isFinite(current.startedAt)
+    ? current.startedAt
+    : toFiniteNumber(combatWindowState.startedAt, safeNow);
+  const lastEventAt = current && Number.isFinite(current.lastEventAt)
+    ? current.lastEventAt
+    : toFiniteNumber(combatWindowState.lastActiveAt, safeNow);
+  const durationSec = Math.max(0, lastEventAt - startedAt);
+  const hasEvents = !!(current && current.eventCount > 0);
+
+  if (hasEvents && durationSec >= COMBAT_WINDOW_MIN_RECORD_SEC) {
+    const sourceStats = Object.values(current.sourceStats || {}).map((entry) => ({
+      sourceKey: entry.sourceKey,
+      label: getDamageSourceLabel(entry.sourceKey),
+      totalDamage: Math.round(toFiniteNumber(entry.totalDamage, 0) * 10) / 10,
+      hitCount: Math.max(0, Math.floor(toFiniteNumber(entry.hitCount, 0))),
+      lastSeenAt: toFiniteNumber(entry.lastSeenAt, startedAt)
+    })).sort((a, b) => {
+      if (b.totalDamage !== a.totalDamage) return b.totalDamage - a.totalDamage;
+      if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount;
+      return String(a.sourceKey).localeCompare(String(b.sourceKey));
+    });
+    const roleStats = Object.values(current.roleStats || {}).map((entry) => ({
+      role: entry.role,
+      roleLabel: getCombatRoleLabel(entry.role),
+      damageTaken: Math.round(toFiniteNumber(entry.damageTaken, 0) * 10) / 10,
+      cellCount: Math.max(1, Math.floor(toFiniteNumber(entry.cellCount, 1)))
+    })).sort((a, b) => {
+      if (b.damageTaken !== a.damageTaken) return b.damageTaken - a.damageTaken;
+      if (b.cellCount !== a.cellCount) return b.cellCount - a.cellCount;
+      return String(a.role).localeCompare(String(b.role));
+    });
+
+    combatWindowState.lastArchived = deepFreezeForDiagnostics({
+      startedAt,
+      endedAt: lastEventAt,
+      durationSec,
+      archivedAt: safeNow,
+      eventCount: current.eventCount,
+      stationHitCount: current.stationHitCount,
+      shieldBlockedCount: current.shieldBlockedCount,
+      missileSalvoCount: current.missileSalvoCount,
+      missileFiredCount: current.missileFiredCount,
+      repairDispatchedCount: current.repairDispatchedCount,
+      repairAppliedCount: current.repairAppliedCount,
+      repairHealed: Math.round(toFiniteNumber(current.repairHealed, 0) * 10) / 10,
+      sourceStats,
+      roleStats
+    });
+    combatWindowState.archivedAt = safeNow;
+    combatReviewCache = null;
+  }
+
+  combatWindowState.active = false;
+  combatWindowState.pendingArchive = false;
+  combatWindowState.startedAt = null;
+  combatWindowState.lastActiveAt = null;
+  combatWindowState.current = null;
+}
+
 function ensureCombatWindowState(now = state.time) {
+  const safeNow = toFiniteNumber(now, 0);
+  if (Number.isFinite(combatWindowState.archivedAt) && safeNow < combatWindowState.archivedAt) {
+    combatWindowState.lastArchived = null;
+    combatWindowState.archivedAt = null;
+    combatReviewCache = null;
+  }
   const pressure = isEnemyPressureLikely();
   if (pressure) {
     if (!combatWindowState.active) {
       combatWindowState.active = true;
-      combatWindowState.startedAt = now;
-      combatWindowState.current = null;
+      combatWindowState.startedAt = safeNow;
+      combatWindowState.current = createEmptyCombatAggregate(safeNow);
+    } else if (!combatWindowState.current) {
+      combatWindowState.current = createEmptyCombatAggregate(
+        toFiniteNumber(combatWindowState.startedAt, safeNow)
+      );
     }
-    combatWindowState.lastActiveAt = now;
+    combatWindowState.lastActiveAt = safeNow;
     combatWindowState.pendingArchive = false;
     return;
   }
@@ -7645,18 +7783,42 @@ function ensureCombatWindowState(now = state.time) {
   combatWindowState.pendingArchive = true;
   if (
     combatWindowState.lastActiveAt != null
-    && now - combatWindowState.lastActiveAt >= COMBAT_WINDOW_QUIET_SEC
+    && safeNow - combatWindowState.lastActiveAt >= COMBAT_WINDOW_QUIET_SEC
   ) {
-    combatWindowState.active = false;
-    combatWindowState.pendingArchive = false;
-    combatWindowState.startedAt = null;
-    combatWindowState.lastActiveAt = null;
-    combatWindowState.current = null;
+    archiveCombatWindow(safeNow);
   }
 }
 
 function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeDamageSourceKey(sourceKey, fallback = "unknown") {
+  const raw = typeof sourceKey === "string" ? sourceKey.trim() : "";
+  if (!raw) return fallback;
+  if (DAMAGE_SOURCE_KEY_ALIASES[raw]) return DAMAGE_SOURCE_KEY_ALIASES[raw];
+  if (raw === "collision") return "asteroid";
+  if (raw === "enemy") return "enemy_fire";
+  return raw;
+}
+
+function getCombatRoleLabel(role) {
+  switch (role) {
+    case "core":
+      return "核心";
+    case "thrust":
+      return "推进";
+    case "weapon":
+      return "武器";
+    case "defense":
+      return "护盾/防御";
+    case "power":
+      return "电力";
+    case "mining":
+      return "采矿";
+    default:
+      return "结构";
+  }
 }
 
 function pruneCombatEvents(now = state.time) {
@@ -7696,6 +7858,82 @@ function sanitizeCombatEventPayload(type, payload = null) {
   return clean;
 }
 
+function updateCombatWindowOnEvent(event) {
+  if (!event || !event.type) return;
+  const eventTime = toFiniteNumber(event.t, toFiniteNumber(state.time, 0));
+  if (!combatWindowState.current) {
+    const startedAt = Number.isFinite(combatWindowState.startedAt)
+      ? combatWindowState.startedAt
+      : eventTime;
+    combatWindowState.current = createEmptyCombatAggregate(startedAt);
+  }
+  if (!combatWindowState.active) {
+    combatWindowState.active = true;
+    combatWindowState.pendingArchive = false;
+    if (!Number.isFinite(combatWindowState.startedAt)) {
+      combatWindowState.startedAt = eventTime;
+    }
+  }
+
+  const current = combatWindowState.current;
+  current.eventCount += 1;
+  current.lastEventAt = eventTime;
+  combatWindowState.lastActiveAt = eventTime;
+  const payload = event.payload || {};
+
+  if (event.type === "stationCellHit" || event.type === "fragmentHit") {
+    const fallbackSource = event.type === "fragmentHit" ? "collision" : "enemy_fire";
+    const sourceKey = normalizeDamageSourceKey(payload.sourceKey, fallbackSource);
+    const damage = Math.max(0, toFiniteNumber(payload.damage, 0));
+    const sourceEntry = current.sourceStats[sourceKey] || {
+      sourceKey,
+      totalDamage: 0,
+      hitCount: 0,
+      lastSeenAt: eventTime
+    };
+    sourceEntry.totalDamage += damage;
+    sourceEntry.hitCount += 1;
+    sourceEntry.lastSeenAt = eventTime;
+    current.sourceStats[sourceKey] = sourceEntry;
+    if (event.type === "stationCellHit") {
+      current.stationHitCount += 1;
+      const role = typeof payload.role === "string" ? payload.role : "structure";
+      const roleEntry = current.roleStats[role] || {
+        role,
+        damageTaken: 0,
+        cellCount: 0,
+        cells: Object.create(null)
+      };
+      roleEntry.damageTaken += damage;
+      const cellKey = payload.cellKey != null ? String(payload.cellKey) : "";
+      if (cellKey && !roleEntry.cells[cellKey]) {
+        roleEntry.cells[cellKey] = 1;
+        roleEntry.cellCount += 1;
+      }
+      current.roleStats[role] = roleEntry;
+    }
+    return;
+  }
+
+  if (event.type === "shieldBlocked") {
+    current.shieldBlockedCount += 1;
+    return;
+  }
+  if (event.type === "missileSalvoFired") {
+    current.missileSalvoCount += 1;
+    current.missileFiredCount += Math.max(0, toFiniteNumber(payload.fired, 0));
+    return;
+  }
+  if (event.type === "repairDispatched") {
+    current.repairDispatchedCount += 1;
+    return;
+  }
+  if (event.type === "repairApplied") {
+    current.repairAppliedCount += 1;
+    current.repairHealed += Math.max(0, toFiniteNumber(payload.healed, 0));
+  }
+}
+
 function recordCombatEvent(type, payload = null) {
   try {
     const eventType = typeof type === "string"
@@ -7715,6 +7953,8 @@ function recordCombatEvent(type, payload = null) {
       combatEventBuffer.splice(0, combatEventBuffer.length - COMBAT_EVENT_BUFFER_CAPACITY);
     }
     ensureCombatWindowState(entry.t);
+    updateCombatWindowOnEvent(entry);
+    combatReviewCache = null;
   } catch {
     // 运行时插眼失败不得影响战斗结算链路
   }
@@ -7733,11 +7973,62 @@ function getDamageSeverityRank(severity) {
 }
 
 function getDamageSourceLabel(sourceKey) {
-  return DAMAGE_SOURCE_LABELS[sourceKey] || DAMAGE_SOURCE_LABELS.unknown;
+  const normalized = normalizeDamageSourceKey(sourceKey, "unknown");
+  return DAMAGE_SOURCE_LABELS[normalized] || DAMAGE_SOURCE_LABELS.unknown;
 }
 
 function getDamageSourceReasonKey(sourceKey) {
-  return DAMAGE_SOURCE_REASON_KEYS[sourceKey] || "station_under_pirate_fire";
+  const normalized = normalizeDamageSourceKey(sourceKey, "enemy_fire");
+  return DAMAGE_SOURCE_REASON_KEYS[normalized] || "station_under_hostile_station_fire";
+}
+
+function getCombatReviewSourceReasonKey(sourceKey, label = "") {
+  const normalized = normalizeDamageSourceKey(sourceKey, "");
+  if (normalized && COMBAT_REVIEW_SOURCE_REASON_KEYS[normalized]) {
+    return COMBAT_REVIEW_SOURCE_REASON_KEYS[normalized];
+  }
+  const safeLabel = typeof label === "string" ? label : "";
+  if (safeLabel.includes("小行星")) return "main_damage_asteroid";
+  if (safeLabel.includes("海盗")) return "main_damage_pirate";
+  if (safeLabel.includes("守护者")) return "main_damage_guardian";
+  if (safeLabel.includes("空间站")) return "main_damage_hostile_station";
+  return "main_damage_station";
+}
+
+function getCombatReviewGapSeverity(reasonKey, repairSummary = null) {
+  if (reasonKey === "repair_overwhelmed") {
+    if (repairSummary?.reasonKey === "repair_missing" || repairSummary?.reasonKey === "repair_no_power") {
+      return "critical";
+    }
+    return "warning";
+  }
+  if (reasonKey === "shield_offline_during_combat") return "warning";
+  if (reasonKey === "no_significant_damage") return "info";
+  return "warning";
+}
+
+function pickCombatReviewRecommendationReasonKey({
+  weaponGapReasonKey = null,
+  repairGapReasonKey = null,
+  worstArea = null,
+  weapon = null,
+  repair = null
+}) {
+  if (repairGapReasonKey === "repair_overwhelmed") {
+    if (repair?.summary?.reasonKey === "repair_no_power") return "add_power_source";
+    return "add_repair_station";
+  }
+  if (weaponGapReasonKey === "shield_offline_during_combat") {
+    if (weapon?.shield?.statusKey === "shield_no_power") return "add_power_source";
+    return "rebuild_shield";
+  }
+  if (weaponGapReasonKey === "missile_never_fired") return "consider_missile_salvo";
+  if (weaponGapReasonKey === "turret_los_blocked_often") return "reposition_weapons";
+  if (weaponGapReasonKey === "thrust_heavy_loss") return "add_thruster_cover";
+  if (worstArea?.role === "power") return "add_power_source";
+  if (worstArea?.role === "weapon") return "reposition_weapons";
+  if (worstArea?.role === "thrust") return "add_thruster_cover";
+  return "add_power_source";
 }
 
 function getDamageCellFrameMaxHp(cell) {
@@ -8497,7 +8788,10 @@ function buildRecentDamageSummarySnapshot() {
       continue;
     }
     if (event.type !== "stationCellHit" && event.type !== "fragmentHit") continue;
-    const sourceKey = String(event.payload?.sourceKey || (event.type === "fragmentHit" ? "collision" : "enemy_fire"));
+    const sourceKey = normalizeDamageSourceKey(
+      event.payload?.sourceKey,
+      event.type === "fragmentHit" ? "collision" : "enemy_fire"
+    );
     const damage = Math.max(0, toFiniteNumber(event.payload?.damage, 0));
     const current = sourceMap.get(sourceKey) || {
       sourceKey,
@@ -8760,6 +9054,253 @@ function getRepairStatusSummary() {
   return snapshot;
 }
 
+function createEmptyCombatReviewSnapshot(now = state.time) {
+  return {
+    generatedAt: now,
+    hasReview: false,
+    reasonKey: "no_recent_combat",
+    windowStartedAt: null,
+    windowEndedAt: null,
+    durationSec: 0,
+    primarySources: [],
+    worstAreas: [],
+    defenseGaps: [],
+    recommendation: null,
+    recommendations: [],
+    shortItems: []
+  };
+}
+
+function getCombatReviewAreaReasonKey(role) {
+  return COMBAT_REVIEW_AREA_REASON_KEYS[role] || "worst_area_power";
+}
+
+function getCombatReviewAreaLabel(role, fallbackLabel = null) {
+  if (typeof fallbackLabel === "string" && fallbackLabel) return fallbackLabel;
+  return getCombatRoleLabel(role);
+}
+
+function pickCombatReviewRecommendation(gapReasonKeys = [], worstArea = null) {
+  if (gapReasonKeys.includes("shield_offline_during_combat")) return "rebuild_shield";
+  if (gapReasonKeys.includes("repair_overwhelmed")) return "add_repair_station";
+  if (gapReasonKeys.includes("missile_never_fired")) return "consider_missile_salvo";
+  if (gapReasonKeys.includes("thrust_heavy_loss")) return "add_thruster_cover";
+  if (worstArea?.role === "weapon") return "reposition_weapons";
+  if (worstArea?.role === "thrust") return "add_thruster_cover";
+  if (worstArea?.role === "defense") return "rebuild_shield";
+  return "add_power_source";
+}
+
+function buildCombatReviewSnapshot() {
+  const now = state.time;
+  ensureCombatWindowState(now);
+  pruneCombatEvents(now);
+  const empty = createEmptyCombatReviewSnapshot(now);
+
+  if (isEnemyPressureLikely()) return empty;
+  const archived = combatWindowState.lastArchived;
+  const archivedAt = toFiniteNumber(combatWindowState.archivedAt, null);
+  if (!archived) return empty;
+  if (archivedAt != null && now - archivedAt > COMBAT_REVIEW_VISIBLE_SEC) return empty;
+
+  const eventCount = Math.max(0, Math.floor(toFiniteNumber(archived.eventCount, 0)));
+  const durationSec = Math.max(0, toFiniteNumber(archived.durationSec, 0));
+  if (eventCount <= 0 || durationSec < COMBAT_WINDOW_MIN_RECORD_SEC) return empty;
+
+  const primarySources = (Array.isArray(archived.sourceStats) ? archived.sourceStats : [])
+    .filter((entry) => toFiniteNumber(entry.totalDamage, 0) > 0)
+    .sort((a, b) => {
+      if (toFiniteNumber(b.totalDamage, 0) !== toFiniteNumber(a.totalDamage, 0)) {
+        return toFiniteNumber(b.totalDamage, 0) - toFiniteNumber(a.totalDamage, 0);
+      }
+      if (toFiniteNumber(b.hitCount, 0) !== toFiniteNumber(a.hitCount, 0)) {
+        return toFiniteNumber(b.hitCount, 0) - toFiniteNumber(a.hitCount, 0);
+      }
+      return String(a.sourceKey).localeCompare(String(b.sourceKey));
+    })
+    .slice(0, 3)
+    .map((entry) => {
+      const sourceKey = normalizeDamageSourceKey(entry.sourceKey, "enemy_fire");
+      return {
+        sourceKey,
+        label: getDamageSourceLabel(sourceKey),
+        totalDamage: Math.round(toFiniteNumber(entry.totalDamage, 0) * 10) / 10,
+        hitCount: Math.max(0, Math.floor(toFiniteNumber(entry.hitCount, 0)))
+      };
+    });
+
+  const worstAreas = (Array.isArray(archived.roleStats) ? archived.roleStats : [])
+    .filter((entry) => toFiniteNumber(entry.damageTaken, 0) > 0)
+    .sort((a, b) => {
+      if (toFiniteNumber(b.damageTaken, 0) !== toFiniteNumber(a.damageTaken, 0)) {
+        return toFiniteNumber(b.damageTaken, 0) - toFiniteNumber(a.damageTaken, 0);
+      }
+      return toFiniteNumber(b.cellCount, 0) - toFiniteNumber(a.cellCount, 0);
+    })
+    .slice(0, 2)
+    .map((entry) => ({
+      role: String(entry.role || "structure"),
+      roleLabel: getCombatReviewAreaLabel(entry.role, entry.roleLabel),
+      damageTaken: Math.round(toFiniteNumber(entry.damageTaken, 0) * 10) / 10,
+      cellCount: Math.max(1, Math.floor(toFiniteNumber(entry.cellCount, 1)))
+    }));
+
+  const stationHitCount = Math.max(0, Math.floor(toFiniteNumber(archived.stationHitCount, 0)));
+  const shieldBlockedCount = Math.max(0, Math.floor(toFiniteNumber(archived.shieldBlockedCount, 0)));
+  const missileFiredCount = Math.max(0, Math.floor(toFiniteNumber(archived.missileFiredCount, 0)));
+  const repairDispatchedCount = Math.max(0, Math.floor(toFiniteNumber(archived.repairDispatchedCount, 0)));
+  const repairAppliedCount = Math.max(0, Math.floor(toFiniteNumber(archived.repairAppliedCount, 0)));
+
+  const gapCandidates = [];
+  if (stationHitCount > 0 && shieldBlockedCount <= 0) {
+    gapCandidates.push({ key: "shield_offline_during_combat", severity: "warning", reasonKey: "shield_offline_during_combat" });
+  }
+  if (stationHitCount > 0 && missileFiredCount <= 0) {
+    gapCandidates.push({ key: "missile_never_fired", severity: "warning", reasonKey: "missile_never_fired" });
+  }
+  const repairGapThreshold = Math.max(1, Math.ceil(repairDispatchedCount * 0.5));
+  if (stationHitCount >= 3 && repairAppliedCount < repairGapThreshold) {
+    gapCandidates.push({ key: "repair_overwhelmed", severity: "warning", reasonKey: "repair_overwhelmed" });
+  }
+  const topArea = worstAreas[0] || null;
+  if (topArea && topArea.role === "thrust" && topArea.damageTaken >= 20) {
+    gapCandidates.push({ key: "thrust_heavy_loss", severity: "warning", reasonKey: "thrust_heavy_loss" });
+  }
+
+  const seenGapReasonKeys = new Set();
+  const defenseGaps = [];
+  for (const gap of gapCandidates) {
+    if (!gap || !gap.reasonKey || seenGapReasonKeys.has(gap.reasonKey)) continue;
+    seenGapReasonKeys.add(gap.reasonKey);
+    defenseGaps.push(gap);
+  }
+
+  const recommendationReasonKey = pickCombatReviewRecommendation(
+    defenseGaps.map((entry) => entry.reasonKey),
+    topArea
+  );
+  const recommendations = recommendationReasonKey
+    ? [{ key: recommendationReasonKey, reasonKey: recommendationReasonKey }]
+    : [];
+
+  const shortItems = [];
+  if (primarySources[0]) {
+    const source = primarySources[0];
+    const sourceSeverity = source.totalDamage >= 80 ? "critical" : "warning";
+    shortItems.push({
+      kind: "source",
+      severity: sourceSeverity,
+      reasonKey: getCombatReviewSourceReasonKey(source.sourceKey),
+      payload: source,
+      text: `主要伤害来自${source.label}（${Math.round(source.totalDamage)} 点/${source.hitCount} 次）。`
+    });
+  }
+  if (topArea) {
+    const areaSeverity = topArea.damageTaken >= 80 ? "critical" : "warning";
+    shortItems.push({
+      kind: "worstArea",
+      severity: areaSeverity,
+      reasonKey: getCombatReviewAreaReasonKey(topArea.role),
+      payload: topArea,
+      text: `损坏最重：${topArea.roleLabel}（${Math.round(topArea.damageTaken)} 点，${topArea.cellCount} 格）。`
+    });
+  }
+  if (defenseGaps.length) {
+    const gapTexts = defenseGaps.map((gap) => {
+      if (gap.reasonKey === "shield_offline_during_combat") return "护盾在战斗中未有效拦截";
+      if (gap.reasonKey === "missile_never_fired") return "导弹火力未参与输出";
+      if (gap.reasonKey === "repair_overwhelmed") return "维修跟不上受损速度";
+      if (gap.reasonKey === "thrust_heavy_loss") return "推进区受损偏重";
+      return gap.reasonKey;
+    });
+    shortItems.push({
+      kind: "gap",
+      severity: "warning",
+      reasonKey: defenseGaps[0].reasonKey,
+      payload: { reasonKeys: defenseGaps.map((entry) => entry.reasonKey) },
+      text: `短板：${gapTexts.join("；")}。`
+    });
+  }
+  if (recommendationReasonKey) {
+    shortItems.push({
+      kind: "recommendation",
+      severity: "info",
+      reasonKey: recommendationReasonKey,
+      payload: { key: recommendationReasonKey },
+      text: `建议：${COMBAT_REVIEW_RECOMMENDATION_COPY[recommendationReasonKey] || "可考虑优先恢复关键战斗能力。"}`
+    });
+  }
+
+  if (!shortItems.length) return empty;
+  const trimmedShortItems = shortItems.slice(0, 4);
+  if (trimmedShortItems.length < 2) {
+    trimmedShortItems.push({
+      kind: "gap",
+      severity: "info",
+      reasonKey: "no_significant_damage",
+      payload: {},
+      text: "短板：本场未记录到明显受损。"
+    });
+  }
+
+  return {
+    generatedAt: now,
+    hasReview: true,
+    windowStartedAt: toFiniteNumber(archived.startedAt, null),
+    windowEndedAt: toFiniteNumber(archived.endedAt, null),
+    durationSec: Math.round(durationSec * 10) / 10,
+    primarySources,
+    worstAreas,
+    defenseGaps,
+    recommendations,
+    shortItems: trimmedShortItems
+  };
+}
+
+function getCombatReview() {
+  const now = state.time;
+  if (combatReviewCache && now < combatReviewCache.sampledAt) {
+    combatReviewCache = null;
+  }
+  if (
+    combatReviewCache
+    && now - combatReviewCache.sampledAt < COMBAT_REVIEW_SAMPLE_INTERVAL
+  ) {
+    return combatReviewCache.value;
+  }
+  const snapshot = deepFreezeForDiagnostics(buildCombatReviewSnapshot());
+  combatReviewCache = { sampledAt: now, value: snapshot };
+  return snapshot;
+}
+
+function getCombatReviewItemText(item) {
+  if (!item) return "";
+  if (typeof item.text === "string" && item.text) return item.text;
+  if (item.kind === "source") {
+    const payload = item.payload || {};
+    return `主要伤害来自${payload.label || "敌对火力"}。`;
+  }
+  if (item.kind === "worstArea") {
+    const payload = item.payload || {};
+    return `损坏最重：${payload.roleLabel || "结构区"}。`;
+  }
+  if (item.kind === "recommendation") {
+    return `建议：${COMBAT_REVIEW_RECOMMENDATION_COPY[item.reasonKey] || "可考虑优先恢复关键战斗能力。"}`
+  }
+  return "复盘：本场战斗事件已记录。";
+}
+
+function buildCombatReviewSummaryHtml(review = getCombatReview()) {
+  if (!review?.hasReview || !Array.isArray(review.shortItems) || review.shortItems.length <= 0) {
+    return "";
+  }
+  const durationText = review.durationSec > 0 ? ` · 持续 ${Math.max(1, Math.round(review.durationSec))}s` : "";
+  const itemsHtml = review.shortItems.slice(0, 4).map((item) => (
+    `<div class="combat-review-item severity-${item.severity || "info"}">${getCombatReviewItemText(item)}</div>`
+  )).join("");
+  return `<div class="combat-review-summary"><div class="combat-review-title">战斗复盘${durationText}</div>${itemsHtml}</div>`;
+}
+
 function buildCombatDamageRepairSummaryHtml(damage = getRecentDamageSummary(), repair = getRepairStatusSummary()) {
   const lines = [];
   if (damage?.summary?.damagedCellCount > 0) {
@@ -8880,12 +9421,14 @@ function buildCombatStatusSummaryHtml(
   threat = getThreatSummary(),
   weapon = getWeaponEffectiveness(),
   damage = getRecentDamageSummary(),
-  repair = getRepairStatusSummary()
+  repair = getRepairStatusSummary(),
+  review = getCombatReview()
 ) {
   const threatHtml = buildCombatThreatSummaryHtml(threat);
   const weaponHtml = buildCombatWeaponSummaryHtml(weapon);
   const damageRepairHtml = buildCombatDamageRepairSummaryHtml(damage, repair);
-  return `${threatHtml}${weaponHtml}${damageRepairHtml}`;
+  const reviewHtml = buildCombatReviewSummaryHtml(review);
+  return `${threatHtml}${weaponHtml}${damageRepairHtml}${reviewHtml}`;
 }
 
 function shouldSustainCombatAlert(reasonKey) {
@@ -11172,11 +11715,12 @@ function destroyFragmentIfEmpty(fragment, toastMessage = "残骸已被摧毁") {
   return false;
 }
 
-function damageFragmentCell(fragment, cell, damage) {
+function damageFragmentCell(fragment, cell, damage, sourceKey = "enemy_fire") {
+  const normalizedSourceKey = normalizeDamageSourceKey(sourceKey, "enemy_fire");
   recordCombatEvent("fragmentHit", {
     cellKey: key(cell.x, cell.y),
     facility: cell.facility,
-    sourceKey: "enemy_fire",
+    sourceKey: normalizedSourceKey,
     damage
   });
   if (cell.facility !== "frame" && cell.facility !== "core") {
@@ -11389,7 +11933,8 @@ function updateHostileStationWeapons(hostileStation, dt) {
       { x: dirX / cellDist, y: dirY / cellDist },
       "enemy",
       damage,
-      projectileSpeed
+      projectileSpeed,
+      hostileStation.kind || "hostile-station"
     );
     cell.fire = 1;
     const baseReload = getHostileStationCellStat(cell, "reload", stationLevel);
@@ -12109,7 +12654,14 @@ function updateEnemies(dt) {
 
     if (enemy.kind !== "asteroid" && enemy.reload <= 0 && distToStation < enemy.range) {
       enemy.reload = enemy.reloadTime ?? (enemyUsesStationAi(enemy) ? 1.6 : 2.2);
-      fireProjectile({ x: enemy.x, y: enemy.y }, dir, "enemy", enemy.projectileDamage || 10, 250);
+      fireProjectile(
+        { x: enemy.x, y: enemy.y },
+        dir,
+        "enemy",
+        enemy.projectileDamage || 10,
+        250,
+        enemy.kind || "enemy_fire"
+      );
     }
 
     if (enemy.spawnInterval > 0) {
@@ -12484,7 +13036,7 @@ function selectTarget(origin, range) {
   return nearestEnemy(origin, range);
 }
 
-function fireProjectile(origin, dir, owner, damage, speed) {
+function fireProjectile(origin, dir, owner, damage, speed, sourceKey = null) {
   state.projectiles.push({
     owner,
     x: origin.x,
@@ -12493,7 +13045,8 @@ function fireProjectile(origin, dir, owner, damage, speed) {
     vy: dir.y * speed,
     damage,
     life: 2.6,
-    r: owner === "enemy" ? 4 : 3
+    r: owner === "enemy" ? 4 : 3,
+    sourceKey: sourceKey == null ? null : String(sourceKey)
   });
 }
 
@@ -12517,14 +13070,15 @@ function updateProjectiles(dt) {
     spawnParticle(projectile, projectile.owner === "enemy" ? [1, 0.35, 0.25, 0.6] : [0.65, 0.92, 1, 0.6]);
 
     if (projectile.owner === "enemy") {
+      const projectileSourceKey = normalizeDamageSourceKey(projectile.sourceKey, "enemy_fire");
       const hit = getCellAtWorld(projectile);
       if (hit && !hit.detached) {
-        damageCell(hit, projectile.damage);
+        damageCell(hit, projectile.damage, projectileSourceKey);
         projectile.dead = true;
       } else if (!projectile.dead) {
         const fragHit = getFragmentCellAtWorld(projectile);
         if (fragHit) {
-          damageFragmentCell(fragHit.fragment, fragHit.cell, projectile.damage);
+          damageFragmentCell(fragHit.fragment, fragHit.cell, projectile.damage, projectileSourceKey);
           projectile.dead = true;
         }
       }
@@ -12592,7 +13146,7 @@ function collideEnemyWithStation(enemy) {
     if (cell.detached) continue;
     const p = cellWorldPosition(cell);
     if (dist(enemy, p) < enemy.r + CELL * 0.48) {
-      damageCell(cell, getCollisionDamage(enemy));
+      damageCell(cell, getCollisionDamage(enemy), enemy.kind || "collision");
       enemy.hp -= enemy.kind === "asteroid" ? 35 : 8;
       const away = normalize({ x: enemy.x - p.x, y: enemy.y - p.y });
       enemy.vx += away.x * COLLISION_FEEL.enemyBounce;
@@ -12602,13 +13156,14 @@ function collideEnemyWithStation(enemy) {
   }
 }
 
-function damageCell(cell, damage) {
+function damageCell(cell, damage, sourceKey = "enemy_fire") {
+  const normalizedSourceKey = normalizeDamageSourceKey(sourceKey, "enemy_fire");
   recordCombatEvent("stationCellHit", {
     cellKey: key(cell.x, cell.y),
     facility: cell.facility,
     role: getFacilityRoleTag(cell.facility),
     isCore: cell.facility === "core",
-    sourceKey: "enemy_fire",
+    sourceKey: normalizedSourceKey,
     damage
   });
   if (cell.facility !== "frame" && cell.facility !== "core") {
@@ -15647,6 +16202,9 @@ window.__gameTest.playtest = {
   getRepairStatusSummary() {
     return safeDeepCloneForTest(getRepairStatusSummary());
   },
+  getCombatReview() {
+    return safeDeepCloneForTest(getCombatReview());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
@@ -15668,6 +16226,7 @@ window.__gameTest.playtest = {
     const weapon = getWeaponEffectiveness();
     const damage = getRecentDamageSummary();
     const repair = getRepairStatusSummary();
+    const review = getCombatReview();
 
     return {
       version: "v0.11.0-playtest-readiness",
@@ -15721,7 +16280,8 @@ window.__gameTest.playtest = {
         threat: safeDeepCloneForTest(threat),
         weapon: safeDeepCloneForTest(weapon),
         damage: safeDeepCloneForTest(damage),
-        repair: safeDeepCloneForTest(repair)
+        repair: safeDeepCloneForTest(repair),
+        review: safeDeepCloneForTest(review)
       }
     };
   },

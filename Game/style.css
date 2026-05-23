@@ -1216,6 +1216,37 @@ h2 {
   color: #f08080;
 }
 
+.combat-review-summary {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(120, 160, 210, 0.2);
+}
+
+.combat-review-title {
+  font-size: 11px;
+  color: #9ecfff;
+  letter-spacing: 0.04em;
+}
+
+.combat-review-item {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #9eb6d8;
+}
+
+.combat-review-item.severity-warning {
+  color: #f0b060;
+}
+
+.combat-review-item.severity-critical {
+  color: #f08080;
+}
+
+.combat-review-item.severity-info {
+  color: #9eb6d8;
+}
+
 .alert-weapon-effectiveness {
   font-weight: 600;
 }
