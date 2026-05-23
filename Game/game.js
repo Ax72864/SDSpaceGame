@@ -255,6 +255,20 @@ const GALAXY_TYPES = {
   }
 };
 
+// v0.9.0 T4 视觉分化：小行星密度乘子 clamp、body tint 混合比、星场小行星数量上限
+const GALAXY_ASTEROID_DENSITY_CLAMP = { min: 0.5, max: 2.0 };
+const GALAXY_ASTEROID_COUNT_CAP = 14;
+const GALAXY_BODY_TINT_MIX = 0.22;
+const GALAXY_NEBULA_ALPHA = {
+  tradeHub: 0.35,
+  pirateTerritory: 0.45,
+  miningBelt: 0.40,
+  mysteryZone: 0.50,
+  warFront: 0.55,
+  techRuin: 0.45,
+  emptyVoid: 0.20
+};
+
 // v0.9.0 候选生成相关常量
 // 数值与 numerics §2 一致：level 0 / 6 强制锚点；level 1-5 候选数量随 level 上升；
 // levelBias 以百分比单位记录"风险等级抽中概率"，先抽 risk 再在该 risk 池内均匀抽 galaxyType
@@ -1319,6 +1333,143 @@ function getBodyColorByResource(resource, rng) {
   return tintColor(palette, rng, 0.12);
 }
 
+function clampGalaxyAsteroidDensityMod(mod) {
+  if (!Number.isFinite(mod)) return 1.0;
+  return clamp(mod, GALAXY_ASTEROID_DENSITY_CLAMP.min, GALAXY_ASTEROID_DENSITY_CLAMP.max);
+}
+
+function computeGalaxyAsteroidCount(asteroidMin, asteroidMax, rng, densityMod) {
+  const mod = clampGalaxyAsteroidDensityMod(densityMod);
+  const baseCount = rngInt(rng, asteroidMin, asteroidMax);
+  if (mod === 1.0) return baseCount;
+  const scaled = Math.round(baseCount * mod);
+  const floor = Math.max(1, Math.floor(asteroidMin * mod * 0.85));
+  const ceiling = Math.min(GALAXY_ASTEROID_COUNT_CAP, Math.ceil(asteroidMax * mod));
+  return clamp(scaled, floor, ceiling);
+}
+
+function mixBodyColorWithGalaxyTint(baseColor, galaxyTint, mixRatio = GALAXY_BODY_TINT_MIX) {
+  if (!galaxyTint || !Array.isArray(baseColor)) return baseColor;
+  const ratio = clamp(mixRatio, 0, 0.45);
+  return [
+    baseColor[0] * (1 - ratio) + galaxyTint[0] * ratio,
+    baseColor[1] * (1 - ratio) + galaxyTint[1] * ratio,
+    baseColor[2] * (1 - ratio) + galaxyTint[2] * ratio,
+    baseColor[3] ?? 1
+  ];
+}
+
+function resolveGenerateGalaxyType(galaxyTypeOverride) {
+  if (typeof galaxyTypeOverride === "string" && GALAXY_TYPES[galaxyTypeOverride]) {
+    return galaxyTypeOverride;
+  }
+  if (state.run?.currentGalaxyType && GALAXY_TYPES[state.run.currentGalaxyType]) {
+    return state.run.currentGalaxyType;
+  }
+  return null;
+}
+
+function getGalaxyNebulaAlpha(galaxyType) {
+  const key = (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType])
+    ? galaxyType
+    : resolveGalaxyTypeKey(galaxyType);
+  return GALAXY_NEBULA_ALPHA[key] ?? 0.35;
+}
+
+function rgbaArrayToHex(rgba) {
+  if (!Array.isArray(rgba) || rgba.length < 3) return null;
+  const toByte = (v) => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, "0");
+  return `#${toByte(rgba[0])}${toByte(rgba[1])}${toByte(rgba[2])}`;
+}
+
+function summarizeGalaxyBodies(galaxy) {
+  const planets = galaxy.bodies.filter((body) => body.type === "planet");
+  const asteroids = galaxy.bodies.filter((body) => body.type === "asteroid");
+  return {
+    planetCount: planets.length,
+    asteroidCount: asteroids.length,
+    samplePlanetColors: planets.slice(0, 2).map((body) => ({ resource: body.resource, color: [...body.color] })),
+    sampleAsteroidColors: asteroids.slice(0, 2).map((body) => ({ resource: body.resource, color: [...body.color] }))
+  };
+}
+
+function getGalaxyVisualSignature(galaxyType) {
+  const key = (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType])
+    ? galaxyType
+    : resolveGalaxyTypeKey(galaxyType);
+  const def = GALAXY_TYPES[key] || GALAXY_TYPES.emptyVoid;
+  return {
+    galaxyType: key,
+    paletteKey: def.paletteKey,
+    bgColor: [...def.bgColor],
+    bgColorHex: rgbaArrayToHex(def.bgColor),
+    nebulaTint: [...def.nebulaTint],
+    nebulaTintHex: rgbaArrayToHex(def.nebulaTint),
+    planetColorTint: [...def.planetColorTint],
+    planetColorTintHex: rgbaArrayToHex(def.planetColorTint),
+    iconColor: [...def.iconColor],
+    iconColorHex: rgbaArrayToHex(def.iconColor),
+    nebulaAlpha: getGalaxyNebulaAlpha(key),
+    asteroidDensityMod: def.asteroidDensityMod,
+    riskLevel: def.riskLevel
+  };
+}
+
+function generateGalaxyPreview(level, galaxyType = "emptyVoid", seed = 4242) {
+  const lvl = levelIndex(level);
+  const safeType = (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType]) ? galaxyType : "emptyVoid";
+  const config = GALAXY_LEVEL_CONFIG[lvl];
+  const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`, safeType);
+  const bodySummary = summarizeGalaxyBodies(galaxy);
+  return {
+    ...getGalaxyVisualSignature(safeType),
+    level: lvl,
+    seed,
+    paletteKey: galaxy.paletteKey,
+    asteroidDensityModApplied: galaxy.asteroidDensityMod ?? 1.0,
+    baseAsteroidRange: { min: config.asteroidMin, max: config.asteroidMax },
+    ...bodySummary
+  };
+}
+
+function runGalaxyVisualSelfCheck() {
+  const types = Object.keys(GALAXY_TYPES);
+  const signatures = types.map((type) => getGalaxyVisualSignature(type));
+  const uniquePaletteKeys = new Set(signatures.map((entry) => entry.paletteKey));
+  const uniqueBgHex = new Set(signatures.map((entry) => entry.bgColorHex));
+  const emptyVoidSig = getGalaxyVisualSignature("emptyVoid");
+  const previewEmpty = generateGalaxyPreview(3, "emptyVoid", 9001);
+  const previewMining = generateGalaxyPreview(3, "miningBelt", 9001);
+  const previewTrade = generateGalaxyPreview(3, "tradeHub", 9001);
+  const previewBad = generateGalaxyPreview(0, "notARealType", 123);
+  const sampleGalaxy = generateGalaxy(3, "visual-self-check:3", "miningBelt");
+  const resourceBodies = sampleGalaxy.bodies.filter((body) => body.type !== "star");
+  const checks = [
+    { name: "sevenGalaxyTypes", ok: types.length === 7 },
+    { name: "paletteKeysMostlyDistinct", ok: uniquePaletteKeys.size >= 5 },
+    { name: "bgColorsMostlyDistinct", ok: uniqueBgHex.size >= 5 },
+    {
+      name: "emptyVoidGreySignature",
+      ok: emptyVoidSig.planetColorTint[0] === 0.4
+        && emptyVoidSig.bgColor[0] <= 0.05
+        && emptyVoidSig.paletteKey === "coldfront"
+    },
+    { name: "emptyVoidDensityAnchor", ok: GALAXY_TYPES.emptyVoid.asteroidDensityMod === 1.0 },
+    { name: "miningBeltMoreAsteroidsThanEmptyVoid", ok: previewMining.asteroidCount >= previewEmpty.asteroidCount },
+    { name: "tradeHubFewerAsteroidsThanMiningBelt", ok: previewTrade.asteroidCount <= previewMining.asteroidCount },
+    { name: "illegalTypeFallbackEmptyVoid", ok: previewBad.galaxyType === "emptyVoid" },
+    {
+      name: "resourceFieldPreserved",
+      ok: resourceBodies.length > 0 && resourceBodies.every((body) => body.resource && RESOURCE_VISUAL[body.resource])
+    },
+    {
+      name: "illegalPaletteFallbackSafe",
+      ok: generateGalaxy(0, "palette-fallback:0", "emptyVoid").paletteKey === "coldfront"
+    }
+  ];
+  return { ok: checks.every((entry) => entry.ok), checks, signatures };
+}
+
 function tryPlaceOrbitBody({ rng, anchor, radius, minOrbit, maxOrbit, type, placed }) {
   for (let attempt = 0; attempt < 80; attempt++) {
     const angle = rngFloat(rng, 0, Math.PI * 2);
@@ -1392,17 +1543,16 @@ function generateGalaxy(level, seed, galaxyTypeOverride) {
   const rng = createSeededRng(seed);
   const galaxyType = config.preferredType || pickGalaxyType(currentLevel, rng);
   const weights = GALAXY_RESOURCE_WEIGHTS[galaxyType] || GALAXY_RESOURCE_WEIGHTS.balance;
-  // v0.9.0：根据 v0.9.0 galaxyType 覆盖 paletteKey 实现视觉签名差异；
-  // 仅切换 GALAXY_PALETTES 调色板，不改变 weights / planetCount / asteroidCount 等资源主逻辑，
-  // 保证 emptyVoid 关卡资源分布与 v0.8.0 基线等价（资源乘子留 T3 在运行路径接入）。
-  const runGalaxyType = (typeof galaxyTypeOverride === "string" && GALAXY_TYPES[galaxyTypeOverride])
-    ? galaxyTypeOverride
-    : (state.run?.currentGalaxyType && GALAXY_TYPES[state.run.currentGalaxyType] ? state.run.currentGalaxyType : null);
+  // v0.9.0 T4：根据 galaxyType 覆盖 paletteKey / bgColor / nebulaTint / body tint / 小行星密度；
+  // emptyVoid asteroidDensityMod=1.0 保证小行星数量与 v0.8.0 基线等价。
+  const runGalaxyType = resolveGenerateGalaxyType(galaxyTypeOverride);
   const galaxyDef = runGalaxyType ? GALAXY_TYPES[runGalaxyType] : null;
   const paletteKey = (galaxyDef?.paletteKey && GALAXY_PALETTES[galaxyDef.paletteKey])
     ? galaxyDef.paletteKey
-    : config.paletteKey;
+    : ((GALAXY_PALETTES[config.paletteKey] ? config.paletteKey : "sun"));
   const palette = GALAXY_PALETTES[paletteKey] || GALAXY_PALETTES.sun;
+  const planetColorTint = galaxyDef?.planetColorTint || null;
+  const asteroidDensityMod = galaxyDef ? clampGalaxyAsteroidDensityMod(galaxyDef.asteroidDensityMod) : 1.0;
 
   const star = {
     type: "star",
@@ -1417,7 +1567,7 @@ function generateGalaxy(level, seed, galaxyTypeOverride) {
 
   const bodies = [star];
   const planetCount = rngInt(rng, config.planetMin, config.planetMax);
-  const asteroidCount = rngInt(rng, config.asteroidMin, config.asteroidMax);
+  const asteroidCount = computeGalaxyAsteroidCount(config.asteroidMin, config.asteroidMax, rng, asteroidDensityMod);
 
   for (let i = 0; i < planetCount; i++) {
     const radius = rngFloat(rng, 70, 160);
@@ -1438,7 +1588,7 @@ function generateGalaxy(level, seed, galaxyTypeOverride) {
       x: pos.x,
       y: pos.y,
       r: radius,
-      color: getBodyColorByResource(resource, rng),
+      color: mixBodyColorWithGalaxyTint(getBodyColorByResource(resource, rng), planetColorTint),
       resource,
       amount: computeBodyAmount("planet", currentLevel, rng)
     });
@@ -1475,7 +1625,7 @@ function generateGalaxy(level, seed, galaxyTypeOverride) {
       x: pos.x,
       y: pos.y,
       r: radius,
-      color: getBodyColorByResource(resource, rng),
+      color: mixBodyColorWithGalaxyTint(getBodyColorByResource(resource, rng), planetColorTint),
       resource,
       amount: computeBodyAmount("asteroid", currentLevel, rng)
     });
@@ -1485,8 +1635,14 @@ function generateGalaxy(level, seed, galaxyTypeOverride) {
     level: currentLevel,
     type: galaxyType,
     seed: hashSeed(seed),
+    galaxyType: runGalaxyType,
     paletteKey,
     palette,
+    bgColor: galaxyDef?.bgColor ? [...galaxyDef.bgColor] : null,
+    nebulaTint: galaxyDef?.nebulaTint ? [...galaxyDef.nebulaTint] : null,
+    nebulaAlpha: runGalaxyType ? getGalaxyNebulaAlpha(runGalaxyType) : null,
+    planetColorTint: planetColorTint ? [...planetColorTint] : null,
+    asteroidDensityMod,
     bodies,
     stars: generateStarsByPalette(palette, rng),
     stationSpawn: findStationSpawn(star, bodies, rng)
@@ -1500,6 +1656,10 @@ function applyGalaxy(galaxy, { placeStation = true } = {}) {
     seed: galaxy.seed,
     palette: galaxy.palette,
     paletteKey: galaxy.paletteKey,
+    galaxyType: galaxy.galaxyType || state.run?.currentGalaxyType || null,
+    bgColor: galaxy.bgColor ? [...galaxy.bgColor] : null,
+    nebulaTint: galaxy.nebulaTint ? [...galaxy.nebulaTint] : null,
+    nebulaAlpha: galaxy.nebulaAlpha ?? null,
     stationSpawn: galaxy.stationSpawn
       ? { x: galaxy.stationSpawn.x, y: galaxy.stationSpawn.y }
       : { x: state.station.pos.x, y: state.station.pos.y },
@@ -3851,7 +4011,12 @@ class Renderer {
     this.vertices.length = 0;
     if (this.contextLost) return;
     const gl = this.gl;
-    gl.clearColor(0.012, 0.022, 0.048, 1);
+    const bg = state.galaxy?.bgColor;
+    if (bg && bg.length >= 3) {
+      gl.clearColor(bg[0], bg[1], bg[2], bg[3] ?? 1);
+    } else {
+      gl.clearColor(0.012, 0.022, 0.048, 1);
+    }
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
 
@@ -6933,6 +7098,24 @@ function render() {
 }
 
 function renderBackground() {
+  const nebulaTint = state.galaxy?.nebulaTint;
+  const nebulaAlpha = state.galaxy?.nebulaAlpha;
+  if (nebulaTint && Number.isFinite(nebulaAlpha) && nebulaAlpha > 0) {
+    const starBody = state.world.bodies.find((body) => body.type === "star") || { x: 0, y: 0 };
+    renderer.circle(starBody, 680, [nebulaTint[0], nebulaTint[1], nebulaTint[2], nebulaAlpha * 0.35], 48);
+    renderer.circle(
+      { x: starBody.x + 420, y: starBody.y - 280 },
+      520,
+      [nebulaTint[0], nebulaTint[1], nebulaTint[2], nebulaAlpha * 0.22],
+      40
+    );
+    renderer.circle(
+      { x: starBody.x - 380, y: starBody.y + 320 },
+      460,
+      [nebulaTint[0], nebulaTint[1], nebulaTint[2], nebulaAlpha * 0.18],
+      36
+    );
+  }
   for (const star of state.stars) {
     const tint = star.color || [0.65, 0.82, 1, 1];
     renderer.circle(star, star.r / state.camera.zoom, [tint[0], tint[1], tint[2], star.a], 8);
@@ -8372,6 +8555,16 @@ window.__gameTest = {
   },
   getGalaxySpawnTimer(baseInterval, galaxyType) {
     return getGalaxySpawnInterval(baseInterval, galaxyType);
+  },
+  // v0.9.0 T4：视觉签名与 generateGalaxy 预览钩子（节点 B 后半 PM 验证用）
+  getGalaxyVisualSignature(galaxyType) {
+    return getGalaxyVisualSignature(galaxyType);
+  },
+  generateGalaxyPreview(level, galaxyType, seed) {
+    return generateGalaxyPreview(level, galaxyType, seed);
+  },
+  runGalaxyVisualSelfCheck() {
+    return runGalaxyVisualSelfCheck();
   },
   getCellStat,
   applyModification,
