@@ -1002,7 +1002,8 @@ h2 {
 #meta,
 .guide-box,
 .status-alerts,
-.resource-guide {
+.resource-guide,
+.design-health-summary {
   color: #b7c8e6;
   font-size: 13px;
   line-height: 1.55;
@@ -1050,6 +1051,75 @@ h2 {
   border-radius: 10px;
   background: rgba(28, 58, 42, 0.22);
   border: 1px solid rgba(117, 245, 180, 0.16);
+}
+
+.design-health-summary:empty {
+  display: none;
+}
+
+.design-health-summary {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(38, 50, 78, 0.24);
+  border: 1px solid rgba(158, 212, 255, 0.18);
+}
+
+.design-health-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #9ecfff;
+  letter-spacing: 0.08em;
+}
+
+.design-health-item {
+  border-left: 3px solid rgba(158, 212, 255, 0.35);
+  padding: 4px 0 4px 8px;
+}
+
+.design-health-item + .design-health-item {
+  margin-top: 4px;
+}
+
+.design-health-item.is-good {
+  border-left-color: rgba(141, 255, 210, 0.8);
+}
+
+.design-health-item.is-warn {
+  border-left-color: rgba(255, 208, 128, 0.85);
+}
+
+.design-health-item.is-bad {
+  border-left-color: rgba(255, 154, 154, 0.9);
+}
+
+.design-health-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.design-health-label {
+  color: #d7eaff;
+  font-weight: 600;
+}
+
+.design-health-state {
+  font-size: 11px;
+  color: #9eb6d8;
+}
+
+.design-health-summary-text {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.design-health-detail {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #8fa8c8;
 }
 
 .resource-line {
@@ -2121,7 +2191,8 @@ h2 {
 
   .guide-box,
   .status-alerts,
-  .resource-guide {
+  .resource-guide,
+  .design-health-summary {
     font-size: 11px;
   }
 
@@ -2380,7 +2451,8 @@ h2 {
 
   .guide-box,
   .resource-guide,
-  .status-alerts {
+  .status-alerts,
+  .design-health-summary {
     padding: 7px 8px;
   }
 

@@ -13,6 +13,7 @@ const nextStepEl = document.getElementById("nextStep");
 const statusAlertsEl = document.getElementById("statusAlerts");
 const resourceGuideEl = document.getElementById("resourceGuide");
 const stationDataEl = document.getElementById("stationData");
+const designHealthSummaryEl = document.getElementById("designHealthSummary");
 const selectedCellPanelEl = document.getElementById("selectedCellPanel");
 const selectedCellInfoEl = document.getElementById("selectedCellInfo");
 const selectedCellDiagnosticsEl = document.getElementById("selectedCellDiagnostics");
@@ -720,6 +721,21 @@ const PLACEMENT_DIAGNOSTICS_COPY = {
   margin_after: "建后余量"
 };
 
+const STATION_DESIGN_HEALTH_LABELS = Object.freeze({
+  power: "电力余量",
+  mining: "采矿能力",
+  thrust: "推进能力",
+  firepower: "火力",
+  defense: "防御",
+  repair: "维修"
+});
+
+const STATION_DESIGN_HEALTH_STATUS_LABELS = Object.freeze({
+  good: "良好",
+  warn: "注意",
+  bad: "短板"
+});
+
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
 const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
@@ -1185,6 +1201,7 @@ const state = {
     guideNext: "",
     alerts: "",
     resourceGuide: "",
+    designHealthSummary: "",
     status: "",
     selected: "",
     selectedDiagnostics: "",
@@ -7295,6 +7312,246 @@ function getPlacementDiagnostics(facility, gridX, gridY) {
   };
 }
 
+function createStationDesignHealthEntry(key, status, summary, detail, reasonKey) {
+  return {
+    key,
+    status,
+    label: STATION_DESIGN_HEALTH_LABELS[key] || key,
+    summary,
+    detail,
+    reasonKey
+  };
+}
+
+function getStationDesignHealth() {
+  return computeStationDesignHealthSnapshot();
+}
+
+function computeStationDesignHealthSnapshot() {
+  const stationCells = [...state.station.cells.values()].filter((cell) => !cell.detached);
+  const frameMaxHp = TYPES.frame?.baseStats?.maxFrameHp || 0;
+  const miningStatus = getMiningStationStatus();
+  const miningInactiveCount = Math.max(0, miningStatus.miners.length - miningStatus.harvesting.length);
+  const miningInactiveRatio = miningStatus.miners.length > 0
+    ? miningInactiveCount / miningStatus.miners.length
+    : 1;
+
+  const thrusterCells = stationCells.filter((cell) => cell.facility === "thruster");
+  const activeThrusterCount = thrusterCells.filter((cell) => cell.enabled && cell.active).length;
+  const blockedThrusterCount = getBlockedThrusters().length;
+
+  const turretCells = stationCells.filter((cell) => cell.facility === "turret");
+  const missileCells = stationCells.filter((cell) => cell.facility === "missile");
+  const activeTurretCount = turretCells.filter((cell) => cell.enabled && cell.active).length;
+  const activeMissileCount = missileCells.filter((cell) => cell.enabled && cell.active).length;
+  const activeWeaponCount = activeTurretCount + activeMissileCount;
+
+  const shieldCells = stationCells.filter((cell) => cell.facility === "shield");
+  const armorCells = stationCells.filter((cell) => cell.facility === "armor");
+  const activeShieldCells = shieldCells.filter((cell) => cell.enabled && cell.active);
+  const activeShieldCount = activeShieldCells.length;
+  const recoveringShieldCount = activeShieldCells.filter((cell) => (cell.shield || 0) <= 0).length;
+
+  const repairCells = stationCells.filter((cell) => cell.facility === "repair");
+  const activeRepairCells = repairCells.filter((cell) => cell.enabled && cell.active);
+  const damagedCells = stationCells.filter((cell) => {
+    const frameHp = Number.isFinite(cell.frameHp) ? cell.frameHp : frameMaxHp;
+    const hullDamaged = Number.isFinite(cell.hp) && Number.isFinite(cell.maxHp) && cell.hp < cell.maxHp;
+    const frameDamaged = frameMaxHp > 0 && frameHp < frameMaxHp;
+    return hullDamaged || frameDamaged;
+  });
+  let uncoveredDamagedCount = 0;
+  if (damagedCells.length > 0) {
+    for (const damagedCell of damagedCells) {
+      const damagedPos = cellWorldPosition(damagedCell);
+      const covered = activeRepairCells.some((repairCell) => {
+        const range = getCellStat(repairCell, "range");
+        return dist(cellWorldPosition(repairCell), damagedPos) <= range;
+      });
+      if (!covered) uncoveredDamagedCount++;
+    }
+  }
+
+  const powerMargin = state.power.available - state.power.used;
+  const powerStarvedCount = getInactiveDueToPower().length;
+  const manualOffCount = getManualOffFacilities().length;
+  const coreCapabilityBlackout = (
+    (miningStatus.miners.length > 0 && miningStatus.activeMiners.length === 0)
+    || ((turretCells.length + missileCells.length) > 0 && activeWeaponCount === 0)
+    || (shieldCells.length > 0 && activeShieldCount === 0)
+    || (repairCells.length > 0 && activeRepairCells.length === 0)
+  );
+
+  let powerStatus = "good";
+  let powerSummary = "电力余量充足";
+  let powerReasonKey = "margin_safe";
+  if (powerMargin < 0) {
+    powerStatus = "bad";
+    powerSummary = "电力出现赤字";
+    powerReasonKey = "power_negative";
+  } else if (powerStarvedCount >= 3 || coreCapabilityBlackout) {
+    powerStatus = "bad";
+    powerSummary = "多处断电影响核心";
+    powerReasonKey = coreCapabilityBlackout ? "core_capability_blackout" : "mass_blackout";
+  } else if (powerMargin < 5 || powerStarvedCount > 0) {
+    powerStatus = "warn";
+    powerSummary = "电力紧张";
+    powerReasonKey = powerStarvedCount > 0 ? "partial_blackout" : "margin_tight";
+  }
+  const powerEntry = createStationDesignHealthEntry(
+    "power",
+    powerStatus,
+    powerSummary,
+    `余量 ${powerMargin.toFixed(1)}，断电 ${powerStarvedCount}，手动关闭 ${manualOffCount}。`,
+    powerReasonKey
+  );
+
+  let miningStatusLevel = "good";
+  let miningSummary = "采矿覆盖良好";
+  let miningReasonKey = "mining_covered";
+  if (miningStatus.miners.length === 0) {
+    miningStatusLevel = "bad";
+    miningSummary = "无有效采矿";
+    miningReasonKey = "no_mining_station";
+  } else if (miningStatus.harvesting.length === 0) {
+    miningStatusLevel = "bad";
+    miningSummary = "无有效采矿";
+    miningReasonKey = "all_miners_not_harvesting";
+  } else if (miningInactiveRatio >= 0.5) {
+    miningStatusLevel = "warn";
+    miningSummary = "采矿覆盖不足";
+    miningReasonKey = "mining_partial_outage";
+  }
+  const miningEntry = createStationDesignHealthEntry(
+    "mining",
+    miningStatusLevel,
+    miningSummary,
+    `采矿站 ${miningStatus.miners.length}，有效 ${miningStatus.harvesting.length}，断电 ${miningStatus.inactivePower.length}。`,
+    miningReasonKey
+  );
+
+  let thrustStatus = "good";
+  let thrustSummary = "推进充足";
+  let thrustReasonKey = "thrust_ready";
+  if (activeThrusterCount === 0) {
+    thrustStatus = "bad";
+    thrustSummary = "缺少推进";
+    thrustReasonKey = thrusterCells.length === 0 ? "no_thruster" : "all_thrusters_offline";
+  } else if (activeThrusterCount === 1 || blockedThrusterCount > 0 || activeThrusterCount < thrusterCells.length) {
+    thrustStatus = "warn";
+    thrustSummary = "推进偏弱";
+    if (blockedThrusterCount > 0) thrustReasonKey = "thruster_blocked";
+    else if (activeThrusterCount === 1) thrustReasonKey = "single_thruster_online";
+    else thrustReasonKey = "partial_thruster_offline";
+  }
+  const thrustEntry = createStationDesignHealthEntry(
+    "thrust",
+    thrustStatus,
+    thrustSummary,
+    `推进器 ${thrusterCells.length}，通电 ${activeThrusterCount}，喷口遮挡 ${blockedThrusterCount}。`,
+    thrustReasonKey
+  );
+
+  let firepowerStatus = "good";
+  let firepowerSummary = "火力充足";
+  let firepowerReasonKey = "firepower_ready";
+  if (activeWeaponCount === 0) {
+    firepowerStatus = "bad";
+    firepowerSummary = "缺少火力";
+    firepowerReasonKey = turretCells.length + missileCells.length > 0 ? "all_weapons_offline" : "no_weapon_built";
+  } else if (activeWeaponCount === 1 || (activeTurretCount === 0 && activeMissileCount > 0)) {
+    firepowerStatus = "warn";
+    firepowerSummary = "火力单一";
+    firepowerReasonKey = activeTurretCount === 0 ? "missile_only_online" : "single_weapon_online";
+  }
+  const firepowerEntry = createStationDesignHealthEntry(
+    "firepower",
+    firepowerStatus,
+    firepowerSummary,
+    `炮塔 ${activeTurretCount}/${turretCells.length}，导弹井 ${activeMissileCount}/${missileCells.length}。`,
+    firepowerReasonKey
+  );
+
+  let defenseStatus = "good";
+  let defenseSummary = "防御充足";
+  let defenseReasonKey = "defense_ready";
+  if (activeShieldCount === 0 && armorCells.length === 0) {
+    defenseStatus = "bad";
+    defenseSummary = "缺少防御";
+    defenseReasonKey = "no_defense_layer";
+  } else if (!(activeShieldCount >= 1 && armorCells.length >= 2 && recoveringShieldCount === 0)) {
+    defenseStatus = "warn";
+    defenseSummary = "防御偏薄";
+    if (activeShieldCount === 0) defenseReasonKey = "shield_offline";
+    else if (armorCells.length < 2) defenseReasonKey = "armor_insufficient";
+    else defenseReasonKey = "shield_recovering";
+  }
+  const defenseEntry = createStationDesignHealthEntry(
+    "defense",
+    defenseStatus,
+    defenseSummary,
+    `护盾 ${activeShieldCount}/${shieldCells.length}，装甲 ${armorCells.length}，护盾恢复中 ${recoveringShieldCount}。`,
+    defenseReasonKey
+  );
+
+  let repairStatus = "good";
+  let repairSummary = "维修覆盖良好";
+  let repairReasonKey = "repair_ready";
+  if (repairCells.length === 0 && damagedCells.length > 0) {
+    repairStatus = "bad";
+    repairSummary = "无维修能力";
+    repairReasonKey = "no_repair_with_damage";
+  } else if (repairCells.length === 0) {
+    repairStatus = "warn";
+    repairSummary = "维修有缺口";
+    repairReasonKey = "no_repair_station";
+  } else if (activeRepairCells.length === 0) {
+    repairStatus = "warn";
+    repairSummary = "维修有缺口";
+    repairReasonKey = "repair_offline";
+  } else if (uncoveredDamagedCount > 0) {
+    repairStatus = "warn";
+    repairSummary = "维修有缺口";
+    repairReasonKey = "damaged_out_of_repair_range";
+  }
+  const repairEntry = createStationDesignHealthEntry(
+    "repair",
+    repairStatus,
+    repairSummary,
+    `维修站 ${activeRepairCells.length}/${repairCells.length}，受损 ${damagedCells.length}，未覆盖 ${uncoveredDamagedCount}。`,
+    repairReasonKey
+  );
+
+  const categories = [powerEntry, miningEntry, thrustEntry, firepowerEntry, defenseEntry, repairEntry];
+  return {
+    generatedAt: state.time,
+    power: powerEntry,
+    mining: miningEntry,
+    thrust: thrustEntry,
+    firepower: firepowerEntry,
+    defense: defenseEntry,
+    repair: repairEntry,
+    categories
+  };
+}
+
+function buildStationDesignHealthSummaryHtml(health = getStationDesignHealth()) {
+  const categories = Array.isArray(health?.categories) ? health.categories : [];
+  if (!categories.length) return "";
+  const itemsHtml = categories.map((item) => {
+    const statusLabel = STATION_DESIGN_HEALTH_STATUS_LABELS[item.status] || item.status;
+    const reasonKey = item.reasonKey || "";
+    return [
+      `<div class="design-health-item is-${item.status}" data-design-key="${item.key}" data-status="${item.status}" data-reason-key="${reasonKey}">`,
+      `<div class="design-health-main"><span class="design-health-label">${item.label}</span><span class="design-health-state">${statusLabel}</span></div>`,
+      `<div class="design-health-summary-text">${item.summary}</div>`,
+      `<div class="design-health-detail">${item.detail}</div>`,
+      `</div>`
+    ].join("");
+  }).join("");
+  return `<div class="design-health-title">空间站设计健康摘要</div>${itemsHtml}`;
+}
+
 function buildSelectedCellDiagnosticsHtml(diagnostics) {
   if (!diagnostics) return "";
   const lines = [];
@@ -11502,6 +11759,11 @@ function updateHud() {
     `结构：${state.station.cells.size} 个，运作：${active}，脱落：${detached}`,
     `速度：${Math.floor(length(state.station.vel))} / 科技等级：${state.station.techLevel}`
   ].join("<br>"));
+  setHtmlIfChanged(
+    designHealthSummaryEl,
+    "designHealthSummary",
+    buildStationDesignHealthSummaryHtml(getStationDesignHealth())
+  );
   updateSelectedCellPanel(selected);
 
   const runInfo = [
@@ -13214,6 +13476,9 @@ window.__gameTest.playtest = {
   getPlacementDiagnostics(facilityOrGrid, gridX, gridY) {
     return safeDeepCloneForTest(resolvePlacementArgsForTest(facilityOrGrid, gridX, gridY));
   },
+  getStationDesignHealth() {
+    return safeDeepCloneForTest(getStationDesignHealth());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
@@ -13258,6 +13523,9 @@ window.__gameTest.playtest = {
         summary: summarizeMetaStorageForPlaytestSnapshot()
       },
       resource: summarizeResourceForPlaytestSnapshot(),
+      design: {
+        health: safeDeepCloneForTest(getStationDesignHealth())
+      },
       objective: summarizeObjectiveForPlaytestSnapshot(),
       guide: summarizeGuideForPlaytestSnapshot(),
       selfChecks: getPlaytestSelfCheckStateSnapshot(),
