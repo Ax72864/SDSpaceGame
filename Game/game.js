@@ -2958,9 +2958,6 @@ function bindInput() {
       (key === "f" || event.key === "[" || event.key === "【" || event.key === "]" || event.key === "】")
     ) {
       if (key === "f") {
-        const now = performance.now();
-        if (now - (state.input._fLastFireAt || 0) < F_FIRE_DEBOUNCE_MS) return;
-        state.input._fLastFireAt = now;
         fireMissiles();
         event.preventDefault();
       } else if (event.key === "[" || event.key === "【") {
@@ -4964,6 +4961,11 @@ function adjustSalvoSize(delta) {
 }
 
 function fireMissiles() {
+  // 防抖检查（v0.7.0 S2-1 修复：F 键和 #missileBtn 都受同款防抖保护）
+  const now = performance.now();
+  if (now - (state.input._fLastFireAt || 0) < F_FIRE_DEBOUNCE_MS) return;
+  state.input._fLastFireAt = now;
+
   const readyEntries = [];
   for (const [cellKey, cell] of state.station.cells) {
     if (cell.facility !== "missile") continue;
