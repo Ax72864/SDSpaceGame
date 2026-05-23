@@ -6763,6 +6763,7 @@ function initGame() {
   updateControlModeUi();
   updateHud();
   syncMainPanelUiState();
+  initReleaseCandidatePlaytestEntry();
   showToast("核心已上线。默认「屏幕方向」移动（W=上）；展开右侧「更多状态」可切换移动模式。鼠标指向决定朝向。");
 }
 
@@ -15744,6 +15745,30 @@ const RELEASE_MANUAL_CHECK_IDS = [
   "P0-7.galaxyJump",
   "P0-8.metaReturn"
 ];
+const PLAYTEST_MANUAL_CHECKLIST_ITEMS = [
+  { id: "P0-1.firstRun", label: "空存档首局", hint: "首屏 HUD/引导可读，无阻塞初始化 error" },
+  { id: "P0-2.miningLoop", label: "建造采矿链", hint: "找到采矿设施并完成最小采集反馈" },
+  { id: "P0-3.resourceShortage", label: "资源不足/断电", hint: "失败原因可读，非无反馈点击" },
+  { id: "P0-4.enemyApproach", label: "敌人接近", hint: "威胁摘要可读，安全态不误报" },
+  { id: "P0-5.combatAndRepair", label: "武器/护盾/维修", hint: "战斗状态与失败原因可诊断" },
+  { id: "P0-6.postCombatReview", label: "战斗后复盘", hint: "交火后 2-4 条复盘或等价总结" },
+  { id: "P0-7.galaxyJump", label: "星系跳转", hint: "跃迁入口可点，回局内 HUD 正常" },
+  { id: "P0-8.metaReturn", label: "Meta 回到新局", hint: "局外天赋/结算后新局状态不混乱" },
+  { id: "P0-9.smallScreen", label: "小屏可读性", hint: "窄屏下核心按钮/面板可滚动且不永久遮挡" },
+  { id: "P0-10.consoleRuntime", label: "控制台/runtime errors", hint: "DevTools console 无阻塞 error（需人工记录）" }
+];
+const PLAYTEST_MANUAL_STATUS_OPTIONS = [
+  { value: "", label: "未完成" },
+  { value: "pass", label: "通过" },
+  { value: "fail", label: "失败" },
+  { value: "uncovered", label: "未覆盖" },
+  { value: "blocking", label: "阻塞发布" }
+];
+let releaseCandidatePanelEl = null;
+let releaseCandidateToggleBtnEl = null;
+let releaseCandidateLastResult = null;
+let releaseCandidatePanelBusy = false;
+let releaseCandidatePlaytestUrlEnabled = false;
 const RELEASE_EXTRA_KEY_DOM_IDS = [
   "runInfo",
   "runDanger",
@@ -17210,6 +17235,339 @@ async function runReleaseCandidateChecks(options = {}) {
   });
 }
 
+function isReleaseCandidatePlaytestUrlEnabled() {
+  if (typeof location === "undefined") return false;
+  try {
+    const params = new URLSearchParams(location.search);
+    return params.get("playtest") === "1" || params.has("release-candidate");
+  } catch {
+    return false;
+  }
+}
+
+function isReleaseCandidatePanelOpen() {
+  return !!releaseCandidatePanelEl && !releaseCandidatePanelEl.classList.contains("hidden");
+}
+
+function ensureReleaseCandidateToggleButton() {
+  if (typeof document === "undefined") return null;
+  if (releaseCandidateToggleBtnEl) return releaseCandidateToggleBtnEl;
+  releaseCandidateToggleBtnEl = document.createElement("button");
+  releaseCandidateToggleBtnEl.type = "button";
+  releaseCandidateToggleBtnEl.id = "releaseCandidateToggleBtn";
+  releaseCandidateToggleBtnEl.className = "release-candidate-toggle hidden";
+  releaseCandidateToggleBtnEl.textContent = "PM 检查";
+  releaseCandidateToggleBtnEl.title = "打开发布候选人工 checklist（仅 playtest 模式）";
+  releaseCandidateToggleBtnEl.addEventListener("click", () => openReleaseCandidatePanel());
+  document.body.appendChild(releaseCandidateToggleBtnEl);
+  return releaseCandidateToggleBtnEl;
+}
+
+function syncReleaseCandidateToggleVisibility() {
+  if (!releaseCandidateToggleBtnEl) return;
+  const showToggle = releaseCandidatePlaytestUrlEnabled && !isReleaseCandidatePanelOpen();
+  releaseCandidateToggleBtnEl.classList.toggle("hidden", !showToggle);
+}
+
+function ensureReleaseCandidatePanel() {
+  if (typeof document === "undefined") return null;
+  if (releaseCandidatePanelEl) return releaseCandidatePanelEl;
+
+  releaseCandidatePanelEl = document.createElement("section");
+  releaseCandidatePanelEl.id = "releaseCandidatePanel";
+  releaseCandidatePanelEl.className = "release-candidate-panel hidden";
+  releaseCandidatePanelEl.setAttribute("role", "complementary");
+  releaseCandidatePanelEl.setAttribute("aria-label", "发布候选人工 playtest checklist");
+
+  releaseCandidatePanelEl.innerHTML = `
+    <header class="release-candidate-panel__header">
+      <h3 class="release-candidate-panel__title">PM 人工 Playtest Checklist</h3>
+      <div class="release-candidate-panel__actions">
+        <button type="button" data-rc-action="refresh">刷新自动检查</button>
+        <button type="button" data-rc-action="copy">复制摘要</button>
+        <button type="button" data-rc-action="close">关闭</button>
+      </div>
+    </header>
+    <p class="release-candidate-panel__notice">
+      自动检查、浏览器取证、人工结论分层展示。人工项默认未完成，脚本不会自动标记通过。
+      未由自动检查覆盖的路径需真实浏览器人工补证；无真实人工体验时结论应为「发布候选证据不足」。
+    </p>
+    <div class="release-candidate-panel__status" data-rc-region="status">尚未运行自动检查。</div>
+    <section class="release-candidate-panel__section" aria-labelledby="rcAutoHeading">
+      <h4 id="rcAutoHeading">自动检查结果</h4>
+      <div class="release-candidate-panel__body" data-rc-region="automatic">等待刷新…</div>
+    </section>
+    <section class="release-candidate-panel__section" aria-labelledby="rcBrowserHeading">
+      <h4 id="rcBrowserHeading">浏览器取证</h4>
+      <div class="release-candidate-panel__body" data-rc-region="browser">等待刷新…</div>
+    </section>
+    <section class="release-candidate-panel__section" aria-labelledby="rcManualHeading">
+      <h4 id="rcManualHeading">人工结论（默认未完成）</h4>
+      <ul class="release-candidate-manual-list" data-rc-region="manual"></ul>
+    </section>
+  `;
+
+  releaseCandidatePanelEl.querySelector('[data-rc-action="refresh"]')?.addEventListener("click", () => {
+    refreshReleaseCandidateAutoChecks();
+  });
+  releaseCandidatePanelEl.querySelector('[data-rc-action="copy"]')?.addEventListener("click", () => {
+    copyReleaseCandidateSummary();
+  });
+  releaseCandidatePanelEl.querySelector('[data-rc-action="close"]')?.addEventListener("click", () => {
+    closeReleaseCandidatePanel();
+  });
+
+  renderReleaseCandidateManualSection();
+  document.body.appendChild(releaseCandidatePanelEl);
+  return releaseCandidatePanelEl;
+}
+
+function readReleaseCandidateManualStatuses() {
+  const statuses = {};
+  if (!releaseCandidatePanelEl) return statuses;
+  const selects = releaseCandidatePanelEl.querySelectorAll("[data-rc-manual-id]");
+  for (const select of selects) {
+    const id = select.getAttribute("data-rc-manual-id");
+    if (id) statuses[id] = select.value || "";
+  }
+  return statuses;
+}
+
+function renderReleaseCandidateManualSection(preserveStatuses = null) {
+  if (!releaseCandidatePanelEl) return;
+  const listEl = releaseCandidatePanelEl.querySelector('[data-rc-region="manual"]');
+  if (!listEl) return;
+  const saved = preserveStatuses || readReleaseCandidateManualStatuses();
+  listEl.innerHTML = "";
+  for (const item of PLAYTEST_MANUAL_CHECKLIST_ITEMS) {
+    const li = document.createElement("li");
+    li.className = "release-candidate-manual-item";
+    const label = document.createElement("label");
+    label.className = "release-candidate-manual-item__label";
+    label.textContent = item.label;
+    const hint = document.createElement("span");
+    hint.className = "release-candidate-manual-item__hint";
+    hint.textContent = item.hint;
+    const select = document.createElement("select");
+    select.setAttribute("data-rc-manual-id", item.id);
+    select.className = "release-candidate-manual-item__status";
+    for (const option of PLAYTEST_MANUAL_STATUS_OPTIONS) {
+      const opt = document.createElement("option");
+      opt.value = option.value;
+      opt.textContent = option.label;
+      select.appendChild(opt);
+    }
+    select.value = saved[item.id] || "";
+    label.appendChild(select);
+    li.appendChild(label);
+    li.appendChild(hint);
+    listEl.appendChild(li);
+  }
+}
+
+function formatReleaseCandidateCheckLine(entry) {
+  if (!entry) return "";
+  const status = entry.status || "unknown";
+  const summary = entry.details?.summary || entry.summary || entry.label || entry.id;
+  return `- [${status}] ${entry.label || entry.id}: ${summary}`;
+}
+
+function renderReleaseCandidateAutomaticSection(result) {
+  if (!releaseCandidatePanelEl) return;
+  const region = releaseCandidatePanelEl.querySelector('[data-rc-region="automatic"]');
+  if (!region) return;
+  const checks = Array.isArray(result?.checks) ? result.checks : [];
+  const automaticChecks = checks.filter((entry) => entry.layer !== "manual");
+  if (automaticChecks.length === 0) {
+    region.textContent = "无自动检查项。";
+    return;
+  }
+  const lines = automaticChecks.map(formatReleaseCandidateCheckLine);
+  const okLine = `ok=${result?.ok === true ? "true" : "false"} · 耗时 ${result?.durationMs ?? "?"}ms`;
+  region.innerHTML = `<p class="release-candidate-panel__meta">${okLine}</p><pre class="release-candidate-panel__pre">${lines.join("\n")}</pre>`;
+}
+
+function renderReleaseCandidateBrowserSection(result) {
+  if (!releaseCandidatePanelEl) return;
+  const region = releaseCandidatePanelEl.querySelector('[data-rc-region="browser"]');
+  if (!region) return;
+  const snapshot = result?.snapshotAfter || result?.snapshot || null;
+  const environment = snapshot?.environment || {};
+  const viewport = snapshot?.base?.viewport || {};
+  const evidenceBrowser = snapshot?.evidence?.layers?.browser || [];
+  const runtimeErrors = snapshot?.base?.runtimeErrors || {};
+  const storage = snapshot?.storageSignature || result?.snapshotBefore?.storageSignature || null;
+  const frameTiming = snapshot?.frameTiming || {};
+  const lines = [
+    `viewport: ${viewport.width ?? "?"}×${viewport.height ?? "?"} · DPR ${viewport.devicePixelRatio ?? "?"} · narrow=${viewport.narrowViewport ? "yes" : "no"}`,
+    `UA: ${environment.userAgent || "unknown"}`,
+    `headlessHint: ${environment.isHeadlessHint ? "yes" : "no"}${environment.headlessReasons?.length ? ` (${environment.headlessReasons.join(", ")})` : ""}`,
+    `runtimeErrors(buffer): count=${runtimeErrors.count ?? 0}`,
+    `storageSignature.save.hash32: ${storage?.save?.hash32 ?? "n/a"}`,
+    `frameTiming: mode=${frameTiming.mode || "n/a"} avg=${frameTiming.avgMs ?? "n/a"}ms max=${frameTiming.maxMs ?? "n/a"}ms`
+  ];
+  if (evidenceBrowser.length > 0) {
+    lines.push("", "evidence.browser:");
+    for (const entry of evidenceBrowser) {
+      lines.push(formatReleaseCandidateCheckLine(entry));
+    }
+  }
+  lines.push("", "注意：DevTools Console 面板需 PM 手工记录，自动检查不覆盖。");
+  region.innerHTML = `<pre class="release-candidate-panel__pre">${lines.join("\n")}</pre>`;
+}
+
+function setReleaseCandidatePanelStatus(message) {
+  if (!releaseCandidatePanelEl) return;
+  const statusEl = releaseCandidatePanelEl.querySelector('[data-rc-region="status"]');
+  if (statusEl) statusEl.textContent = message;
+}
+
+function setReleaseCandidatePanelBusy(busy) {
+  releaseCandidatePanelBusy = busy;
+  if (!releaseCandidatePanelEl) return;
+  const refreshBtn = releaseCandidatePanelEl.querySelector('[data-rc-action="refresh"]');
+  if (refreshBtn) refreshBtn.disabled = busy;
+  releaseCandidatePanelEl.classList.toggle("release-candidate-panel--busy", busy);
+}
+
+async function refreshReleaseCandidateAutoChecks() {
+  ensureReleaseCandidatePanel();
+  if (!releaseCandidatePanelEl || releaseCandidatePanelBusy) return;
+  const manualSnapshot = readReleaseCandidateManualStatuses();
+  setReleaseCandidatePanelBusy(true);
+  setReleaseCandidatePanelStatus("正在运行 runReleaseCandidateChecks…");
+  try {
+    const result = await runReleaseCandidateChecks({ sampleFrames: RELEASE_FRAME_TIMING_DEFAULT_SAMPLES });
+    releaseCandidateLastResult = result;
+    renderReleaseCandidateAutomaticSection(result);
+    renderReleaseCandidateBrowserSection(result);
+    renderReleaseCandidateManualSection(manualSnapshot);
+    const coverage = result?.snapshotAfter?.evidence?.coverage;
+    const coverageLine = coverage
+      ? `automatic ${coverage.automaticPassed}/${coverage.automaticPassed + coverage.automaticFailed + coverage.automaticUnknown} pass · browser covered ${coverage.browserCovered} · manual uncovered ${coverage.manualUncovered}`
+      : "";
+    setReleaseCandidatePanelStatus(`自动检查完成。${coverageLine}`.trim());
+  } catch (error) {
+    setReleaseCandidatePanelStatus(`自动检查失败：${error?.message || error}`);
+    console.error("[releaseCandidate] runChecks failed", error);
+  } finally {
+    setReleaseCandidatePanelBusy(false);
+  }
+}
+
+function buildReleaseCandidateSummaryText() {
+  const manualStatuses = readReleaseCandidateManualStatuses();
+  const result = releaseCandidateLastResult;
+  const snapshot = result?.snapshotAfter || null;
+  const viewport = snapshot?.base?.viewport || {};
+  const environment = snapshot?.environment || {};
+  const lines = [
+    "=== v0.14.0 发布候选 Playtest 摘要 ===",
+    `capturedAt: ${new Date().toISOString()}`,
+    `browser: ${environment.userAgent || "unknown"}`,
+    `viewport: ${viewport.width ?? "?"}×${viewport.height ?? "?"} DPR=${viewport.devicePixelRatio ?? "?"}`,
+    `automatic.ok: ${result?.ok === true ? "true" : result?.ok === false ? "false" : "n/a"}`,
+    ""
+  ];
+  if (Array.isArray(result?.checks)) {
+    lines.push("[自动检查]");
+    for (const check of result.checks.filter((entry) => entry.layer !== "manual")) {
+      lines.push(formatReleaseCandidateCheckLine(check));
+    }
+    lines.push("");
+  }
+  lines.push("[浏览器取证]");
+  lines.push(`headlessHint: ${environment.isHeadlessHint ? "yes" : "no"}`);
+  lines.push(`runtimeErrors.count: ${snapshot?.base?.runtimeErrors?.count ?? "n/a"}`);
+  lines.push(`storage.save.hash32: ${snapshot?.storageSignature?.save?.hash32 ?? "n/a"}`);
+  lines.push("console: 需 PM 手工记录 DevTools");
+  lines.push("");
+  lines.push("[人工结论 — 脚本不自动标记通过]");
+  for (const item of PLAYTEST_MANUAL_CHECKLIST_ITEMS) {
+    const status = manualStatuses[item.id] || "";
+    const statusLabel = PLAYTEST_MANUAL_STATUS_OPTIONS.find((opt) => opt.value === status)?.label || "未完成";
+    lines.push(`- ${item.label}: ${statusLabel}`);
+  }
+  const manualIncomplete = PLAYTEST_MANUAL_CHECKLIST_ITEMS.some((item) => !manualStatuses[item.id]);
+  if (manualIncomplete) {
+    lines.push("", "结论提示: 存在未完成人工项 → 发布候选证据不足（需真实浏览器人工补证）");
+  }
+  if (Array.isArray(result?.residualRisks) && result.residualRisks.length > 0) {
+    lines.push("", "[残留风险]");
+    for (const risk of result.residualRisks) {
+      lines.push(`- [${risk.severity}] ${risk.kind}: ${risk.summary}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+async function copyReleaseCandidateSummary() {
+  const text = buildReleaseCandidateSummaryText();
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Playtest 摘要已复制到剪贴板。");
+      return { ok: true, method: "clipboard" };
+    } catch {
+      // fall through
+    }
+  }
+  if (typeof document !== "undefined") {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      textarea.remove();
+      if (copied) {
+        showToast("Playtest 摘要已复制（fallback）。");
+        return { ok: true, method: "execCommand" };
+      }
+    } catch {
+      // fall through
+    }
+  }
+  console.log("[releaseCandidate] copy fallback\n", text);
+  showToast("复制不可用，摘要已输出到 console。");
+  return { ok: false, method: "console" };
+}
+
+function openReleaseCandidatePanel() {
+  if (typeof document === "undefined") {
+    return { ok: false, reason: "no_document" };
+  }
+  ensureReleaseCandidatePanel();
+  if (!releaseCandidatePanelEl) {
+    return { ok: false, reason: "panel_create_failed" };
+  }
+  releaseCandidatePanelEl.classList.remove("hidden");
+  syncReleaseCandidateToggleVisibility();
+  if (!releaseCandidateLastResult && !releaseCandidatePanelBusy) {
+    refreshReleaseCandidateAutoChecks();
+  }
+  return { ok: true };
+}
+
+function closeReleaseCandidatePanel() {
+  if (!releaseCandidatePanelEl) {
+    return { ok: true };
+  }
+  releaseCandidatePanelEl.classList.add("hidden");
+  syncReleaseCandidateToggleVisibility();
+  return { ok: true };
+}
+
+function initReleaseCandidatePlaytestEntry() {
+  releaseCandidatePlaytestUrlEnabled = isReleaseCandidatePlaytestUrlEnabled();
+  if (!releaseCandidatePlaytestUrlEnabled) return;
+  ensureReleaseCandidateToggleButton();
+  openReleaseCandidatePanel();
+}
+
 function handlePlaytestEscapeKeydown() {
   if (isGalaxyMapPanelOpen()) {
     cancelGalaxyJump();
@@ -17381,6 +17739,15 @@ window.__gameTest.playtest = {
     },
     async runReleaseCandidateChecks(options = {}) {
       return runReleaseCandidateChecks(options);
+    },
+    openPanel() {
+      return openReleaseCandidatePanel();
+    },
+    closePanel() {
+      return closeReleaseCandidatePanel();
+    },
+    isPanelOpen() {
+      return isReleaseCandidatePanelOpen();
     }
   },
   runAllSelfChecks() {
