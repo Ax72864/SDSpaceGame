@@ -444,6 +444,35 @@ button:disabled {
   margin-bottom: 3px;
 }
 
+.galaxy-map-foresight {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(132, 205, 255, 0.26);
+  background: rgba(18, 48, 78, 0.32);
+}
+
+.galaxy-map-foresight-title {
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #d9efff;
+}
+
+.galaxy-map-foresight-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #b8d8f4;
+}
+
+.galaxy-map-foresight-list li + li {
+  margin-top: 2px;
+}
+
 .galaxy-map-footer {
   display: flex;
   justify-content: center;
