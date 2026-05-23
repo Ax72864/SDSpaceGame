@@ -1313,6 +1313,45 @@ h2 {
   margin-top: 8px;
 }
 
+.selected-cell-diagnostics {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(8, 20, 34, 0.72);
+  border: 1px solid rgba(117, 245, 255, 0.12);
+}
+
+.selected-cell-diagnostics.hidden {
+  display: none;
+}
+
+.diag-line {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #b8d4ea;
+}
+
+.diag-line + .diag-line {
+  margin-top: 4px;
+}
+
+.diag-line.diag-ok {
+  color: #9fd9b0;
+}
+
+.diag-line.diag-warning {
+  color: #f0c878;
+}
+
+.diag-line.diag-critical {
+  color: #ff9a84;
+}
+
+.placement-info,
+.placement-warning {
+  margin-top: 2px;
+}
+
 .cell-upgrade-panel {
   margin-top: 8px;
   padding-top: 8px;

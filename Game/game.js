@@ -15,6 +15,7 @@ const resourceGuideEl = document.getElementById("resourceGuide");
 const stationDataEl = document.getElementById("stationData");
 const selectedCellPanelEl = document.getElementById("selectedCellPanel");
 const selectedCellInfoEl = document.getElementById("selectedCellInfo");
+const selectedCellDiagnosticsEl = document.getElementById("selectedCellDiagnostics");
 const metaStatsEl = document.getElementById("metaStats");
 const toastEl = document.getElementById("toast");
 const runSettlementPanelEl = document.getElementById("runSettlementPanel");
@@ -672,6 +673,53 @@ const BUILD_PALETTE_TIP_COPY = {
   redundant_high_count: "已有较多同类设施，先检查电力。"
 };
 
+const SELECTED_DIAGNOSTICS_COPY = {
+  enabled: "启用",
+  disabled_manual: "已手动关闭",
+  active: "运作中",
+  power_starved: "电力不足停机",
+  detached: "已脱离核心",
+  connected: "已连通核心",
+  nozzle_blocked: "喷口被遮挡",
+  harvesting: "正在采集",
+  mining_standby_gap: "待命：距资源外环还差",
+  mining_standby_empty: "范围内暂无可用资源",
+  mining_no_body: "附近无资源外环",
+  weapon_ready: "火力可用：有供电，射程内敌人可攻击",
+  weapon_no_power: "火力断电：补供电后参与战斗",
+  weapon_no_target: "暂无目标：武器就绪，等待敌人进入射程",
+  weapon_los_blocked: "射线受限：当前方向可能被自机遮挡",
+  weapon_boundary: "射程约",
+  shield_active: "基础护盾存在，定向拦截来袭弹体",
+  shield_no_power: "护盾缺电：补供电后恢复拦截",
+  shield_broken: "护盾已被打破，正在恢复",
+  armor_note: "高耐久护甲层，吸收伤害",
+  repair_active: "维修可用：会派出无人机修复最近受损设施",
+  repair_no_power: "维修缺电：补供电后恢复",
+  repair_idle: "维修就绪：当前无受损目标",
+  power_out: "产电",
+  power_use: "耗电",
+  power_neutral: "不耗电"
+};
+
+const PLACEMENT_DIAGNOSTICS_COPY = {
+  occupied: "该格已有设施",
+  no_neighbor: "未连接空间站核心",
+  placement_invalid: "当前位置不可放置",
+  resource_low: "资源不足，暂时不能建造",
+  out_of_mining_range: "未覆盖资源外环，当前位置采不到资源",
+  power_pressure: "建造后电力紧张，关键设施可能断电",
+  power_negative: "建造后电力为负，部分设施可能断电",
+  mining_good: "覆盖资源外环，适合采集",
+  mining_far: "距离资源外环偏远，采矿效率可能不足",
+  weapon_tip: "建议放在外缘，减少自机遮挡射线",
+  shield_tip: "定向护盾需朝向主要来袭方向",
+  repair_tip: "靠近核心或受损密集区，维修响应更快",
+  power_tip: "优先放在耗电设施附近，稳定供电",
+  can_place: "可放置",
+  margin_after: "建后余量"
+};
+
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
 const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
@@ -1139,6 +1187,7 @@ const state = {
     resourceGuide: "",
     status: "",
     selected: "",
+    selectedDiagnostics: "",
     selectedUpgradeKey: "",
     meta: "",
     runInfo: "",
@@ -1232,6 +1281,7 @@ const state = {
   lastBuildError: "",
   buildHint: "",
   bridgePreview: null,
+  placementPreview: null,
   particles: [],
   fireCooldown: 0,
   spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER,
@@ -6949,6 +6999,538 @@ function getBuildPaletteDiagnostics() {
   };
 }
 
+function getConnectedComponentStats(cell) {
+  if (!cell || cell.detached) {
+    return { connected: false, fragmentSize: 0, isCoreFragment: false };
+  }
+  const startKey = key(cell.x, cell.y);
+  const visited = new Set();
+  const queue = [startKey];
+  let isCoreFragment = false;
+  while (queue.length) {
+    const currentKey = queue.pop();
+    if (visited.has(currentKey)) continue;
+    visited.add(currentKey);
+    const current = state.station.cells.get(currentKey);
+    if (!current || current.detached) continue;
+    if (current.facility === "core") isCoreFragment = true;
+    const [cx, cy] = currentKey.split(",").map(Number);
+    for (const neighbor of neighbors(cx, cy)) {
+      const neighborCell = state.station.cells.get(key(neighbor.x, neighbor.y));
+      if (neighborCell && !neighborCell.detached) {
+        queue.push(key(neighbor.x, neighbor.y));
+      }
+    }
+  }
+  return {
+    connected: true,
+    fragmentSize: visited.size,
+    isCoreFragment
+  };
+}
+
+function getSelectedCellPowerImpact(cell) {
+  const def = TYPES[cell.facility] || {};
+  const powerOut = def.powerOut || def.baseStats?.powerOut || 0;
+  const bonusPowerOut = def.baseStats?.bonusPowerOut || 0;
+  const powerUse = def.powerUse || 0;
+  return {
+    powerOut,
+    bonusPowerOut,
+    powerUse,
+    netDelta: powerOut + bonusPowerOut - powerUse
+  };
+}
+
+function getSelectedCellRangeDiagnostics(cell) {
+  if (!cell || cell.detached) return null;
+  const facility = cell.facility;
+  if (facility === "mining") {
+    const target = getMiningCellTarget(cell);
+    const nearest = getNearestResourceBody(cellWorldPosition(cell));
+    const nearestHint = nearest
+      ? {
+          bodyName: nearest.body.name,
+          resource: nearest.body.resource,
+          distance: nearest.distance,
+          range: nearest.range,
+          gap: Math.max(0, Math.ceil(nearest.distance - nearest.range)),
+          inRange: nearest.distance <= nearest.range
+        }
+      : null;
+    return {
+      kind: "mining",
+      nominalRange: nearest?.range || MINING_RANGE_OFFSET,
+      currentTarget: target
+        ? {
+            bodyName: target.body.name,
+            resource: target.body.resource
+          }
+        : null,
+      nearestHint
+    };
+  }
+  if (facility === "turret" || facility === "missile") {
+    return {
+      kind: "weapon",
+      nominalRange: getCellStat(cell, "range"),
+      currentTarget: null,
+      nearestHint: null
+    };
+  }
+  if (facility === "shield") {
+    return {
+      kind: "shield",
+      nominalRange: getCellStat(cell, "range"),
+      currentTarget: null,
+      nearestHint: null
+    };
+  }
+  if (facility === "repair") {
+    return {
+      kind: "repair",
+      nominalRange: null,
+      currentTarget: null,
+      nearestHint: null
+    };
+  }
+  return null;
+}
+
+function getSelectedCellWeaponDiagnostics(cell) {
+  if (!cell || (cell.facility !== "turret" && cell.facility !== "missile")) return null;
+  const origin = cellWorldPosition(cell);
+  const range = getCellStat(cell, "range");
+  const rangeText = `约 ${Math.floor(range)}`;
+  if (cell.detached || !cell.enabled) {
+    return { losAvailable: null, rangeText, statusKey: cell.detached ? "detached" : "disabled_manual" };
+  }
+  if (!cell.active) {
+    return { losAvailable: null, rangeText, statusKey: "weapon_no_power" };
+  }
+  const enemy = selectTarget(origin, range);
+  if (!enemy) {
+    return { losAvailable: null, rangeText, statusKey: "weapon_no_target" };
+  }
+  const losAvailable = hasLineOfSight(origin, enemy);
+  return {
+    losAvailable,
+    rangeText,
+    statusKey: losAvailable ? "weapon_ready" : "weapon_los_blocked",
+    targetDistance: Math.floor(dist(origin, enemy))
+  };
+}
+
+function getSelectedCellShieldDiagnostics(cell) {
+  if (!cell || cell.facility !== "shield") return null;
+  let coverageStatus = "unknown";
+  if (cell.detached) coverageStatus = "inactive";
+  else if (!cell.enabled) coverageStatus = "inactive";
+  else if (!cell.active) coverageStatus = "inactive";
+  else if ((cell.shield || 0) <= 0) coverageStatus = "recovering";
+  else coverageStatus = "active";
+  return {
+    coverageStatus,
+    shield: Math.floor(cell.shield || 0),
+    maxShield: Math.floor(cell.maxShield || getCellStat(cell, "maxShield")),
+    range: Math.floor(getCellStat(cell, "range"))
+  };
+}
+
+function getSelectedCellRepairDiagnostics(cell) {
+  if (!cell || cell.facility !== "repair") return null;
+  let coverageStatus = "unknown";
+  if (cell.detached || !cell.enabled || !cell.active) {
+    coverageStatus = "inactive";
+  } else {
+    const hasDamaged = [...state.station.cells.values()].some(
+      (entry) => !entry.detached && (entry.hp < entry.maxHp || entry.frameHp < TYPES.frame.baseStats.maxFrameHp)
+    );
+    coverageStatus = hasDamaged ? "active" : "idle";
+  }
+  return {
+    coverageStatus,
+    repairRate: getCellStat(cell, "repairRate"),
+    frameRepairRate: getCellStat(cell, "frameRepairRate"),
+    cooldown: getCellStat(cell, "cooldown")
+  };
+}
+
+function collectSelectedCellReasonKeys(cell, status, range, weapon, shield, repair) {
+  const keys = [];
+  if (cell.detached) keys.push("detached");
+  if (!cell.enabled && cell.facility !== "core") keys.push("disabled_manual");
+  if (status.powerStarved) keys.push("power_starved");
+  if (status.nozzleBlocked) keys.push("nozzle_blocked");
+  if (range?.kind === "mining") {
+    if (range.currentTarget) keys.push("harvesting");
+    else if (range.nearestHint && !range.nearestHint.inRange) keys.push("out_of_range");
+    else if (!range.nearestHint) keys.push("target_depleted");
+  }
+  if (weapon?.statusKey === "weapon_no_power") keys.push("power_starved");
+  if (weapon?.statusKey === "weapon_los_blocked") keys.push("weapon_los_blocked");
+  if (shield?.coverageStatus === "inactive" && (TYPES[cell.facility]?.powerUse || 0) > 0 && cell.enabled) {
+    keys.push("power_starved");
+  }
+  if (repair?.coverageStatus === "inactive" && cell.enabled) keys.push("power_starved");
+  return keys;
+}
+
+function getSelectedCellDiagnostics(cell) {
+  if (!cell) return null;
+  const facility = cell.facility;
+  const def = TYPES[facility] || {};
+  const powerImpact = getSelectedCellPowerImpact(cell);
+  const status = {
+    enabled: cell.enabled,
+    active: cell.active,
+    detached: cell.detached,
+    powerStarved: !cell.detached && cell.enabled && !cell.active && (def.powerUse || 0) > 0,
+    nozzleBlocked: cell.facility === "thruster" && !cell.detached && cell.enabled && isThrusterNozzleBlocked(cell)
+  };
+  const connection = getConnectedComponentStats(cell);
+  const range = getSelectedCellRangeDiagnostics(cell);
+  const weapon = getSelectedCellWeaponDiagnostics(cell);
+  const shield = getSelectedCellShieldDiagnostics(cell);
+  const repair = getSelectedCellRepairDiagnostics(cell);
+  const reasonKeys = collectSelectedCellReasonKeys(cell, status, range, weapon, shield, repair);
+  return {
+    cellKey: key(cell.x, cell.y),
+    facility,
+    facilityName: facility === "core" ? "核心" : def.name,
+    role: getFacilityRoleTag(facility),
+    status,
+    connection,
+    power: powerImpact,
+    range,
+    weapon,
+    shield,
+    repair,
+    hp: {
+      current: cell.hp,
+      max: cell.maxHp
+    },
+    reasonKeys
+  };
+}
+
+function evaluatePlacementGrid(facility, gridX, gridY) {
+  const gridKey = key(gridX, gridY);
+  const occupied = state.station.cells.has(gridKey);
+  const hasNeighbor = hasConnectedNeighbor(gridX, gridY);
+  let reasonKey = null;
+  if (occupied) reasonKey = "occupied";
+  else if (!hasNeighbor) reasonKey = "no_neighbor";
+  return {
+    valid: !occupied && hasNeighbor,
+    reasonKey,
+    connectedToCore: hasNeighbor
+  };
+}
+
+function getPlacementDiagnostics(facility, gridX, gridY) {
+  const def = TYPES[facility] || {};
+  const cost = getBuildCost(facility);
+  const missingResources = getBuildPaletteMissingResources(cost);
+  const affordable = missingResources.length === 0;
+  const placement = evaluatePlacementGrid(facility, gridX, gridY);
+  const powerHeadroomBefore = state.power.available - state.power.used;
+  const powerImpact = getFacilityPowerImpact(facility);
+  const marginAfter = powerHeadroomBefore + powerImpact.netDelta;
+  const powerForecast = {
+    powerHeadroomBefore,
+    marginAfter,
+    willCausePowerPressure: affordable && marginAfter < 1 && powerImpact.netDelta < 0,
+    willCausePowerNegative: affordable && marginAfter < 0
+  };
+  let rangeHint = null;
+  if (facility === "mining") {
+    const worldPos = cellWorldPosition({ x: gridX, y: gridY, detached: false });
+    const nearest = getNearestResourceBody(worldPos);
+    if (nearest) {
+      rangeHint = {
+        kind: "mining",
+        nearestBody: nearest.body.name,
+        resource: nearest.body.resource,
+        distance: nearest.distance,
+        range: nearest.range,
+        gap: Math.max(0, Math.ceil(nearest.distance - nearest.range)),
+        inRange: nearest.distance <= nearest.range
+      };
+    } else {
+      rangeHint = {
+        kind: "mining",
+        nearestBody: null,
+        resource: null,
+        distance: null,
+        range: MINING_RANGE_OFFSET,
+        gap: null,
+        inRange: false
+      };
+    }
+  }
+  const warnings = [];
+  if (!placement.valid) warnings.push("placement_invalid");
+  if (!affordable) warnings.push("resource_low");
+  if (rangeHint && rangeHint.kind === "mining" && !rangeHint.inRange) warnings.push("out_of_mining_range");
+  if (powerForecast.willCausePowerNegative) warnings.push("power_negative");
+  else if (powerForecast.willCausePowerPressure) warnings.push("power_pressure");
+  if (facility === "turret" || facility === "missile") warnings.push("weapon_tip");
+  if (facility === "shield") warnings.push("shield_tip");
+  if (facility === "repair") warnings.push("repair_tip");
+  if (facility === "power") warnings.push("power_tip");
+  return {
+    facility,
+    gridKey: key(gridX, gridY),
+    gridX,
+    gridY,
+    affordability: {
+      affordable,
+      missingResources
+    },
+    placement,
+    powerForecast,
+    rangeHint,
+    warnings
+  };
+}
+
+function buildSelectedCellDiagnosticsHtml(diagnostics) {
+  if (!diagnostics) return "";
+  const lines = [];
+  const { status, connection, power, range, weapon, shield, repair, facility } = diagnostics;
+
+  if (status.detached) {
+    lines.push({ severity: "critical", text: `连接：${SELECTED_DIAGNOSTICS_COPY.detached}` });
+  } else {
+    lines.push({
+      severity: "ok",
+      text: `连接：${SELECTED_DIAGNOSTICS_COPY.connected}（${connection.fragmentSize} 格）`
+    });
+  }
+
+  const powerParts = [];
+  if (power.powerOut > 0) powerParts.push(`${SELECTED_DIAGNOSTICS_COPY.power_out} +${power.powerOut}`);
+  if (power.bonusPowerOut > 0) powerParts.push(`副产电 +${power.bonusPowerOut}`);
+  if (power.powerUse > 0) powerParts.push(`${SELECTED_DIAGNOSTICS_COPY.power_use} ${power.powerUse}`);
+  if (!powerParts.length) powerParts.push(SELECTED_DIAGNOSTICS_COPY.power_neutral);
+  let powerSeverity = "ok";
+  if (status.powerStarved) powerSeverity = "critical";
+  else if (!status.active && power.powerUse > 0 && status.enabled) powerSeverity = "warning";
+  lines.push({
+    severity: powerSeverity,
+    text: `电力：${powerParts.join(" · ")}${status.powerStarved ? ` · ${SELECTED_DIAGNOSTICS_COPY.power_starved}` : ""}`
+  });
+
+  if (facility === "mining" && range?.kind === "mining") {
+    if (range.currentTarget) {
+      const visual = RESOURCE_VISUAL[range.currentTarget.resource] || RESOURCE_VISUAL.ore;
+      lines.push({
+        severity: "ok",
+        text: `采矿：${SELECTED_DIAGNOSTICS_COPY.harvesting} ${visual.label} @ ${range.currentTarget.bodyName}`
+      });
+    } else if (range.nearestHint) {
+      const severity = range.nearestHint.inRange ? "warning" : "critical";
+      const gapText = range.nearestHint.gap > 0
+        ? `${SELECTED_DIAGNOSTICS_COPY.mining_standby_gap} ${range.nearestHint.gap}`
+        : SELECTED_DIAGNOSTICS_COPY.mining_standby_empty;
+      lines.push({
+        severity,
+        text: `采矿：${gapText}（${range.nearestHint.bodyName}）`
+      });
+    } else {
+      lines.push({ severity: "warning", text: `采矿：${SELECTED_DIAGNOSTICS_COPY.mining_no_body}` });
+    }
+  }
+
+  if (weapon) {
+    const weaponCopy = SELECTED_DIAGNOSTICS_COPY[weapon.statusKey] || SELECTED_DIAGNOSTICS_COPY.weapon_boundary;
+    lines.push({
+      severity: weapon.statusKey === "weapon_ready" ? "ok" : weapon.statusKey === "weapon_no_target" ? "warning" : "critical",
+      text: `火力：${weaponCopy}${weapon.rangeText ? ` · ${SELECTED_DIAGNOSTICS_COPY.weapon_boundary} ${weapon.rangeText}` : ""}`
+    });
+  }
+
+  if (shield) {
+    let shieldText = SELECTED_DIAGNOSTICS_COPY.shield_active;
+    let shieldSeverity = "ok";
+    if (shield.coverageStatus === "inactive") {
+      shieldText = SELECTED_DIAGNOSTICS_COPY.shield_no_power;
+      shieldSeverity = "critical";
+    } else if (shield.coverageStatus === "recovering") {
+      shieldText = SELECTED_DIAGNOSTICS_COPY.shield_broken;
+      shieldSeverity = "warning";
+    }
+    lines.push({
+      severity: shieldSeverity,
+      text: `护盾：${shieldText} · 范围 ${shield.range} · ${shield.shield}/${shield.maxShield}`
+    });
+  }
+
+  if (facility === "armor") {
+    lines.push({
+      severity: diagnostics.hp.current <= diagnostics.hp.max * 0.35
+        ? "critical"
+        : diagnostics.hp.current < diagnostics.hp.max
+          ? "warning"
+          : "ok",
+      text: `装甲：${SELECTED_DIAGNOSTICS_COPY.armor_note} · ${Math.ceil(diagnostics.hp.current)}/${Math.ceil(diagnostics.hp.max)}`
+    });
+  }
+
+  if (repair) {
+    let repairText = SELECTED_DIAGNOSTICS_COPY.repair_active;
+    let repairSeverity = "ok";
+    if (repair.coverageStatus === "inactive") {
+      repairText = SELECTED_DIAGNOSTICS_COPY.repair_no_power;
+      repairSeverity = "critical";
+    } else if (repair.coverageStatus === "idle") {
+      repairText = SELECTED_DIAGNOSTICS_COPY.repair_idle;
+      repairSeverity = "warning";
+    }
+    lines.push({
+      severity: repairSeverity,
+      text: `维修：${repairText} · ${repair.repairRate}/s · 骨架 ${repair.frameRepairRate}/s`
+    });
+  }
+
+  if (facility === "power" && power.powerOut > 0) {
+    lines.push({
+      severity: status.active ? "ok" : "warning",
+      text: `供电：${SELECTED_DIAGNOSTICS_COPY.power_out} +${power.powerOut}${status.powerStarved ? " · 当前未运作" : ""}`
+    });
+  }
+
+  if (status.nozzleBlocked) {
+    lines.push({ severity: "critical", text: `推进：${SELECTED_DIAGNOSTICS_COPY.nozzle_blocked}` });
+  }
+
+  if (!lines.length) return "";
+  return `<div class="selected-cell-diagnostics">${lines.map((line) =>
+    `<div class="diag-line diag-${line.severity}">${line.text}</div>`
+  ).join("")}</div>`;
+}
+
+function buildPlacementHintText(diagnostics) {
+  if (!diagnostics) return "";
+  const name = TYPES[diagnostics.facility]?.name || diagnostics.facility;
+  const parts = [`放置预览：${name}`];
+  if (!diagnostics.placement.valid) {
+    const reason = PLACEMENT_DIAGNOSTICS_COPY[diagnostics.placement.reasonKey]
+      || PLACEMENT_DIAGNOSTICS_COPY.placement_invalid;
+    parts.push(reason);
+    return parts.join(" · ");
+  }
+  parts.push(PLACEMENT_DIAGNOSTICS_COPY.can_place);
+  if (!diagnostics.affordability.affordable) {
+    const primary = diagnostics.affordability.missingResources.reduce(
+      (best, item) => (item.gap > best.gap ? item : best),
+      diagnostics.affordability.missingResources[0]
+    );
+    parts.push(`缺${shortResource(primary.name)} ${primary.gap}`);
+  }
+  if (diagnostics.rangeHint?.kind === "mining") {
+    if (diagnostics.rangeHint.inRange) {
+      parts.push(PLACEMENT_DIAGNOSTICS_COPY.mining_good);
+    } else if (diagnostics.rangeHint.nearestBody) {
+      parts.push(`${PLACEMENT_DIAGNOSTICS_COPY.mining_far}（还差 ${diagnostics.rangeHint.gap}）`);
+    } else {
+      parts.push(PLACEMENT_DIAGNOSTICS_COPY.out_of_mining_range);
+    }
+  }
+  if (diagnostics.powerForecast.willCausePowerNegative) {
+    parts.push(PLACEMENT_DIAGNOSTICS_COPY.power_negative);
+  } else if (diagnostics.powerForecast.willCausePowerPressure) {
+    parts.push(PLACEMENT_DIAGNOSTICS_COPY.power_pressure);
+  } else {
+    parts.push(`${PLACEMENT_DIAGNOSTICS_COPY.margin_after} ${Math.floor(diagnostics.powerForecast.marginAfter)}`);
+  }
+  const roleTipKey = diagnostics.placement.valid && diagnostics.affordability.affordable
+    ? diagnostics.warnings.find((entry) =>
+        entry === "weapon_tip" || entry === "shield_tip" || entry === "repair_tip" || entry === "power_tip"
+      )
+    : null;
+  if (roleTipKey && PLACEMENT_DIAGNOSTICS_COPY[roleTipKey]) {
+    parts.push(PLACEMENT_DIAGNOSTICS_COPY[roleTipKey]);
+  }
+  return parts.join(" · ");
+}
+
+function buildPlacementResourceGuideLine(diagnostics) {
+  if (!diagnostics || diagnostics.facility !== "mining" || !diagnostics.placement.valid) return "";
+  if (!diagnostics.rangeHint) {
+    return `<div class="resource-line warn placement-info">放置预览：附近未发现可采资源外环。</div>`;
+  }
+  if (diagnostics.rangeHint.inRange) {
+    const visual = RESOURCE_VISUAL[diagnostics.rangeHint.resource] || RESOURCE_VISUAL.ore;
+    return `<div class="resource-line good placement-info">放置预览：靠近${visual.label}外环（${diagnostics.rangeHint.nearestBody}），覆盖良好。</div>`;
+  }
+  return `<div class="resource-line warn placement-warning">放置预览：距${diagnostics.rangeHint.nearestBody || "资源"}外环还差 ${diagnostics.rangeHint.gap}，当前位置采不到资源。</div>`;
+}
+
+function updatePlacementPreviewState() {
+  if (!state.selectedBuild) {
+    clearBuildHint();
+    state.placementPreview = null;
+    return;
+  }
+  if (state.selectedBuild === "frame") {
+    state.placementPreview = null;
+    updateBridgePreviewState();
+    return;
+  }
+  state.bridgePreview = null;
+  if (!state.input.mouseWorld) {
+    state.placementPreview = null;
+    clearBuildHint();
+    return;
+  }
+  const grid = worldToGrid(state.input.mouseWorld);
+  const diagnostics = getPlacementDiagnostics(state.selectedBuild, grid.x, grid.y);
+  state.placementPreview = diagnostics;
+  const hint = buildPlacementHintText(diagnostics);
+  if (hint) setBuildHint(hint);
+  else clearBuildHint();
+}
+
+function resolveSelectedCellArgForTest(cellKeyOrXY) {
+  if (cellKeyOrXY == null) {
+    return state.selectedCell ? state.station.cells.get(state.selectedCell) : null;
+  }
+  if (typeof cellKeyOrXY === "string") {
+    return state.station.cells.get(cellKeyOrXY) || null;
+  }
+  if (typeof cellKeyOrXY === "object" && Number.isFinite(cellKeyOrXY.x) && Number.isFinite(cellKeyOrXY.y)) {
+    return state.station.cells.get(key(cellKeyOrXY.x, cellKeyOrXY.y)) || null;
+  }
+  return null;
+}
+
+function resolvePlacementArgsForTest(facilityOrGrid, gridX, gridY) {
+  if (facilityOrGrid && typeof facilityOrGrid === "object" && !Array.isArray(facilityOrGrid)) {
+    const options = facilityOrGrid;
+    return getPlacementDiagnostics(
+      options.facility || state.selectedBuild || "mining",
+      Number.isFinite(options.gridX) ? options.gridX : 0,
+      Number.isFinite(options.gridY) ? options.gridY : 0
+    );
+  }
+  const facility = facilityOrGrid || state.selectedBuild || "mining";
+  let x = gridX;
+  let y = gridY;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    if (state.input.mouseWorld) {
+      const grid = worldToGrid(state.input.mouseWorld);
+      x = grid.x;
+      y = grid.y;
+    } else {
+      x = 0;
+      y = 0;
+    }
+  }
+  return getPlacementDiagnostics(facility, x, y);
+}
+
 function buildFacilityCardInnerHtml(entry) {
   const costSummary = formatBuildPaletteCostSummary(entry.cost, entry.baseCost);
   const powerText = formatBuildPalettePowerText(entry.powerImpact);
@@ -10236,7 +10818,7 @@ function renderFragmentOutline(fragment) {
 }
 
 function renderBridgePreview() {
-  updateBridgePreviewState();
+  updatePlacementPreviewState();
   const preview = state.bridgePreview;
   if (!preview?.worldP) return;
   const ringColor = preview.tier === "ready" ? BRIDGE_PREVIEW_RING_READY : BRIDGE_PREVIEW_RING_NEAR;
@@ -10684,6 +11266,18 @@ function buildStatusAlerts() {
         level: "warn",
         text: `建造「${TYPES[state.selectedBuild].name}」资源不足：${formatCost(cost)}（核心会缓慢产金属）`
       });
+    } else if (
+      state.selectedBuild !== "frame"
+      && state.placementPreview
+      && !state.placementPreview.placement.valid
+      && state.placementPreview.placement.reasonKey
+    ) {
+      const reason = PLACEMENT_DIAGNOSTICS_COPY[state.placementPreview.placement.reasonKey]
+        || PLACEMENT_DIAGNOSTICS_COPY.placement_invalid;
+      alerts.push({
+        level: "warn",
+        text: `无法放置：${reason}`
+      });
     }
   }
   return alerts;
@@ -10743,6 +11337,14 @@ function buildResourceGuideHtml() {
 
   if (nearest || status.miners.length === 0) {
     lines.push(`<div class="resource-line resource-meta resource-color-legend">橙=矿石，银=金属，绿=气体，紫=等离子。</div>`);
+  }
+
+  if (state.selectedBuild && state.selectedBuild !== "frame" && state.input.mouseWorld) {
+    const grid = worldToGrid(state.input.mouseWorld);
+    const placementLine = buildPlacementResourceGuideLine(
+      getPlacementDiagnostics(state.selectedBuild, grid.x, grid.y)
+    );
+    if (placementLine) lines.push(placementLine);
   }
 
   return lines.join("");
@@ -10993,11 +11595,16 @@ function renderSelectedCellReloadBar(cell) {
 
 function updateSelectedCellPanel(cell) {
   if (!cell) {
-    if (state.hud.selected !== "") {
+    if (state.hud.selected !== "" || state.hud.selectedDiagnostics !== "") {
       state.hud.selected = "";
+      state.hud.selectedDiagnostics = "";
       state.hud.selectedUpgradeKey = "";
       selectedCellPanelEl.classList.add("hidden");
       selectedCellInfoEl.textContent = "";
+      if (selectedCellDiagnosticsEl) {
+        selectedCellDiagnosticsEl.innerHTML = "";
+        selectedCellDiagnosticsEl.classList.add("hidden");
+      }
       if (selectedCellUpgradeEl) {
         selectedCellUpgradeEl.innerHTML = "";
         selectedCellUpgradeEl.classList.add("hidden");
@@ -11053,6 +11660,11 @@ function updateSelectedCellPanel(cell) {
     state.hud.selected = html;
     selectedCellPanelEl.classList.remove("hidden");
     selectedCellInfoEl.innerHTML = html;
+  }
+  const diagnosticsHtml = buildSelectedCellDiagnosticsHtml(getSelectedCellDiagnostics(cell));
+  if (selectedCellDiagnosticsEl) {
+    setHtmlIfChanged(selectedCellDiagnosticsEl, "selectedDiagnostics", diagnosticsHtml);
+    selectedCellDiagnosticsEl.classList.toggle("hidden", !diagnosticsHtml);
   }
   renderSelectedCellUpgradePanel(cell);
   renderSelectedCellModificationPanel(cell);
@@ -12579,6 +13191,13 @@ function safeDeepCloneForTest(value) {
 window.__gameTest.playtest = {
   getBuildPaletteDiagnostics() {
     return safeDeepCloneForTest(getBuildPaletteDiagnostics());
+  },
+  getSelectedCellDiagnostics(cellKeyOrXY) {
+    const cell = resolveSelectedCellArgForTest(cellKeyOrXY);
+    return safeDeepCloneForTest(getSelectedCellDiagnostics(cell));
+  },
+  getPlacementDiagnostics(facilityOrGrid, gridX, gridY) {
+    return safeDeepCloneForTest(resolvePlacementArgsForTest(facilityOrGrid, gridX, gridY));
   },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
