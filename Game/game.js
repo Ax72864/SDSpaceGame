@@ -23,15 +23,16 @@ const quickRestartBtnEl = document.getElementById("quickRestartBtn");
 
 const CELL = 30;
 
-const PRIORITY_TARGET_LIFETIME = 12.0;
-const PRIORITY_TARGET_LOCK_RADIUS = 48;
-const PRIORITY_TARGET_BREAK_DISTANCE = 800;
-const F_FIRE_DEBOUNCE_MS = 300;
-const LOS_BLOCK_WARN_DURATION = 0.5;
-const LOS_BLOCK_WARN_COOLDOWN = 5.0;
-const PRIORITY_TARGET_RING_PULSE_PERIOD = 1.0;
-const PRIORITY_TARGET_RING_ROTATE_RATE = 1.0;
-const SALVO_SIZE_OPTIONS = [1, 2, 3, 999];
+// v0.7.0 战斗操控：优先目标、齐射档位、LOS 警告与锁定框视觉
+const PRIORITY_TARGET_LIFETIME = 12.0; // 优先目标有效时长（秒）
+const PRIORITY_TARGET_LOCK_RADIUS = 48; // 右键锁敌点击半径（px）
+const PRIORITY_TARGET_BREAK_DISTANCE = 800; // 超出此距离自动解除锁定（px）
+const F_FIRE_DEBOUNCE_MS = 300; // F 键齐射防抖（毫秒）
+const LOS_BLOCK_WARN_DURATION = 0.5; // turret LOS 遮挡橙色环显示时长（秒）
+const LOS_BLOCK_WARN_COOLDOWN = 5.0; // 同一 turret cell 重复 LOS 警告节流（秒）
+const PRIORITY_TARGET_RING_PULSE_PERIOD = 1.0; // 锁定框脉冲周期（秒）
+const PRIORITY_TARGET_RING_ROTATE_RATE = 1.0; // 锁定框圆环旋转角速度（rad/s）
+const SALVO_SIZE_OPTIONS = [1, 2, 3, 999]; // 齐射档位：1 / 2 / 3 / 全部(999)
 
 const SAVE_KEY = "star-ring-station-meta-v1";
 const ASYNC_KEY = "star-ring-station-async-v1";
@@ -684,12 +685,12 @@ const state = {
     moveKeys: new Set(),
     mouseWorld: null,
     controlMode: "screen",
-    priorityTarget: null,
-    aimingRightButton: false,
+    priorityTarget: null, // v0.7.0：右键锁定的优先目标 { enemy, setAt, validUntil }
+    aimingRightButton: false, // v0.7.0：右键按下状态（预留扩展）
     _fLastFireAt: 0
   },
   missile: {
-    salvoSize: 1
+    salvoSize: 1 // v0.7.0：F 键齐射档位，仅 run 内有效
   },
   lastBuildError: "",
   buildHint: "",
@@ -4896,6 +4897,7 @@ function updateTurret(cell, dt) {
   const losOk = hasLineOfSight(origin, enemy);
   if (!losOk) {
     if (cell._losBlockedPrev !== true) {
+      // v0.7.0：记录 LOS 遮挡时刻，供橙色警告环与 HUD 计数；5 秒内同 cell 不重复触发
       if (!cell._losBlockedAt || state.time - cell._losBlockedAt >= LOS_BLOCK_WARN_COOLDOWN) {
         cell._losBlockedAt = state.time;
       }
@@ -4949,6 +4951,7 @@ function updateShield(cell) {
   }
 }
 
+// v0.7.0：[`/`]` 循环切换导弹齐射档位（1 / 2 / 3 / 全部）
 function adjustSalvoSize(delta) {
   const options = SALVO_SIZE_OPTIONS;
   const current = state.missile.salvoSize || 1;
@@ -5028,10 +5031,12 @@ function nearestEnemy(origin, range) {
   return best;
 }
 
+// v0.7.0：清除优先目标锁定
 function clearPriorityTarget() {
   state.input.priorityTarget = null;
 }
 
+// v0.7.0：右键点击敌人附近时设置优先目标
 function setPriorityTarget(world) {
   let closest = null;
   let closestDist = Infinity;
@@ -5054,10 +5059,12 @@ function setPriorityTarget(world) {
   }
 }
 
+// v0.7.0：canvas 右键入口，委托 setPriorityTarget
 function handleRightClick(world) {
   setPriorityTarget(world);
 }
 
+// v0.7.0：武器索敌统一入口；有效 priorityTarget 优先，否则 fallback nearestEnemy
 function selectTarget(origin, range) {
   const pt = state.input.priorityTarget;
   if (pt && pt.enemy) {
@@ -5462,6 +5469,7 @@ function render() {
   renderBridgePreview();
   renderMiningEffects();
   renderEnemies();
+  renderPriorityTargetLockOverlay();
   renderProjectilesAndEffects();
   renderer.flush();
 }
@@ -5598,6 +5606,26 @@ function renderStation() {
       drawHpBar: true,
       drawEffects: true
     });
+    renderStationCellCombatVisuals(cell, stationTransform);
+  }
+}
+
+// v0.7.0：玩家 station cell 战斗视觉反馈（missile ready 发光环 / turret LOS 橙色环）
+function renderStationCellCombatVisuals(cell, transform) {
+  if (cell.detached) return;
+  const p = cellWorldPositionByTransform(cell, transform);
+
+  if (cell.facility === "missile" && cell.reload <= 0 && cell.enabled) {
+    const pulseAlpha = 0.4 + 0.4 * Math.sin(state.time * 4);
+    renderer.ring(p, CELL * 0.5, 2, [85 / 255, 136 / 255, 1, pulseAlpha], 32);
+  }
+
+  if (cell.facility === "turret" && cell._losBlockedAt) {
+    const elapsed = state.time - cell._losBlockedAt;
+    if (elapsed >= 0 && elapsed < LOS_BLOCK_WARN_DURATION) {
+      const alpha = 1.0 - elapsed / LOS_BLOCK_WARN_DURATION;
+      renderer.ring(p, CELL * 0.6, 3, [1, 136 / 255, 0, alpha * 0.8], 32);
+    }
   }
 }
 
@@ -5688,6 +5716,52 @@ function shieldDirection(cell, origin = cellWorldPosition(cell), angle = state.s
   const enemy = selectTarget(origin, 420);
   if (enemy) return normalize({ x: enemy.x - origin.x, y: enemy.y - origin.y });
   return rotate(thrusterNozzle(cell), angle);
+}
+
+// v0.7.0：优先目标锁定框（红十字 + 脉冲旋转圆环），仅在 priorityTarget 有效时绘制
+function renderPriorityTargetLockOverlay() {
+  const pt = state.input.priorityTarget;
+  if (!pt || !pt.enemy) return;
+  const enemy = pt.enemy;
+  if (enemy.hp <= 0) return;
+
+  const baseRadius = enemy.kind === "hostile-station" ? 80 : (enemy.r || 24) * 1.5;
+  const t = state.time;
+  const pulseAlpha = 0.5 + 0.5 * Math.sin((t / PRIORITY_TARGET_RING_PULSE_PERIOD) * Math.PI * 2);
+  const rotation = (t * PRIORITY_TARGET_RING_ROTATE_RATE) % (Math.PI * 2);
+  const center = { x: enemy.x, y: enemy.y };
+  const ringColor = [1, 68 / 255, 68 / 255, pulseAlpha];
+
+  renderer.ring(center, baseRadius, 2, ringColor, 64);
+
+  for (let i = 0; i < 4; i++) {
+    const ang = rotation + i * Math.PI / 2;
+    const inner = baseRadius - 6;
+    const outer = baseRadius + 6;
+    renderer.line(
+      { x: center.x + Math.cos(ang) * inner, y: center.y + Math.sin(ang) * inner },
+      { x: center.x + Math.cos(ang) * outer, y: center.y + Math.sin(ang) * outer },
+      2,
+      ringColor
+    );
+  }
+
+  const crossSize = 20 / state.camera.zoom;
+  const crossWidth = 2 / state.camera.zoom;
+  const crossAlpha = 0.8 + 0.2 * pulseAlpha;
+  const crossColor = [1, 68 / 255, 68 / 255, crossAlpha];
+  renderer.line(
+    { x: center.x - crossSize, y: center.y },
+    { x: center.x + crossSize, y: center.y },
+    crossWidth,
+    crossColor
+  );
+  renderer.line(
+    { x: center.x, y: center.y - crossSize },
+    { x: center.x, y: center.y + crossSize },
+    crossWidth,
+    crossColor
+  );
 }
 
 function renderEnemies() {
@@ -6235,6 +6309,7 @@ function setHtmlIfChanged(element, cacheKey, html) {
   element.innerHTML = html;
 }
 
+// v0.7.0：HUD 武器行（导弹井 / 炮塔 / 齐射档 / LOS 遮挡计数）
 function updateWeaponsRow() {
   if (!weaponsRowEl) return;
 
