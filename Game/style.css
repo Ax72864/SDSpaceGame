@@ -1206,11 +1206,25 @@ h2 {
   color: #f08080;
 }
 
+.combat-status-damage.severity-warning,
+.combat-status-repair.severity-warning {
+  color: #f0b060;
+}
+
+.combat-status-damage.severity-critical,
+.combat-status-repair.severity-critical {
+  color: #f08080;
+}
+
 .alert-weapon-effectiveness {
   font-weight: 600;
 }
 
 .alert-threat-summary {
+  font-weight: 600;
+}
+
+.alert-damage-repair {
   font-weight: 600;
 }
 

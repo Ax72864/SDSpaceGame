@@ -782,6 +782,30 @@ const WEAPON_EFFECTIVENESS_COPY = Object.freeze({
   priority_target_out_of_range: "锁敌目标超出射程"
 });
 
+const COMBAT_DAMAGE_ALERT_COOLDOWN_SEC = 8;
+const COMBAT_DAMAGE_ALERT_MAX = 1;
+const COMBAT_DAMAGE_SAMPLE_INTERVAL = 0.12;
+
+const DAMAGE_SOURCE_LABELS = Object.freeze({
+  pirate: "海盗火力",
+  asteroid: "小行星撞击",
+  station: "敌方建筑火力",
+  guardian: "守护者火力",
+  "hostile-station": "敌方空间站远程",
+  collision: "撞击伤害",
+  player: "我方火力",
+  enemy_fire: "敌对火力",
+  unknown: "未知来源"
+});
+
+const DAMAGE_SOURCE_REASON_KEYS = Object.freeze({
+  pirate: "station_under_pirate_fire",
+  asteroid: "station_under_asteroid_impact",
+  "hostile-station": "station_under_hostile_station_fire",
+  enemy_fire: "station_under_pirate_fire",
+  collision: "station_under_asteroid_impact"
+});
+
 const SALVO_SIZE_LABELS = Object.freeze({
   1: "单发",
   2: "齐射 2",
@@ -1408,6 +1432,8 @@ const combatWindowState = {
 };
 let threatSummaryCache = null;
 let weaponEffectivenessCache = null;
+let recentDamageSummaryCache = null;
+let repairStatusSummaryCache = null;
 
 let fragmentIdSeed = 1;
 let npcIdSeed = 1;
@@ -7629,6 +7655,145 @@ function ensureCombatWindowState(now = state.time) {
   }
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function pruneCombatEvents(now = state.time) {
+  const cutoff = now - RECENT_DAMAGE_WINDOW_SEC;
+  while (combatEventBuffer.length > 0 && combatEventBuffer[0].t < cutoff) {
+    combatEventBuffer.shift();
+  }
+}
+
+function sanitizeCombatEventPayload(type, payload = null) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const clean = {};
+  if (source.cellKey != null) clean.cellKey = String(source.cellKey);
+  if (source.targetKey != null) clean.targetKey = String(source.targetKey);
+  if (source.repairerKey != null) clean.repairerKey = String(source.repairerKey);
+  if (source.facility != null) clean.facility = String(source.facility);
+  if (source.targetFacility != null) clean.targetFacility = String(source.targetFacility);
+  if (source.role != null) clean.role = String(source.role);
+  if (source.enemyKind != null) clean.enemyKind = String(source.enemyKind);
+  if (source.sourceKey != null) clean.sourceKey = String(source.sourceKey);
+  if (!clean.sourceKey && source.sourceKind != null) clean.sourceKey = String(source.sourceKind);
+  if (source.coverageStatus != null) clean.coverageStatus = String(source.coverageStatus);
+  if (source.returning != null) clean.returning = !!source.returning;
+  if (source.isCore != null) clean.isCore = !!source.isCore;
+  const damage = toFiniteNumber(source.damage, null);
+  if (damage != null) clean.damage = damage;
+  const fired = toFiniteNumber(source.fired, null);
+  if (fired != null) clean.fired = fired;
+  const count = toFiniteNumber(source.count, null);
+  if (count != null) clean.count = count;
+  const healed = toFiniteNumber(source.healed, null);
+  if (healed != null) clean.healed = healed;
+  const cooldown = toFiniteNumber(source.cooldownRemaining, null);
+  if (cooldown != null) clean.cooldownRemaining = cooldown;
+  if (!clean.sourceKey && type === "stationCellHit") clean.sourceKey = "enemy_fire";
+  if (!clean.sourceKey && type === "fragmentHit") clean.sourceKey = "collision";
+  return clean;
+}
+
+function recordCombatEvent(type, payload = null) {
+  try {
+    const eventType = typeof type === "string"
+      ? type
+      : type && typeof type === "object" && typeof type.type === "string"
+        ? type.type
+        : "";
+    if (!eventType) return;
+    const rawPayload = typeof type === "string" ? payload : type;
+    const entry = {
+      t: toFiniteNumber(state.time, 0),
+      type: eventType,
+      payload: sanitizeCombatEventPayload(eventType, rawPayload)
+    };
+    combatEventBuffer.push(entry);
+    if (combatEventBuffer.length > COMBAT_EVENT_BUFFER_CAPACITY) {
+      combatEventBuffer.splice(0, combatEventBuffer.length - COMBAT_EVENT_BUFFER_CAPACITY);
+    }
+    ensureCombatWindowState(entry.t);
+  } catch {
+    // 运行时插眼失败不得影响战斗结算链路
+  }
+}
+
+function getRecentCombatEvents(now = state.time, windowSec = RECENT_DAMAGE_WINDOW_SEC) {
+  pruneCombatEvents(now);
+  const cutoff = now - windowSec;
+  return combatEventBuffer.filter((event) => event.t >= cutoff);
+}
+
+function getDamageSeverityRank(severity) {
+  if (severity === "critical") return 3;
+  if (severity === "warning") return 2;
+  return 1;
+}
+
+function getDamageSourceLabel(sourceKey) {
+  return DAMAGE_SOURCE_LABELS[sourceKey] || DAMAGE_SOURCE_LABELS.unknown;
+}
+
+function getDamageSourceReasonKey(sourceKey) {
+  return DAMAGE_SOURCE_REASON_KEYS[sourceKey] || "station_under_pirate_fire";
+}
+
+function getDamageCellFrameMaxHp(cell) {
+  if (Number.isFinite(cell?.maxFrameHp) && cell.maxFrameHp > 0) return cell.maxFrameHp;
+  const frameBase = toFiniteNumber(TYPES.frame?.baseStats?.maxFrameHp, 1);
+  return Math.max(1, frameBase * getMetaEffect("hullIntegrity"));
+}
+
+function getCellDamageSeverity(hpRatio, frameRatio) {
+  if (hpRatio < 0.35 || frameRatio < 0.35) return "critical";
+  if (hpRatio < 0.6 || frameRatio < 0.6) return "warning";
+  return "ok";
+}
+
+function getDamagedCellSnapshots({ damageByCell = null, includePosition = false } = {}) {
+  const snapshots = [];
+  for (const cell of state.station.cells.values()) {
+    if (!cell || cell.detached) continue;
+    const maxHp = Math.max(1, toFiniteNumber(cell.maxHp, 1));
+    const hp = clamp(toFiniteNumber(cell.hp, maxHp), 0, maxHp);
+    const frameMaxHp = getDamageCellFrameMaxHp(cell);
+    const frameHp = clamp(toFiniteNumber(cell.frameHp, frameMaxHp), 0, frameMaxHp);
+    if (!(hp < maxHp || frameHp < frameMaxHp)) continue;
+    const cellKey = key(cell.x, cell.y);
+    const role = getFacilityRoleTag(cell.facility);
+    const snapshot = {
+      cellKey,
+      facility: cell.facility,
+      facilityName: TYPES[cell.facility]?.name || cell.facility,
+      role,
+      roleLabel: FACILITY_ROLE_LABEL[role] || role,
+      hp: Math.round(hp * 10) / 10,
+      maxHp: Math.round(maxHp * 10) / 10,
+      hpRatio: maxHp > 0 ? hp / maxHp : 1,
+      frameHp: Math.round(frameHp * 10) / 10,
+      frameMaxHp: Math.round(frameMaxHp * 10) / 10,
+      frameRatio: frameMaxHp > 0 ? frameHp / frameMaxHp : 1,
+      severity: getCellDamageSeverity(maxHp > 0 ? hp / maxHp : 1, frameMaxHp > 0 ? frameHp / frameMaxHp : 1),
+      isCore: cell.facility === "core",
+      damageTakenWindow: damageByCell instanceof Map ? toFiniteNumber(damageByCell.get(cellKey), 0) : 0
+    };
+    if (includePosition) snapshot.position = cellWorldPosition(cell);
+    snapshots.push(snapshot);
+  }
+  snapshots.sort((a, b) => {
+    const severityDiff = getDamageSeverityRank(b.severity) - getDamageSeverityRank(a.severity);
+    if (severityDiff !== 0) return severityDiff;
+    if (a.isCore !== b.isCore) return a.isCore ? -1 : 1;
+    if (b.damageTakenWindow !== a.damageTakenWindow) return b.damageTakenWindow - a.damageTakenWindow;
+    if (a.hpRatio !== b.hpRatio) return a.hpRatio - b.hpRatio;
+    if (a.frameRatio !== b.frameRatio) return a.frameRatio - b.frameRatio;
+    return a.cellKey.localeCompare(b.cellKey);
+  });
+  return snapshots;
+}
+
 function getLiveThreatEnemies() {
   return state.enemies.filter((enemy) => enemy && enemy.hp > 0 && enemy.dead !== true);
 }
@@ -8317,6 +8482,327 @@ function getWeaponEffectiveness() {
   return snapshot;
 }
 
+function buildRecentDamageSummarySnapshot() {
+  const now = state.time;
+  ensureCombatWindowState(now);
+  const recentEvents = getRecentCombatEvents(now);
+  const sourceMap = new Map();
+  const damageByCell = new Map();
+  let shieldBlockedCount = 0;
+
+  for (const event of recentEvents) {
+    if (!event || !event.type) continue;
+    if (event.type === "shieldBlocked") {
+      shieldBlockedCount += 1;
+      continue;
+    }
+    if (event.type !== "stationCellHit" && event.type !== "fragmentHit") continue;
+    const sourceKey = String(event.payload?.sourceKey || (event.type === "fragmentHit" ? "collision" : "enemy_fire"));
+    const damage = Math.max(0, toFiniteNumber(event.payload?.damage, 0));
+    const current = sourceMap.get(sourceKey) || {
+      sourceKey,
+      label: getDamageSourceLabel(sourceKey),
+      hitCount: 0,
+      totalDamage: 0,
+      lastSeenAt: null
+    };
+    current.hitCount += 1;
+    current.totalDamage += damage;
+    current.lastSeenAt = event.t;
+    sourceMap.set(sourceKey, current);
+    if (event.type === "stationCellHit" && event.payload?.cellKey) {
+      const cellKey = String(event.payload.cellKey);
+      damageByCell.set(cellKey, toFiniteNumber(damageByCell.get(cellKey), 0) + damage);
+    }
+  }
+
+  const recentSources = [...sourceMap.values()].sort((a, b) => {
+    if (b.totalDamage !== a.totalDamage) return b.totalDamage - a.totalDamage;
+    if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount;
+    return String(a.sourceKey).localeCompare(String(b.sourceKey));
+  });
+
+  const allDamagedCells = getDamagedCellSnapshots({ damageByCell });
+  const damagedCells = allDamagedCells.slice(0, 5);
+  const roleDamageMap = new Map();
+  for (const cell of allDamagedCells) {
+    const entry = roleDamageMap.get(cell.role) || {
+      role: cell.role,
+      roleLabel: cell.roleLabel,
+      damageTaken: 0,
+      cellCount: 0
+    };
+    entry.damageTaken += cell.damageTakenWindow > 0
+      ? cell.damageTakenWindow
+      : (1 - Math.min(cell.hpRatio, cell.frameRatio)) * cell.maxHp;
+    entry.cellCount += 1;
+    roleDamageMap.set(cell.role, entry);
+  }
+  const worstAreas = [...roleDamageMap.values()].sort((a, b) => {
+    if (b.damageTaken !== a.damageTaken) return b.damageTaken - a.damageTaken;
+    if (b.cellCount !== a.cellCount) return b.cellCount - a.cellCount;
+    return String(a.role).localeCompare(String(b.role));
+  });
+  const coreDamaged = allDamagedCells.some((cell) => cell.isCore && cell.severity === "critical");
+  const criticalDamagedCount = allDamagedCells.filter((cell) => cell.severity === "critical").length;
+  const weakConnectionCount = allDamagedCells.filter((cell) => cell.frameRatio < 0.4).length;
+  const fragmentsCount = Array.isArray(state.fragments) ? state.fragments.length : 0;
+  let detachmentSeverity = "ok";
+  if (fragmentsCount > 0 || weakConnectionCount > 0) detachmentSeverity = "warning";
+  if (fragmentsCount >= 2 || weakConnectionCount >= 4 || coreDamaged) detachmentSeverity = "critical";
+  const reasonKeys = [];
+  if (coreDamaged) reasonKeys.push("core_low_hp");
+  if (detachmentSeverity !== "ok" && fragmentsCount > 0) reasonKeys.push("fragment_detaching");
+  if (recentSources.length > 0) {
+    reasonKeys.push(getDamageSourceReasonKey(recentSources[0].sourceKey));
+  }
+  if (!reasonKeys.length && allDamagedCells.length === 0) {
+    reasonKeys.push("no_recent_damage");
+  }
+  const topReasonKey = reasonKeys[0] || "no_recent_damage";
+  let severity = "ok";
+  if (coreDamaged || criticalDamagedCount > 0 || detachmentSeverity === "critical") severity = "critical";
+  else if (allDamagedCells.length > 0 || recentSources.length > 0) severity = "warning";
+
+  return {
+    generatedAt: now,
+    windowSec: RECENT_DAMAGE_WINDOW_SEC,
+    recentEventCount: recentEvents.length,
+    damagedCells,
+    recentSources,
+    worstAreas: worstAreas.slice(0, 2),
+    detachmentRisk: {
+      fragmentsCount,
+      weakConnectionCount,
+      severity: detachmentSeverity
+    },
+    shieldBlockedCount,
+    reasonKeys: [...new Set(reasonKeys)],
+    topReasonKey,
+    summary: {
+      severity,
+      damagedCellCount: allDamagedCells.length,
+      criticalDamagedCount,
+      coreDamaged,
+      reasonKey: topReasonKey
+    }
+  };
+}
+
+function getRecentDamageSummary() {
+  const now = state.time;
+  if (recentDamageSummaryCache && now < recentDamageSummaryCache.sampledAt) {
+    recentDamageSummaryCache = null;
+  }
+  if (
+    recentDamageSummaryCache
+    && now - recentDamageSummaryCache.sampledAt < COMBAT_DAMAGE_SAMPLE_INTERVAL
+  ) {
+    return recentDamageSummaryCache.value;
+  }
+  const snapshot = deepFreezeForDiagnostics(buildRecentDamageSummarySnapshot());
+  recentDamageSummaryCache = { sampledAt: now, value: snapshot };
+  return snapshot;
+}
+
+function buildRepairStatusSummarySnapshot() {
+  const now = state.time;
+  ensureCombatWindowState(now);
+  const recentEvents = getRecentCombatEvents(now);
+  const dispatchByRepairer = new Map();
+  const appliedByRepairer = new Map();
+  for (const event of recentEvents) {
+    if (!event || !event.type) continue;
+    if (event.type === "repairDispatched" && event.payload?.repairerKey) {
+      const repairerKey = String(event.payload.repairerKey);
+      dispatchByRepairer.set(repairerKey, toFiniteNumber(dispatchByRepairer.get(repairerKey), 0) + 1);
+    } else if (event.type === "repairApplied" && event.payload?.repairerKey) {
+      const repairerKey = String(event.payload.repairerKey);
+      appliedByRepairer.set(repairerKey, toFiniteNumber(appliedByRepairer.get(repairerKey), 0) + 1);
+    }
+  }
+
+  const damagedCells = getDamagedCellSnapshots({ includePosition: true });
+  const repairers = [];
+  const activeCoverage = [];
+  let repairerCount = 0;
+  let activeRepairerCount = 0;
+  let idleRepairerCount = 0;
+  let poweredOffCount = 0;
+  for (const cell of state.station.cells.values()) {
+    if (!cell || cell.detached || cell.facility !== "repair") continue;
+    repairerCount += 1;
+    const cellKey = key(cell.x, cell.y);
+    const diagnostics = getSelectedCellRepairDiagnostics(cell);
+    const coverageStatus = diagnostics?.coverageStatus || (cell.enabled && cell.active ? "active" : "inactive");
+    const origin = cellWorldPosition(cell);
+    const range = getCellStat(cell, "range");
+    let nearestDamagedDistance = null;
+    let coveredDamagedCount = 0;
+    for (const damaged of damagedCells) {
+      const distance = dist(origin, damaged.position);
+      if (nearestDamagedDistance == null || distance < nearestDamagedDistance) {
+        nearestDamagedDistance = distance;
+      }
+      if (distance <= range) coveredDamagedCount += 1;
+    }
+    let statusKey = "repair_no_target";
+    if (coverageStatus === "inactive") {
+      statusKey = "repair_no_power";
+      poweredOffCount += 1;
+    } else if (damagedCells.length === 0) {
+      statusKey = "repair_no_target";
+      idleRepairerCount += 1;
+    } else if (coveredDamagedCount <= 0) {
+      statusKey = "repair_uncovered";
+      idleRepairerCount += 1;
+    } else {
+      statusKey = "repair_active";
+      activeRepairerCount += 1;
+    }
+    if (coverageStatus === "active") {
+      activeCoverage.push({ origin, range });
+    }
+    repairers.push({
+      cellKey,
+      coverageStatus,
+      statusKey,
+      repairRate: diagnostics?.repairRate || getCellStat(cell, "repairRate"),
+      frameRepairRate: diagnostics?.frameRepairRate || getCellStat(cell, "frameRepairRate"),
+      cooldown: diagnostics?.cooldown || getCellStat(cell, "cooldown"),
+      cooldownRemaining: Math.max(0, toFiniteNumber(cell.repairCooldown, 0)),
+      nearestDamagedDistance: nearestDamagedDistance == null ? null : Math.floor(nearestDamagedDistance),
+      coveredDamagedCount,
+      recentDispatchCount: toFiniteNumber(dispatchByRepairer.get(cellKey), 0),
+      recentAppliedCount: toFiniteNumber(appliedByRepairer.get(cellKey), 0)
+    });
+  }
+
+  let uncoveredDamagedCount = 0;
+  for (const damaged of damagedCells) {
+    const covered = activeCoverage.some((entry) => dist(entry.origin, damaged.position) <= entry.range);
+    if (!covered) uncoveredDamagedCount += 1;
+  }
+
+  const drones = state.repairDrones.map((drone) => {
+    const target = state.station.cells.get(drone.targetKey);
+    const targetExists = !!(target && !target.detached);
+    const targetPos = targetExists ? cellWorldPosition(target) : null;
+    const targetDistance = targetPos ? Math.floor(dist({ x: drone.x, y: drone.y }, targetPos)) : null;
+    return {
+      repairerKey: String(drone.repairerKey || ""),
+      targetKey: String(drone.targetKey || ""),
+      returning: !!drone.returning,
+      lifeRemaining: Math.max(0, Math.round(toFiniteNumber(drone.life, 0) * 10) / 10),
+      targetFacility: target?.facility || null,
+      targetFacilityName: target?.facility ? (TYPES[target.facility]?.name || target.facility) : null,
+      targetExists,
+      targetDistance
+    };
+  });
+
+  const damagedCellCount = damagedCells.length;
+  let reasonKey = "repair_no_target";
+  if (repairerCount <= 0) {
+    reasonKey = damagedCellCount > 0 ? "repair_missing" : "repair_no_target";
+  } else if (damagedCellCount <= 0) {
+    reasonKey = "repair_no_target";
+  } else if (activeRepairerCount <= 0) {
+    reasonKey = poweredOffCount > 0 ? "repair_no_power" : "repair_uncovered";
+  } else if (uncoveredDamagedCount > 0) {
+    reasonKey = "repair_uncovered";
+  } else {
+    reasonKey = "repair_active";
+  }
+
+  let severity = "ok";
+  if (damagedCellCount <= 0) severity = "ok";
+  else if (reasonKey === "repair_missing" || reasonKey === "repair_no_power" && damagedCellCount >= 2) severity = "critical";
+  else if (reasonKey === "repair_no_power" || reasonKey === "repair_uncovered") severity = "warning";
+
+  const activeTargetCount = drones.filter((entry) => !entry.returning && entry.targetExists).length;
+  const summary = {
+    repairerCount,
+    activeRepairerCount,
+    idleRepairerCount,
+    poweredOffCount,
+    droneCount: drones.length,
+    activeTargetCount,
+    damagedCellCount,
+    uncoveredDamagedCount,
+    severity,
+    reasonKey
+  };
+
+  return {
+    generatedAt: now,
+    windowSec: RECENT_DAMAGE_WINDOW_SEC,
+    repairers,
+    drones,
+    summary,
+    reasonKeys: [reasonKey]
+  };
+}
+
+function getRepairStatusSummary() {
+  const now = state.time;
+  if (repairStatusSummaryCache && now < repairStatusSummaryCache.sampledAt) {
+    repairStatusSummaryCache = null;
+  }
+  if (
+    repairStatusSummaryCache
+    && now - repairStatusSummaryCache.sampledAt < COMBAT_DAMAGE_SAMPLE_INTERVAL
+  ) {
+    return repairStatusSummaryCache.value;
+  }
+  const snapshot = deepFreezeForDiagnostics(buildRepairStatusSummarySnapshot());
+  repairStatusSummaryCache = { sampledAt: now, value: snapshot };
+  return snapshot;
+}
+
+function buildCombatDamageRepairSummaryHtml(damage = getRecentDamageSummary(), repair = getRepairStatusSummary()) {
+  const lines = [];
+  if (damage?.summary?.damagedCellCount > 0) {
+    const primarySource = damage.recentSources?.[0] || null;
+    const worst = damage.damagedCells?.[0] || null;
+    const prefix = damage.summary.coreDamaged
+      ? "受损：核心承压"
+      : worst
+        ? `受损：${worst.facilityName}最重`
+        : `受损：${damage.summary.damagedCellCount} 处模块受损`;
+    const tail = [];
+    if (primarySource) tail.push(`主要来源 ${primarySource.label}`);
+    if (damage.detachmentRisk?.severity !== "ok") tail.push("存在脱落风险");
+    lines.push(
+      `<div class="combat-status-line combat-status-damage severity-${damage.summary.severity}">${prefix}${tail.length ? ` · ${tail.join(" · ")}` : ""}</div>`
+    );
+  } else {
+    lines.push('<div class="combat-status-line combat-status-damage">受损：暂无明显损伤</div>');
+  }
+
+  if (repair?.summary) {
+    let text = "维修：状态未知";
+    if (repair.summary.reasonKey === "repair_active") {
+      text = repair.summary.activeTargetCount > 0
+        ? `维修：无人机执行中 · ${repair.summary.activeTargetCount} 个目标`
+        : "维修：覆盖正常，等待下一次受损";
+    } else if (repair.summary.reasonKey === "repair_no_target") {
+      text = "维修：当前无可修对象";
+    } else if (repair.summary.reasonKey === "repair_no_power") {
+      text = "维修：缺电停摆，未派出无人机";
+    } else if (repair.summary.reasonKey === "repair_uncovered") {
+      text = "维修：覆盖不足，部分受损区未纳入范围";
+    } else if (repair.summary.reasonKey === "repair_missing") {
+      text = "维修：无维修设施覆盖受损区";
+    }
+    lines.push(
+      `<div class="combat-status-line combat-status-repair severity-${repair.summary.severity}">${text}</div>`
+    );
+  }
+
+  return lines.join("");
+}
+
 function buildWeaponHudFragment(weapon = getWeaponEffectiveness()) {
   if (!weapon?.active) return "";
   const parts = [];
@@ -8390,17 +8876,25 @@ function buildCombatWeaponSummaryHtml(weapon = getWeaponEffectiveness()) {
   return lines.join("");
 }
 
-function buildCombatStatusSummaryHtml(threat = getThreatSummary(), weapon = getWeaponEffectiveness()) {
+function buildCombatStatusSummaryHtml(
+  threat = getThreatSummary(),
+  weapon = getWeaponEffectiveness(),
+  damage = getRecentDamageSummary(),
+  repair = getRepairStatusSummary()
+) {
   const threatHtml = buildCombatThreatSummaryHtml(threat);
   const weaponHtml = buildCombatWeaponSummaryHtml(weapon);
-  return `${threatHtml}${weaponHtml}`;
+  const damageRepairHtml = buildCombatDamageRepairSummaryHtml(damage, repair);
+  return `${threatHtml}${weaponHtml}${damageRepairHtml}`;
 }
 
 function shouldSustainCombatAlert(reasonKey) {
-  return reasonKey.startsWith("threat_") || reasonKey.startsWith("weapon_alert_");
+  return reasonKey.startsWith("threat_")
+    || reasonKey.startsWith("weapon_alert_")
+    || reasonKey.startsWith("damage_repair_alert_");
 }
 
-function consumeCombatAlertCooldown(reasonKey, now, sustained) {
+function consumeCombatAlertCooldown(reasonKey, now, sustained, cooldownSec = WEAPON_EFFECTIVENESS_ALERT_COOLDOWN_SEC) {
   if (sustained) {
     designIssueAlertRuntime.activeKeys.add(reasonKey);
     designIssueAlertRuntime.lastRaisedAt.set(reasonKey, now);
@@ -8409,7 +8903,7 @@ function consumeCombatAlertCooldown(reasonKey, now, sustained) {
   const wasActive = designIssueAlertRuntime.activeKeys.has(reasonKey)
     || shouldSustainCombatAlert(reasonKey) && designIssueAlertRuntime.lastRaisedAt.has(reasonKey);
   const lastRaisedAt = designIssueAlertRuntime.lastRaisedAt.get(reasonKey);
-  if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < WEAPON_EFFECTIVENESS_ALERT_COOLDOWN_SEC) {
+  if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < cooldownSec) {
     return false;
   }
   if (!wasActive) {
@@ -8462,6 +8956,46 @@ function buildWeaponEffectivenessAlerts(weapon = getWeaponEffectiveness()) {
   }
 
   return alerts.slice(0, COMBAT_WEAPON_ALERT_MAX);
+}
+
+function buildDamageRepairStatusAlerts(
+  damage = getRecentDamageSummary(),
+  repair = getRepairStatusSummary(),
+  threat = getThreatSummary()
+) {
+  if (!damage?.summary || !repair?.summary) return [];
+  const now = state.time;
+  const highPressure = threat?.threatLevel === "danger" || threat?.threatLevel === "critical";
+  const alerts = [];
+  const pushAlert = (reasonKey, text, level, sustained = false) => {
+    const alertKey = `damage_repair_alert_${reasonKey}`;
+    if (!consumeCombatAlertCooldown(alertKey, now, sustained, COMBAT_DAMAGE_ALERT_COOLDOWN_SEC)) return;
+    alerts.push({ level, cssClass: "alert-damage-repair", text });
+  };
+
+  if (damage.summary.coreDamaged) {
+    pushAlert("core_low_hp", "核心受损：请优先保障供电与维修覆盖。", "danger", true);
+  } else if (
+    damage.summary.criticalDamagedCount > 0
+    && (repair.summary.reasonKey === "repair_missing" || repair.summary.reasonKey === "repair_no_power")
+  ) {
+    pushAlert(
+      "critical_no_repair",
+      "严重受损且维修未在线，当前受损区可能继续扩大。",
+      highPressure ? "danger" : "warn",
+      highPressure
+    );
+  } else if (repair.summary.reasonKey === "repair_no_power" && repair.summary.damagedCellCount > 0) {
+    pushAlert("repair_no_power", "维修站缺电，未派出无人机。", highPressure ? "danger" : "warn", highPressure);
+  } else if (
+    repair.summary.reasonKey === "repair_uncovered"
+    && repair.summary.damagedCellCount >= 3
+    && highPressure
+  ) {
+    pushAlert("repair_uncovered", "维修覆盖不足：部分受损区未被覆盖。", "warn", true);
+  }
+
+  return alerts.slice(0, COMBAT_DAMAGE_ALERT_MAX);
 }
 
 function buildThreatHudFragment(threat = getThreatSummary()) {
@@ -9074,6 +9608,44 @@ function buildSelectedCellDiagnosticsHtml(diagnostics) {
       severity: repairSeverity,
       text: `维修：${repairText} · ${repair.repairRate}/s · 骨架 ${repair.frameRepairRate}/s`
     });
+    const repairStatus = getRepairStatusSummary();
+    const repairerEntry = repairStatus.repairers.find((entry) => entry.cellKey === diagnostics.cellKey);
+    const activeDrone = repairStatus.drones.find(
+      (entry) => entry.repairerKey === diagnostics.cellKey && !entry.returning
+    );
+    if (activeDrone && activeDrone.targetExists) {
+      const targetLabel = activeDrone.targetFacilityName || activeDrone.targetFacility || "受损结构";
+      const targetDistance = Number.isFinite(activeDrone.targetDistance) ? ` · ${activeDrone.targetDistance}m` : "";
+      lines.push({
+        severity: "ok",
+        text: `维修目标：无人机前往 ${targetLabel}${targetDistance}`
+      });
+    } else if (repairStatus.summary.reasonKey === "repair_no_power") {
+      lines.push({
+        severity: "critical",
+        text: "维修目标：缺电停摆，当前未派出无人机。"
+      });
+    } else if (
+      repairStatus.summary.reasonKey === "repair_uncovered"
+      && repairerEntry
+      && repairerEntry.coveredDamagedCount <= 0
+    ) {
+      lines.push({
+        severity: "warning",
+        text: "维修目标：本站射程内无可修对象，需调整覆盖。"
+      });
+    } else if (repairStatus.summary.reasonKey === "repair_no_target") {
+      lines.push({
+        severity: "warning",
+        text: "维修目标：当前无可修对象（仅状态提示，不承诺自动修复）。"
+      });
+    }
+    if (repairerEntry) {
+      lines.push({
+        severity: repairerEntry.recentDispatchCount > 0 || repairerEntry.recentAppliedCount > 0 ? "ok" : "warning",
+        text: `近 ${RECENT_DAMAGE_WINDOW_SEC} 秒派出 ${repairerEntry.recentDispatchCount} 次，完成 ${repairerEntry.recentAppliedCount} 次`
+      });
+    }
   }
 
   if (facility === "power" && power.powerOut > 0) {
@@ -9946,6 +10518,11 @@ function seedEscortNpc(galaxy, rng, level) {
 
 function damageNpc(npc, amount) {
   if (!npc || npc.destroyed || npc.arrived) return;
+  recordCombatEvent("npcHit", {
+    enemyKind: npc.kind || "npc",
+    sourceKey: "enemy_fire",
+    damage: amount
+  });
   npc.hp -= amount;
   for (let i = 0; i < 3; i++) spawnParticle(npc, [0.5, 0.9, 1.0, 0.9]);
   if (npc.hp <= 0) {
@@ -10596,6 +11173,12 @@ function destroyFragmentIfEmpty(fragment, toastMessage = "残骸已被摧毁") {
 }
 
 function damageFragmentCell(fragment, cell, damage) {
+  recordCombatEvent("fragmentHit", {
+    cellKey: key(cell.x, cell.y),
+    facility: cell.facility,
+    sourceKey: "enemy_fire",
+    damage
+  });
   if (cell.facility !== "frame" && cell.facility !== "core") {
     cell.hp -= damage;
     if (cell.hp <= 0) {
@@ -10750,7 +11333,16 @@ function tryDamageHostileStationCell(projectile, hostileStation) {
     }
   });
   if (closestKey == null) return false;
-  return damageHostileStationCell(projectile, hostileStation, closestKey);
+  const damaged = damageHostileStationCell(projectile, hostileStation, closestKey);
+  if (damaged) {
+    recordCombatEvent("hostileStationCellHit", {
+      cellKey: closestKey,
+      enemyKind: hostileStation.kind || "hostile-station",
+      sourceKey: "player",
+      damage: projectile?.damage
+    });
+  }
+  return damaged;
 }
 
 function findCellByFacility(cellsMap, facility) {
@@ -11564,6 +12156,10 @@ function updateEnemies(dt) {
       return true;
     }
     if (enemy.hp > 0) return true;
+    recordCombatEvent("enemyKilled", {
+      enemyKind: enemy.kind || "unknown",
+      sourceKey: enemy.kind || "unknown"
+    });
     state.resources.metal += enemy.reward * getGalaxyResourceMultiplier("metal");
     state.resources.gas += enemy.reward * 0.15 * getGalaxyResourceMultiplier("gas");
     awardEndgameActivityPoints(enemyActivityPointReward(enemy.kind));
@@ -11729,6 +12325,11 @@ function updateShield(cell) {
     if (length(toProjectile) < range && dot(normalize(toProjectile), outward) > -0.1) {
       projectile.dead = true;
       cell.fire = 1;
+      recordCombatEvent("shieldBlocked", {
+        cellKey: key(cell.x, cell.y),
+        facility: cell.facility,
+        sourceKey: "enemy_fire"
+      });
       for (let i = 0; i < 5; i++) spawnParticle(projectile, [0.35, 1, 0.94, 1]);
     }
   }
@@ -11803,6 +12404,11 @@ function fireMissiles() {
     cell.reload = getCellStat(cell, "reload");
     fired += projectileCount;
   }
+  recordCombatEvent("missileSalvoFired", {
+    fired,
+    salvoSize,
+    count: toFire.length
+  });
   showToast(fired ? `导弹齐射：${fired} 枚` : "没有可发射的导弹井或目标。");
 }
 
@@ -11962,6 +12568,11 @@ function updateProjectiles(dt) {
         }
         if (dist(projectile, enemy) < enemy.r + projectile.r) {
           enemy.hp -= projectile.damage;
+          recordCombatEvent("enemyDamaged", {
+            enemyKind: enemy.kind || "unknown",
+            sourceKey: projectile.owner || "player",
+            damage: projectile.damage
+          });
           projectile.dead = true;
           break;
         }
@@ -11992,6 +12603,14 @@ function collideEnemyWithStation(enemy) {
 }
 
 function damageCell(cell, damage) {
+  recordCombatEvent("stationCellHit", {
+    cellKey: key(cell.x, cell.y),
+    facility: cell.facility,
+    role: getFacilityRoleTag(cell.facility),
+    isCore: cell.facility === "core",
+    sourceKey: "enemy_fire",
+    damage
+  });
   if (cell.facility !== "frame" && cell.facility !== "core") {
     cell.hp -= damage;
     if (cell.hp <= 0) {
@@ -12068,6 +12687,11 @@ function updateRepair(dt) {
       returning: false,
       life: 10
     });
+    recordCombatEvent("repairDispatched", {
+      repairerKey: key(repairer.x, repairer.y),
+      targetKey: key(target.x, target.y),
+      targetFacility: target.facility
+    });
   }
   for (const drone of state.repairDrones) {
     drone.life -= dt;
@@ -12088,11 +12712,19 @@ function updateRepair(dt) {
       if (!drone.returning && target && !target.detached) {
         const repairRate = repairer ? getCellStat(repairer, "repairRate") : TYPES.repair.baseStats.repairRate;
         const frameRepairRate = repairer ? getCellStat(repairer, "frameRepairRate") : TYPES.repair.baseStats.frameRepairRate;
+        const hpBefore = target.hp;
+        const frameHpBefore = target.frameHp;
         target.hp = Math.min(target.maxHp, target.hp + repairRate);
         target.frameHp = Math.min(
           TYPES.frame.baseStats.maxFrameHp * getMetaEffect("hullIntegrity"),
           target.frameHp + frameRepairRate
         );
+        recordCombatEvent("repairApplied", {
+          repairerKey: String(drone.repairerKey || ""),
+          targetKey: String(drone.targetKey || ""),
+          targetFacility: target.facility,
+          healed: Math.max(0, (target.hp - hpBefore) + (target.frameHp - frameHpBefore))
+        });
         drone.returning = true;
       } else {
         drone.life = 0;
@@ -12975,13 +13607,21 @@ function buildStatusAlerts() {
   if (designIssueAlerts.length) {
     alerts.push(...designIssueAlerts);
   }
-  const threatAlerts = buildThreatSummaryAlerts(getThreatSummary());
+  const threatSummary = getThreatSummary();
+  const weaponEffectiveness = getWeaponEffectiveness();
+  const damageSummary = getRecentDamageSummary();
+  const repairSummary = getRepairStatusSummary();
+  const threatAlerts = buildThreatSummaryAlerts(threatSummary);
   if (threatAlerts.length) {
     alerts.unshift(...threatAlerts.slice(0, THREAT_STATUS_ALERT_MAX));
   }
-  const weaponAlerts = buildWeaponEffectivenessAlerts(getWeaponEffectiveness());
+  const weaponAlerts = buildWeaponEffectivenessAlerts(weaponEffectiveness);
   if (weaponAlerts.length) {
     alerts.splice(threatAlerts.length, 0, ...weaponAlerts);
+  }
+  const damageRepairAlerts = buildDamageRepairStatusAlerts(damageSummary, repairSummary, threatSummary);
+  if (damageRepairAlerts.length) {
+    alerts.splice(threatAlerts.length + weaponAlerts.length, 0, ...damageRepairAlerts);
   }
   if (state.buildHint && !state.lastBuildError) {
     alerts.push({
@@ -15001,6 +15641,12 @@ window.__gameTest.playtest = {
   getWeaponEffectiveness() {
     return safeDeepCloneForTest(getWeaponEffectiveness());
   },
+  getRecentDamageSummary() {
+    return safeDeepCloneForTest(getRecentDamageSummary());
+  },
+  getRepairStatusSummary() {
+    return safeDeepCloneForTest(getRepairStatusSummary());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
@@ -15020,6 +15666,8 @@ window.__gameTest.playtest = {
     const power = getPowerMargin();
     const threat = getThreatSummary();
     const weapon = getWeaponEffectiveness();
+    const damage = getRecentDamageSummary();
+    const repair = getRepairStatusSummary();
 
     return {
       version: "v0.11.0-playtest-readiness",
@@ -15071,7 +15719,9 @@ window.__gameTest.playtest = {
       },
       combat: {
         threat: safeDeepCloneForTest(threat),
-        weapon: safeDeepCloneForTest(weapon)
+        weapon: safeDeepCloneForTest(weapon),
+        damage: safeDeepCloneForTest(damage),
+        repair: safeDeepCloneForTest(repair)
       }
     };
   },
