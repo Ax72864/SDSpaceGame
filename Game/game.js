@@ -613,6 +613,65 @@ const FACILITY_ORDER = [
   "repair"
 ];
 
+const FACILITY_ROLE = {
+  frame: "support",
+  power: "power",
+  thruster: "thrust",
+  mining: "mining",
+  processor: "production",
+  plasma: "production",
+  research: "research",
+  turret: "weapon",
+  missile: "weapon",
+  shield: "defense",
+  armor: "defense",
+  repair: "repair"
+};
+
+const FACILITY_ROLE_LABEL = {
+  support: "支撑",
+  power: "供电",
+  thrust: "推进",
+  mining: "采矿",
+  production: "加工",
+  research: "研发",
+  weapon: "武器",
+  defense: "防御",
+  repair: "维修"
+};
+
+const FACILITY_SHORT_PURPOSE = {
+  frame: "扩展结构与连接面",
+  power: "供应空间站电力",
+  thruster: "提供推进与机动",
+  mining: "近天体自动采矿",
+  processor: "矿石转金属",
+  plasma: "气体精炼为等离子",
+  research: "产出研发点数",
+  turret: "自动近程开火",
+  missile: "手动远程齐射",
+  shield: "定向护盾拦截",
+  armor: "高耐久护甲层",
+  repair: "派出无人机维修"
+};
+
+const BUILD_PALETTE_TIP_COPY = {
+  core_capability_missing: {
+    mining: "推荐：当前无采矿能力，先建立资源收入。",
+    power: "推荐：先补供电，避免关键设施断电。",
+    thrust: "推荐：跃迁前补推进能力。",
+    weapon: "推荐：敌袭前补基础火力。",
+    defense: "推荐：已有火力，补一层基础防护更稳。",
+    repair: "推荐：维修能力不足，受损后恢复慢。",
+    support: "推荐：扩展结构与连接面。",
+    production: "推荐：补加工链，提高资源转化。",
+    research: "推荐：补研发产出，解锁升级。"
+  },
+  capability_limited: "推荐：同类设施已建但未运作，先检查供电。",
+  power_pressure: "推荐：先补供电，避免关键设施断电。",
+  redundant_high_count: "已有较多同类设施，先检查电力。"
+};
+
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
 const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
@@ -6674,6 +6733,270 @@ class Renderer {
 
 let renderer;
 
+function getFacilityRoleTag(facility) {
+  return FACILITY_ROLE[facility] || "support";
+}
+
+function countFacilitiesByRole() {
+  const counts = {};
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached) continue;
+    const role = getFacilityRoleTag(cell.facility);
+    counts[role] = (counts[role] || 0) + 1;
+  }
+  return counts;
+}
+
+function countActiveFacilitiesByRole() {
+  const counts = {};
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached || !cell.active) continue;
+    const role = getFacilityRoleTag(cell.facility);
+    counts[role] = (counts[role] || 0) + 1;
+  }
+  return counts;
+}
+
+function getFacilityPowerImpact(facilityId) {
+  const def = TYPES[facilityId] || {};
+  const powerOut = def.powerOut || def.baseStats?.powerOut || 0;
+  const bonusPowerOut = def.baseStats?.bonusPowerOut || 0;
+  const powerUse = def.powerUse || 0;
+  return {
+    powerOut,
+    bonusPowerOut,
+    powerUse,
+    netDelta: powerOut + bonusPowerOut - powerUse
+  };
+}
+
+function getBuildCostBase(facility) {
+  const base = TYPES[facility]?.cost || {};
+  return Object.fromEntries(Object.entries(base));
+}
+
+function getBuildPaletteMissingResources(cost) {
+  return Object.entries(cost)
+    .filter(([name, value]) => (state.resources[name] || 0) < value)
+    .map(([name, value]) => ({
+      name,
+      need: value,
+      have: Math.floor(state.resources[name] || 0),
+      gap: value - Math.floor(state.resources[name] || 0)
+    }));
+}
+
+function getBuildPaletteRecommendation(facilityId, role, count, roleCounts, activeRoleCounts, powerHeadroom, powerUse) {
+  if (role === "mining" && !(roleCounts.mining > 0)) {
+    return { priority: "high", reasonKey: "core_capability_missing" };
+  }
+  if (role === "power" && !(roleCounts.power > 0)) {
+    return { priority: "high", reasonKey: "core_capability_missing" };
+  }
+  if (role === "thrust" && !(roleCounts.thrust > 0)) {
+    return { priority: "medium", reasonKey: "core_capability_missing" };
+  }
+  if (role === "weapon" && !(roleCounts.weapon > 0)) {
+    return { priority: "medium", reasonKey: "core_capability_missing" };
+  }
+  if (role === "defense" && !(roleCounts.defense > 0) && roleCounts.weapon > 0) {
+    return { priority: "medium", reasonKey: "core_capability_missing" };
+  }
+  if (role === "repair" && !(roleCounts.repair > 0)) {
+    return { priority: "neutral", reasonKey: "core_capability_missing" };
+  }
+  if ((roleCounts[role] || 0) > 0 && !(activeRoleCounts[role] > 0) && powerUse > 0) {
+    return { priority: "medium", reasonKey: "capability_limited" };
+  }
+  if (powerHeadroom < powerUse && role !== "power") {
+    return { priority: "medium", reasonKey: "power_pressure" };
+  }
+  if (powerHeadroom < 5 && role === "power") {
+    return { priority: "high", reasonKey: "power_pressure" };
+  }
+  if (count >= 4) {
+    return { priority: "neutral", reasonKey: "redundant_high_count" };
+  }
+  return { priority: "neutral", reasonKey: null };
+}
+
+function getBuildPaletteStatusText(entry) {
+  if (!entry.affordable && entry.missingResources.length) {
+    const primary = entry.missingResources.reduce((best, item) => (item.gap > best.gap ? item : best));
+    return `缺${shortResource(primary.name)} ${primary.gap}`;
+  }
+  if (entry.powerRiskAfterBuild) return "建后可能断电";
+  if (entry.powerTightAfterBuild) return "建后电力紧张";
+  return "可建造";
+}
+
+function getBuildPaletteTipText(entry) {
+  if (!entry.affordable && entry.missingResources.length) {
+    const primary = entry.missingResources.reduce((best, item) => (item.gap > best.gap ? item : best));
+    return `警告：缺${shortResource(primary.name)} ${primary.gap}，当前不能建造。`;
+  }
+  if (entry.powerRiskAfterBuild) {
+    return "警告：建造后电力余量为负，关键设施可能断电。";
+  }
+  if (entry.powerTightAfterBuild) {
+    return "推荐：建造后电力偏紧，留意供电。";
+  }
+  const reasonKey = entry.recommendation?.reasonKey;
+  if (!reasonKey) return "";
+  if (reasonKey === "core_capability_missing") {
+    return BUILD_PALETTE_TIP_COPY.core_capability_missing[entry.role] || "";
+  }
+  return BUILD_PALETTE_TIP_COPY[reasonKey] || "";
+}
+
+function formatBuildPaletteCostSummary(cost, baseCost) {
+  const adjusted = Object.keys({ ...cost, ...baseCost }).some((name) => cost[name] !== baseCost[name]);
+  if (!adjusted) return formatCost(cost);
+  const parts = Object.entries(cost).map(([name, value]) => {
+    const base = baseCost[name];
+    if (base != null && base !== value) {
+      return `${shortResource(name)} ${value}（${base}）`;
+    }
+    return `${shortResource(name)} ${value}`;
+  });
+  return parts.length ? parts.join(" / ") : "免费";
+}
+
+function formatBuildPalettePowerText(powerImpact) {
+  const { powerOut, bonusPowerOut, powerUse, netDelta } = powerImpact;
+  if (netDelta === 0 && powerUse === 0 && powerOut === 0 && bonusPowerOut === 0) return "电力 0";
+  const parts = [];
+  if (powerOut > 0) parts.push(`产电 +${powerOut}`);
+  if (bonusPowerOut > 0) parts.push(`副产电 +${bonusPowerOut}`);
+  if (powerUse > 0) parts.push(`耗电 ${powerUse}`);
+  if (parts.length === 1 && netDelta !== 0) {
+    return netDelta > 0 ? `电力 +${netDelta}` : `电力 ${netDelta}`;
+  }
+  return parts.join(" · ");
+}
+
+function getBuildPaletteDiagnostics() {
+  const powerHeadroom = state.power.available - state.power.used;
+  const roleCounts = countFacilitiesByRole();
+  const activeRoleCounts = countActiveFacilitiesByRole();
+  const overallPowerTight = state.power.used >= state.power.available - 0.25 && state.power.available > 0;
+
+  const facilities = FACILITY_ORDER.map((id) => {
+    const def = TYPES[id];
+    const cost = getBuildCost(id);
+    const baseCost = getBuildCostBase(id);
+    const missingResources = getBuildPaletteMissingResources(cost);
+    const affordable = missingResources.length === 0;
+    const powerImpact = getFacilityPowerImpact(id);
+    const count = countFacility(id);
+    const role = getFacilityRoleTag(id);
+    const afterMargin = powerHeadroom + powerImpact.netDelta;
+    const powerRiskAfterBuild = affordable && afterMargin < 0;
+    const powerTightAfterBuild = affordable && !powerRiskAfterBuild && afterMargin < 1 && powerImpact.netDelta < 0;
+    const gapSum = missingResources.reduce((sum, item) => sum + item.gap, 0);
+    const recommendation = getBuildPaletteRecommendation(
+      id,
+      role,
+      count,
+      roleCounts,
+      activeRoleCounts,
+      powerHeadroom,
+      powerImpact.powerUse
+    );
+    if (!affordable && gapSum > 0 && gapSum < 10 && !recommendation.reasonKey) {
+      recommendation.reasonKey = "resource_pressure";
+      recommendation.priority = recommendation.priority === "neutral" ? "medium" : recommendation.priority;
+    }
+
+    const entry = {
+      id,
+      name: def.name,
+      role,
+      roleLabel: FACILITY_ROLE_LABEL[role] || role,
+      purpose: FACILITY_SHORT_PURPOSE[id] || def.desc,
+      cost,
+      baseCost,
+      costAdjusted: Object.keys({ ...cost, ...baseCost }).some((name) => cost[name] !== baseCost[name]),
+      affordable,
+      missingResources,
+      powerImpact,
+      powerRiskAfterBuild,
+      powerTightAfterBuild,
+      count,
+      countLimitHint: null,
+      recommendation,
+      flags: {
+        firstOfKind: count === 0,
+        unaffordableButCloseToAffordable: !affordable && gapSum > 0 && gapSum < 10
+      },
+      statusText: "",
+      tipText: ""
+    };
+    entry.statusText = getBuildPaletteStatusText(entry);
+    entry.tipText = getBuildPaletteTipText(entry);
+    return entry;
+  });
+
+  return {
+    generatedAt: state.time,
+    facilities,
+    summary: {
+      affordableCount: facilities.filter((entry) => entry.affordable).length,
+      totalCount: facilities.length,
+      powerHeadroom,
+      overallPowerTight
+    }
+  };
+}
+
+function buildFacilityCardInnerHtml(entry) {
+  const costSummary = formatBuildPaletteCostSummary(entry.cost, entry.baseCost);
+  const powerText = formatBuildPalettePowerText(entry.powerImpact);
+  const bonusTag = entry.costAdjusted ? `<span class="facility-card-bonus">已受加成</span>` : "";
+  const tipClass = entry.tipText.startsWith("警告")
+    ? " is-warning"
+    : entry.tipText.startsWith("推荐")
+      ? " is-recommend"
+      : "";
+  const tipHtml = entry.tipText
+    ? `<span class="facility-card-tip${tipClass}">${entry.tipText}</span>`
+    : "";
+
+  return [
+    `<span class="facility-card-header">`,
+    `<span class="facility-card-role">${entry.roleLabel}</span>`,
+    `<span class="facility-card-name">${entry.name}</span>`,
+    `<span class="facility-card-count">x${entry.count}</span>`,
+    `</span>`,
+    `<span class="facility-card-purpose">${entry.purpose}</span>`,
+    `<span class="facility-card-meta">`,
+    `<span class="facility-card-cost">${costSummary}${bonusTag}</span>`,
+    `<span class="facility-card-power">${powerText}</span>`,
+    `</span>`,
+    `<span class="facility-card-status">${entry.statusText}</span>`,
+    tipHtml
+  ].join("");
+}
+
+function applyBuildPaletteEntryToButton(button, entry) {
+  const costSummary = formatBuildPaletteCostSummary(entry.cost, entry.baseCost);
+  button.dataset.role = entry.role;
+  button.dataset.affordable = entry.affordable ? "true" : "false";
+  button.dataset.count = String(entry.count);
+  button.dataset.powerNet = String(entry.powerImpact.netDelta);
+  button.dataset.costSummary = costSummary;
+  button.dataset.status = entry.statusText;
+  button.dataset.purpose = entry.purpose;
+  button.className = "build-button facility-card";
+  button.classList.add(`role-${entry.role}`);
+  button.classList.toggle("is-affordable", entry.affordable);
+  button.classList.toggle("is-unaffordable", !entry.affordable);
+  button.classList.toggle("has-power-risk", entry.powerRiskAfterBuild || entry.powerTightAfterBuild);
+  button.classList.toggle("is-recommended", entry.recommendation?.priority === "high" || entry.tipText.startsWith("推荐"));
+  button.classList.toggle("has-critical-warning", entry.tipText.startsWith("警告"));
+  button.innerHTML = buildFacilityCardInnerHtml(entry);
+}
+
 function createBuildUi() {
   buildButtonsEl.innerHTML = "";
   const pointer = document.createElement("button");
@@ -6693,9 +7016,9 @@ function createBuildUi() {
     const def = TYPES[type];
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "build-button";
+    button.className = "build-button facility-card";
     button.dataset.type = type;
-    button.innerHTML = `${def.name}<small>${formatCost(getBuildCost(type))} / ${def.desc}</small>`;
+    button.innerHTML = `<span class="facility-card-name">${def.name}</span>`;
     button.addEventListener("click", () => {
       state.selectedBuild = type;
       state.selectedCell = null;
@@ -6746,8 +7069,15 @@ function createBuildUi() {
 }
 
 function updateBuildButtons() {
+  const palette = getBuildPaletteDiagnostics();
   for (const button of buildButtonsEl.querySelectorAll("button")) {
-    button.classList.toggle("active", button.dataset.type === state.selectedBuild || (!button.dataset.type && state.selectedBuild === null));
+    if (!button.dataset.type) {
+      button.classList.toggle("active", state.selectedBuild === null);
+      continue;
+    }
+    const entry = palette.facilities.find((facility) => facility.id === button.dataset.type);
+    if (entry) applyBuildPaletteEntryToButton(button, entry);
+    button.classList.toggle("active", button.dataset.type === state.selectedBuild);
   }
   buildButtonsEl.closest(".build-panel")?.classList.toggle("build-mode-active", Boolean(state.selectedBuild));
 }
@@ -10583,6 +10913,7 @@ function updateHud() {
   updateControlModeUi();
   updateCurrentGalaxyInfoHud();
   updateGalaxyPathHud();
+  updateBuildButtons();
 }
 
 function setHtmlIfChanged(element, cacheKey, html) {
@@ -12233,7 +12564,22 @@ function handlePlaytestEscapeKeydown() {
   return { handled: false, action: "default" };
 }
 
+function safeDeepCloneForTest(value) {
+  if (value == null) return value;
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch {
+      // fall through to JSON clone
+    }
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
 window.__gameTest.playtest = {
+  getBuildPaletteDiagnostics() {
+    return safeDeepCloneForTest(getBuildPaletteDiagnostics());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
