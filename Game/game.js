@@ -3050,8 +3050,6 @@ function getGalaxyChoiceRng(targetLevel) {
 
 // v0.9.0：通用乘子叠加 helper
 // final[type] = base[type] × (galaxyMod[type] ?? 1.0)；乘子缺失走 1.0；保护负值不出现
-// 本批仅供 __gameTest.getObjectiveType / __gameTest.getGalaxyTypeWeights 测试钩子使用，
-// 不接入 getObjectiveWeightTable / seedEncountersForLevel 等运行路径（T3 再接入）。
 function applyGalaxyWeightMod(baseWeights, galaxyMod) {
   if (!baseWeights || typeof baseWeights !== "object") return {};
   if (!galaxyMod || typeof galaxyMod !== "object") return { ...baseWeights };
@@ -3066,6 +3064,61 @@ function applyGalaxyWeightMod(baseWeights, galaxyMod) {
     }
   }
   return result;
+}
+
+function resolveGalaxyTypeKey(galaxyType) {
+  if (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType]) return galaxyType;
+  if (typeof state.run?.currentGalaxyType === "string" && GALAXY_TYPES[state.run.currentGalaxyType]) {
+    return state.run.currentGalaxyType;
+  }
+  return "emptyVoid";
+}
+
+function getGalaxyDefinition(galaxyType) {
+  const key = resolveGalaxyTypeKey(galaxyType);
+  return GALAXY_TYPES[key] || GALAXY_TYPES.emptyVoid;
+}
+
+function getGalaxyResourceMultiplier(resourceType, galaxyType) {
+  const resourceMod = getGalaxyDefinition(galaxyType)?.resourceMod;
+  if (!resourceMod || typeof resourceMod !== "object") return 1.0;
+  const mod = resourceMod[resourceType];
+  if (!Number.isFinite(mod)) return 1.0;
+  return Math.max(0, mod);
+}
+
+function getGalaxyEnemySpawnMultiplier(galaxyType) {
+  const enemySpawnMod = getGalaxyDefinition(galaxyType)?.enemySpawnMod;
+  if (!Number.isFinite(enemySpawnMod)) return 1.0;
+  return Math.max(0.1, enemySpawnMod);
+}
+
+function getGalaxySpawnInterval(baseInterval, galaxyType) {
+  if (!Number.isFinite(baseInterval)) return baseInterval;
+  return baseInterval / getGalaxyEnemySpawnMultiplier(galaxyType);
+}
+
+function getObjectiveWeightsForLevel(level, galaxyType, hostileStationSpawned = false) {
+  const lvl = levelIndex(level);
+  let weightTable = {
+    ...(OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1])
+  };
+  if (hostileStationSpawned) {
+    delete weightTable.assault;
+  }
+  const galaxyDef = getGalaxyDefinition(galaxyType);
+  weightTable = applyGalaxyWeightMod(weightTable, galaxyDef.objectiveWeightMod);
+  if (weightTable.assault != null && Number.isFinite(galaxyDef.hostileStationMod)) {
+    weightTable.assault = Math.max(0, weightTable.assault * galaxyDef.hostileStationMod);
+  }
+  return weightTable;
+}
+
+function getEncounterWeightsForLevel(level, galaxyType) {
+  const lvl = levelIndex(level);
+  const baseWeights = { ...(ENCOUNTER_LEVEL_WEIGHTS[lvl] || {}) };
+  const galaxyDef = getGalaxyDefinition(galaxyType);
+  return applyGalaxyWeightMod(baseWeights, galaxyDef.encounterWeightMod);
 }
 
 // v0.9.0：基于 GALAXY_LEVEL_BIAS 的二阶段加权候选抽样
@@ -3182,13 +3235,7 @@ function cancelGalaxyJump() {
 }
 
 function getObjectiveWeightTable(level) {
-  const weightTable = {
-    ...(OBJECTIVE_LEVEL_WEIGHTS[level] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1])
-  };
-  if (state.run.hostileStationSpawnedThisGalaxy) {
-    delete weightTable.assault;
-  }
-  return weightTable;
+  return getObjectiveWeightsForLevel(level, undefined, Boolean(state.run.hostileStationSpawnedThisGalaxy));
 }
 
 function resolveObjectiveRewardMultiplier(objectiveType, level) {
@@ -3272,10 +3319,10 @@ function applyEncounterReward(encounter) {
   if (!encounter || !encounter.encounterData) return;
   const reward = encounter.encounterData.reward;
   if (!reward || typeof reward !== "object") return;
-  if (Number.isFinite(reward.metal)) state.resources.metal += reward.metal;
-  if (Number.isFinite(reward.ore)) state.resources.ore += reward.ore;
-  if (Number.isFinite(reward.gas)) state.resources.gas += reward.gas;
-  if (Number.isFinite(reward.plasma)) state.resources.plasma += reward.plasma;
+  if (Number.isFinite(reward.metal)) state.resources.metal += reward.metal * getGalaxyResourceMultiplier("metal");
+  if (Number.isFinite(reward.ore)) state.resources.ore += reward.ore * getGalaxyResourceMultiplier("ore");
+  if (Number.isFinite(reward.gas)) state.resources.gas += reward.gas * getGalaxyResourceMultiplier("gas");
+  if (Number.isFinite(reward.plasma)) state.resources.plasma += reward.plasma * getGalaxyResourceMultiplier("plasma");
   if (Number.isFinite(reward.research)) {
     state.resources.research = (state.resources.research || 0) + reward.research;
   }
@@ -3291,8 +3338,10 @@ function seedEncountersForLevel(level) {
   const counts = ENCOUNTER_PER_LEVEL_COUNT[lvl] || { min: 0, max: 0 };
   if (counts.max <= 0) return;
 
-  const baseWeights = ENCOUNTER_LEVEL_WEIGHTS[lvl] || {};
-  const availableTypes = Object.keys(baseWeights).filter((type) => ENCOUNTER_TYPES[type]);
+  const baseWeights = getEncounterWeightsForLevel(lvl);
+  const availableTypes = Object.keys(baseWeights).filter(
+    (type) => ENCOUNTER_TYPES[type] && Number.isFinite(baseWeights[type]) && baseWeights[type] > 0
+  );
   if (availableTypes.length === 0) return;
 
   const rng = getEncounterRng(lvl);
@@ -3576,7 +3625,7 @@ function grantObjectiveReward() {
   if (state.run.objective?.type === "assault") {
     const effectiveLevel = level === 4 ? 4 : level === 5 ? 5 : 3;
     const metalBase = ASSAULT_METAL_BASE_BY_LEVEL[effectiveLevel] ?? 35;
-    const metalGain = Math.floor(metalBase * rewardMultiplier * (1 + level * 0.1));
+    const metalGain = Math.floor(metalBase * rewardMultiplier * (1 + level * 0.1) * getGalaxyResourceMultiplier("metal"));
     state.resources.metal += metalGain;
   }
   if (state.run.level >= ENDGAME_LEVEL || state.run.objective?.type === "guardian") {
@@ -5805,7 +5854,9 @@ function updateMiningAndResearch(dt) {
       if (body) {
         const amount = Math.min(body.amount, getCellStat(cell, "mineRate") * miningBonus * dt);
         body.amount -= amount;
-        state.resources[body.resource] = (state.resources[body.resource] || 0) + amount;
+        const resourceType = body.resource;
+        const gained = amount * getGalaxyResourceMultiplier(resourceType);
+        state.resources[resourceType] = (state.resources[resourceType] || 0) + gained;
         mined += amount;
         cell.fire = 1;
         spawnParticle(p, body.color);
@@ -5868,7 +5919,7 @@ function getLevelTransitionBuffer(level) {
 }
 
 function scheduleNextSpawnTimer() {
-  let timer = getSpawnTimerByLevel(getSpawnDifficultyLevel());
+  let timer = getGalaxySpawnInterval(getSpawnTimerByLevel(getSpawnDifficultyLevel()));
   if (levelIndex(state.run.level) === 0 && state.time < LEVEL0_SPAWN_WINDOW_SEC) {
     const postWindowGap = LEVEL0_SPAWN_WINDOW_SEC - state.time + 0.05;
     timer = Math.max(timer, postWindowGap);
@@ -6164,8 +6215,8 @@ function updateEnemies(dt) {
       return true;
     }
     if (enemy.hp > 0) return true;
-    state.resources.metal += enemy.reward;
-    state.resources.gas += enemy.reward * 0.15;
+    state.resources.metal += enemy.reward * getGalaxyResourceMultiplier("metal");
+    state.resources.gas += enemy.reward * 0.15 * getGalaxyResourceMultiplier("gas");
     awardEndgameActivityPoints(enemyActivityPointReward(enemy.kind));
     if (enemy.kind === "guardian") {
       state.run.guardianDefeated = true;
@@ -6804,9 +6855,9 @@ function nextLevel(galaxyType = "emptyVoid") {
   createObjective();
   seedEncountersForLevel(state.run.level);
 
-  state.resources.metal += 55;
-  state.resources.ore += 25;
-  state.resources.gas += 18;
+  state.resources.metal += 55 * getGalaxyResourceMultiplier("metal", safeGalaxyType);
+  state.resources.ore += 25 * getGalaxyResourceMultiplier("ore", safeGalaxyType);
+  state.resources.gas += 18 * getGalaxyResourceMultiplier("gas", safeGalaxyType);
   state.spawnTimer = getLevelTransitionBuffer(state.run.level);
 
   if (state.run.endgame) {
@@ -8108,22 +8159,14 @@ window.__gameTest = {
     const lvl = levelIndex(level);
     const objectiveSeed = (seed ^ 0x9e3779b9) + lvl * 0x85ebca6b;
     const objectiveRng = mulberry32(objectiveSeed);
-    let weightTable = { ...(OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1]) };
-    if (typeof galaxyType === "string") {
-      const galaxyDef = GALAXY_TYPES[galaxyType];
-      if (galaxyDef && galaxyDef.objectiveWeightMod) {
-        weightTable = applyGalaxyWeightMod(weightTable, galaxyDef.objectiveWeightMod);
-        if (weightTable.assault != null && Number.isFinite(galaxyDef.hostileStationMod)) {
-          weightTable.assault = Math.max(0, weightTable.assault * galaxyDef.hostileStationMod);
-        }
-      }
-    }
+    const targetGalaxyType = (typeof galaxyType === "string" && GALAXY_TYPES[galaxyType]) ? galaxyType : "emptyVoid";
+    const weightTable = getObjectiveWeightsForLevel(lvl, targetGalaxyType, false);
     return pickWeighted(objectiveRng, weightTable);
   },
-  sampleAssaultRate(level, sampleCount = 1000, startSeed = 1) {
+  sampleAssaultRate(level, sampleCount = 1000, startSeed = 1, galaxyType) {
     let assaultCount = 0;
     for (let i = 0; i < sampleCount; i++) {
-      if (this.getObjectiveType(startSeed + i, level) === "assault") assaultCount++;
+      if (this.getObjectiveType(startSeed + i, level, galaxyType) === "assault") assaultCount++;
     }
     return assaultCount / sampleCount;
   },
@@ -8304,27 +8347,31 @@ window.__gameTest = {
   // 当 galaxyType 缺省或为 emptyVoid 时，输出与 base 表完全一致（emptyVoid 所有 mod = 1.0）
   getGalaxyTypeWeights(galaxyType, level) {
     const lvl = levelIndex(level);
-    const galaxyDef = GALAXY_TYPES[galaxyType];
-    const objectiveBase = { ...(OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1]) };
-    const encounterBase = { ...(ENCOUNTER_LEVEL_WEIGHTS[lvl] || {}) };
-    if (!galaxyDef) {
+    if (typeof galaxyType === "string" && !GALAXY_TYPES[galaxyType]) {
+      const objectiveBase = { ...(OBJECTIVE_LEVEL_WEIGHTS[lvl] || OBJECTIVE_LEVEL_WEIGHTS[OBJECTIVE_LEVEL_WEIGHTS.length - 1]) };
+      const encounterBase = { ...(ENCOUNTER_LEVEL_WEIGHTS[lvl] || {}) };
       return { ok: false, reason: "unknown galaxyType", level: lvl, objective: objectiveBase, encounter: encounterBase };
     }
-    let objectiveModded = applyGalaxyWeightMod(objectiveBase, galaxyDef.objectiveWeightMod);
-    if (objectiveModded.assault != null && Number.isFinite(galaxyDef.hostileStationMod)) {
-      objectiveModded.assault = Math.max(0, objectiveModded.assault * galaxyDef.hostileStationMod);
-    }
-    const encounterModded = applyGalaxyWeightMod(encounterBase, galaxyDef.encounterWeightMod);
+    const resolvedGalaxyType = resolveGalaxyTypeKey(galaxyType);
+    const galaxyDef = getGalaxyDefinition(resolvedGalaxyType);
+    const objectiveModded = getObjectiveWeightsForLevel(lvl, resolvedGalaxyType, false);
+    const encounterModded = getEncounterWeightsForLevel(lvl, resolvedGalaxyType);
     return {
       ok: true,
       level: lvl,
-      galaxyType,
+      galaxyType: resolvedGalaxyType,
       objective: objectiveModded,
       encounter: encounterModded,
       enemySpawnMod: galaxyDef.enemySpawnMod,
       resourceMod: galaxyDef.resourceMod,
       hostileStationMod: galaxyDef.hostileStationMod
     };
+  },
+  getGalaxyResourceMod(resourceType, galaxyType) {
+    return getGalaxyResourceMultiplier(resourceType, galaxyType);
+  },
+  getGalaxySpawnTimer(baseInterval, galaxyType) {
+    return getGalaxySpawnInterval(baseInterval, galaxyType);
   },
   getCellStat,
   applyModification,
