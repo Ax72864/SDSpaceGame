@@ -318,6 +318,24 @@ button:disabled {
   transform: scale(1.02);
 }
 
+.galaxy-map-cards.disabled,
+.galaxy-map-card.disabled,
+.galaxy-map-card:disabled {
+  pointer-events: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.galaxy-map-card.disabled:hover,
+.galaxy-map-card.disabled:focus-visible,
+.galaxy-map-card:disabled:hover,
+.galaxy-map-card:disabled:focus-visible {
+  transform: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(117, 245, 255, 0.22);
+}
+
 .galaxy-map-card.galaxy-trade-hub:hover,
 .galaxy-map-card.galaxy-trade-hub:focus-visible {
   border-color: rgba(94, 168, 255, 0.75);

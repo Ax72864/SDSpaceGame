@@ -1472,6 +1472,116 @@ function runGalaxyVisualSelfCheck() {
   return { ok: checks.every((entry) => entry.ok), checks, signatures };
 }
 
+function ensureGameplayTestBaseline() {
+  ensureRunRuntimeState();
+  if (state.station.cells.size === 0) {
+    initStation();
+    initWorld();
+  }
+}
+
+function runGalaxyJumpStateMachineSelfCheck() {
+  ensureGameplayTestBaseline();
+  const checks = [];
+
+  const runCase = (name, fn) => {
+    let ok = false;
+    let detail = null;
+    try {
+      const result = fn();
+      ok = !!result?.ok;
+      detail = result;
+    } catch (error) {
+      detail = { error: error.message };
+    }
+    checks.push({ name, ok, detail });
+    return ok;
+  };
+
+  runCase("staleCandidateDoubleConfirm", () => {
+    window.__gameTest.resetRun(42, 0);
+    const levelBefore = state.run.level;
+    const galaxyType = "tradeHub";
+    if (state.run.galaxyMap) {
+      state.run.galaxyMap.pendingChoices = [{ galaxyType, reason: "test" }];
+    }
+    state.run.galaxyChoicesShown = true;
+    const first = confirmGalaxyJump(galaxyType);
+    const second = confirmGalaxyJump(galaxyType);
+    return {
+      ok: first && !second && state.run.level === levelBefore + 1,
+      levelBefore,
+      levelAfter: state.run.level,
+      first,
+      second
+    };
+  });
+
+  runCase("rejectConfirmWithoutPending", () => {
+    window.__gameTest.resetRun(42, 0);
+    state.run.galaxyChoicesShown = true;
+    if (state.run.galaxyMap) state.run.galaxyMap.pendingChoices = [];
+    const rejected = confirmGalaxyJump("tradeHub");
+    return { ok: !rejected && state.run.level === 0, rejected };
+  });
+
+  runCase("cancelThenReconfirm", () => {
+    window.__gameTest.resetRun(42, 0);
+    if (state.run.galaxyMap) {
+      state.run.galaxyMap.pendingChoices = [{ galaxyType: "miningBelt", reason: "test" }];
+    }
+    state.run.galaxyChoicesShown = true;
+    cancelGalaxyJump();
+    const galaxyType = "pirateTerritory";
+    if (state.run.galaxyMap) {
+      state.run.galaxyMap.pendingChoices = [{ galaxyType, reason: "test-reopen" }];
+    }
+    state.run.galaxyChoicesShown = true;
+    const ok = confirmGalaxyJump(galaxyType);
+    return {
+      ok: ok && state.run.level === 1 && state.run.currentGalaxyType === galaxyType,
+      level: state.run.level,
+      galaxyType: state.run.currentGalaxyType
+    };
+  });
+
+  runCase("endgameWarFrontSingleAdvance", () => {
+    window.__gameTest.resetRun(42, 5);
+    const levelBefore = state.run.level;
+    const first = confirmGalaxyJump("warFront");
+    const second = confirmGalaxyJump("warFront");
+    return {
+      ok: first && !second && state.run.level === levelBefore + 1 && state.run.level === ENDGAME_LEVEL,
+      levelBefore,
+      levelAfter: state.run.level,
+      first,
+      second
+    };
+  });
+
+  runCase("forceConfirmGalaxyJumpHook", () => {
+    window.__gameTest.resetRun(42, 0);
+    const result = window.__gameTest.forceConfirmGalaxyJump("techRuin");
+    return {
+      ok: result.ok && state.run.level === 1 && state.run.currentGalaxyType === "techRuin",
+      result
+    };
+  });
+
+  runCase("forceConfirmThenStaleSecondConfirm", () => {
+    window.__gameTest.resetRun(42, 0);
+    const result = window.__gameTest.forceConfirmGalaxyJump("techRuin");
+    const stale = confirmGalaxyJump("techRuin");
+    return {
+      ok: result.ok && !stale && state.run.level === 1,
+      result,
+      stale
+    };
+  });
+
+  return { ok: checks.every((entry) => entry.ok), checks };
+}
+
 function tryPlaceOrbitBody({ rng, anchor, radius, minOrbit, maxOrbit, type, placed }) {
   for (let attempt = 0; attempt < 80; attempt++) {
     const angle = rngFloat(rng, 0, Math.PI * 2);
@@ -1996,6 +2106,7 @@ let selectedCellModificationEl = null;
 let researchTreePanelEl = null;
 let researchTreeBtnEl = null;
 let galaxyMapPanelBound = false;
+let galaxyJumpInFlight = false;
 
 function ensureSelectedCellUpgradeUi() {
   if (selectedCellUpgradeEl) return;
@@ -3355,33 +3466,52 @@ function generateGalaxyChoices(targetLevel, rng) {
 // 本批可由测试钩子（forceConfirmGalaxyJump）调用，UI 层 T5 接入卡片点击时同样走此函数；
 // 关闭 galaxyMapPanel（若 DOM 存在）、清理 pendingChoices / galaxyChoicesShown，
 // 然后通过 nextLevel(galaxyType) 推进关卡，并在 galaxyMap.nodes 中追加新节点。
-function confirmGalaxyJump(galaxyType) {
+// options.allowFallback：无 panel / 无候选时的内部 emptyVoid 回落路径（不经玩家点选）。
+function confirmGalaxyJump(galaxyType, options = {}) {
   if (!GALAXY_TYPES[galaxyType]) return false;
   if (state.run.level >= ENDGAME_LEVEL) return false;
-  hideGalaxyMapPanel();
-  if (state.run.galaxyMap) {
-    state.run.galaxyMap.pendingChoices = [];
+  if (galaxyJumpInFlight) return false;
+
+  const nextLvl = levelIndex(state.run.level + 1);
+  const isEndgameForced = nextLvl >= ENDGAME_LEVEL && galaxyType === "warFront";
+  const allowFallback = options.allowFallback === true;
+  const pending = state.run.galaxyMap?.pendingChoices || [];
+  const inPending = pending.some((choice) => choice && choice.galaxyType === galaxyType);
+
+  if (!isEndgameForced && !allowFallback) {
+    if (!state.run.galaxyChoicesShown || !inPending) return false;
   }
-  state.run.galaxyChoicesShown = false;
-  nextLevel(galaxyType);
-  // 在 galaxyMap.nodes 中追加新节点；前一个 current 节点转为 visited
-  if (state.run.galaxyMap) {
-    for (const node of state.run.galaxyMap.nodes) {
-      if (node) node.current = false;
+
+  galaxyJumpInFlight = true;
+  disableGalaxyMapCards();
+  try {
+    hideGalaxyMapPanel();
+    if (state.run.galaxyMap) {
+      state.run.galaxyMap.pendingChoices = [];
     }
-    galaxyNodeIdSeed += 1;
-    const newNode = {
-      id: `node-${galaxyNodeIdSeed}`,
-      level: levelIndex(state.run.level),
-      galaxyType,
-      visited: true,
-      current: true
-    };
-    state.run.galaxyMap.nodes.push(newNode);
-    state.run.galaxyMap.currentNodeId = newNode.id;
+    state.run.galaxyChoicesShown = false;
+    nextLevel(galaxyType);
+    // 在 galaxyMap.nodes 中追加新节点；前一个 current 节点转为 visited
+    if (state.run.galaxyMap) {
+      for (const node of state.run.galaxyMap.nodes) {
+        if (node) node.current = false;
+      }
+      galaxyNodeIdSeed += 1;
+      const newNode = {
+        id: `node-${galaxyNodeIdSeed}`,
+        level: levelIndex(state.run.level),
+        galaxyType,
+        visited: true,
+        current: true
+      };
+      state.run.galaxyMap.nodes.push(newNode);
+      state.run.galaxyMap.currentNodeId = newNode.id;
+    }
+    if (typeof updateHud === "function") updateHud();
+    return true;
+  } finally {
+    galaxyJumpInFlight = false;
   }
-  if (typeof updateHud === "function") updateHud();
-  return true;
 }
 
 // v0.9.0：玩家在 galaxyMapPanel 按 Escape 或点击「暂时停留」时调用
@@ -3390,9 +3520,24 @@ function confirmGalaxyJump(galaxyType) {
 // pendingChoices 留待 jumpBtn 重新触发时按 RNG 再生成（数值方案 §6.1 校验 5）。
 function cancelGalaxyJump() {
   hideGalaxyMapPanel();
+  disableGalaxyMapCards();
+  galaxyJumpInFlight = false;
   state.run.galaxyChoicesShown = false;
   if (typeof updateObjectiveChoiceUi === "function") updateObjectiveChoiceUi();
   if (typeof updateHud === "function") updateHud();
+}
+
+function disableGalaxyMapCards() {
+  const panel = document.getElementById("galaxyMapPanel");
+  const cardsEl = panel?.querySelector(".galaxy-map-cards");
+  if (cardsEl) cardsEl.classList.add("disabled");
+  const cards = panel?.querySelectorAll(".galaxy-map-card");
+  if (!cards) return;
+  for (const card of cards) {
+    card.disabled = true;
+    card.classList.add("disabled");
+    card.setAttribute("aria-disabled", "true");
+  }
 }
 
 const OBJECTIVE_PREF_LABELS = {
@@ -3522,7 +3667,7 @@ function openGalaxyMapPanel(choices) {
     ? choices.filter((choice) => choice && GALAXY_TYPES[choice.galaxyType])
     : [];
   if (!safeChoices.length) {
-    confirmGalaxyJump("emptyVoid");
+    confirmGalaxyJump("emptyVoid", { allowFallback: true });
     return false;
   }
   if (!renderGalaxyMapCards(safeChoices)) {
@@ -3541,10 +3686,14 @@ function bindGalaxyMapPanelEvents() {
   panel.querySelector(".galaxy-map-cancel-btn")?.addEventListener("click", () => cancelGalaxyJump());
   panel.querySelector(".galaxy-map-overlay")?.addEventListener("click", () => cancelGalaxyJump());
   panel.querySelector(".galaxy-map-cards")?.addEventListener("click", (event) => {
+    if (galaxyJumpInFlight) return;
     const card = event.target.closest(".galaxy-map-card");
-    if (!card) return;
+    if (!card || card.disabled || card.classList.contains("disabled")) return;
     const galaxyType = card.dataset.galaxyType;
-    if (galaxyType && GALAXY_TYPES[galaxyType]) confirmGalaxyJump(galaxyType);
+    if (galaxyType && GALAXY_TYPES[galaxyType]) {
+      disableGalaxyMapCards();
+      confirmGalaxyJump(galaxyType);
+    }
   });
 }
 
@@ -8434,7 +8583,7 @@ window.gameActions = {
       const rng = getGalaxyChoiceRng(nextLvl);
       const choices = generateGalaxyChoices(nextLvl, rng);
       if (!choices || choices.length === 0) {
-        confirmGalaxyJump("emptyVoid");
+        confirmGalaxyJump("emptyVoid", { allowFallback: true });
         return;
       }
       if (state.run.galaxyMap) {
@@ -8447,7 +8596,7 @@ window.gameActions = {
       updateHud();
       return;
     }
-    confirmGalaxyJump("emptyVoid");
+    confirmGalaxyJump("emptyVoid", { allowFallback: true });
   },
   stayInCurrentGalaxy() {
     if (state.run.endgame) return;
@@ -8507,6 +8656,7 @@ window.__gameTest = {
     state.run.currentGalaxyType = safeGalaxyType;
     state.run.galaxyMap = { nodes: [], currentNodeId: null, pendingChoices: [] };
     state.run.galaxyChoicesShown = false;
+    galaxyJumpInFlight = false;
     const lvl = levelIndex(level);
     const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`, safeGalaxyType);
     applyGalaxy(galaxy);
@@ -8700,8 +8850,35 @@ window.__gameTest = {
   // 强制确认跃迁到指定 galaxyType（绕过 panel 点击）；非法 type 报错
   forceConfirmGalaxyJump(galaxyType) {
     if (!GALAXY_TYPES[galaxyType]) return { ok: false, reason: "unknown galaxyType" };
+    if (state.run.galaxyMap) {
+      state.run.galaxyMap.pendingChoices = [{ galaxyType, reason: "test-force" }];
+    }
+    state.run.galaxyChoicesShown = true;
     const ok = confirmGalaxyJump(galaxyType);
     return { ok, level: state.run.level, galaxyType: state.run.currentGalaxyType };
+  },
+  // PM 回归：模拟 stale 候选二次 confirm，level 只应 +1
+  simulateStaleGalaxyConfirm(galaxyType = "tradeHub") {
+    if (!GALAXY_TYPES[galaxyType]) return { ok: false, reason: "unknown galaxyType" };
+    ensureGameplayTestBaseline();
+    this.resetRun(42, 0);
+    const levelBefore = state.run.level;
+    if (state.run.galaxyMap) {
+      state.run.galaxyMap.pendingChoices = [{ galaxyType, reason: "stale-sim" }];
+    }
+    state.run.galaxyChoicesShown = true;
+    const first = confirmGalaxyJump(galaxyType);
+    const second = confirmGalaxyJump(galaxyType);
+    return {
+      ok: first && !second && state.run.level === levelBefore + 1,
+      levelBefore,
+      levelAfter: state.run.level,
+      first,
+      second
+    };
+  },
+  runGalaxyJumpStateMachineSelfCheck() {
+    return runGalaxyJumpStateMachineSelfCheck();
   },
   // 测试 Escape 取消流程（不破坏 awaitingObjectiveChoice）
   cancelGalaxyJump() {
