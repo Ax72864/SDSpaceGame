@@ -19,6 +19,7 @@ const metaStatsEl = document.getElementById("metaStats");
 const toastEl = document.getElementById("toast");
 const runSettlementPanelEl = document.getElementById("runSettlementPanel");
 const runSettlementStatsEl = document.getElementById("runSettlementStats");
+const runSettlementMetaFeedbackEl = document.getElementById("runSettlementMetaFeedback");
 const quickRestartBtnEl = document.getElementById("quickRestartBtn");
 const currentGalaxyInfoEl = document.getElementById("currentGalaxyInfoEl");
 const galaxyPathEl = document.getElementById("galaxyPathEl");
@@ -791,6 +792,14 @@ const RESOURCE_VISUAL = {
   plasma: { ring: [0.85, 0.38, 1.0, 1], label: "等离子", css: "plasma" }
 };
 
+const RUN_BASE_STARTING_RESOURCES = Object.freeze({
+  metal: 130,
+  ore: 60,
+  gas: 35,
+  plasma: 8,
+  research: 0
+});
+
 const META_SCHEMA_VERSION = 2;
 const META_DEFAULT_PROTOCOL_ID = "balanced";
 const META_TALENT_TREE = [
@@ -1030,6 +1039,25 @@ const META_EFFECT_MODE = {
   weaponFacilityDiscount: "mul",
   earlyHint: "flag"
 };
+const START_PROTOCOL_RESOURCE_EFFECT_MAP = Object.freeze({
+  startingMetal: "metal",
+  startingOre: "ore",
+  startingGas: "gas",
+  startingPlasma: "plasma"
+});
+const START_PROTOCOL_FACILITY_DISCOUNT_MAP = Object.freeze({
+  miningFacilityDiscount: "mining",
+  weaponFacilityDiscount: "weapon"
+});
+const START_PROTOCOL_RESOURCE_BONUS_CAP_RATIO = 0.5;
+const START_PROTOCOL_HULL_BONUS_MAX = 0.15;
+const START_PROTOCOL_FACILITY_DISCOUNT_MIN = 0.8;
+const START_PROTOCOL_HINT_TEXT = Object.freeze({
+  miningStart: "采矿起步已生效：优先部署采矿设施，尽快拉高基础资源滚动。",
+  defenseStart: "防御起步已生效：优先稳住核心与外环，前期容错更高。",
+  weaponStart: "武器起步已生效：优先补武器设施，尽早建立火力网。",
+  scoutStart: "星图探索已生效：优先观察星系提示，规划下一跳路径。"
+});
 
 const state = {
   paused: false,
@@ -1086,9 +1114,17 @@ const state = {
     // v0.9.0：局间星系图状态；走 runtime 路径不进 SAVE_KEY，刷新即重置
     galaxyMap: { nodes: [], currentNodeId: null, pendingChoices: [] },
     currentGalaxyType: "emptyVoid",
-    galaxyChoicesShown: false
+    galaxyChoicesShown: false,
+    activeStartProtocolId: META_DEFAULT_PROTOCOL_ID,
+    startupFacilityDiscounts: { mining: 1, weapon: 1 },
+    startupHullBonus: 1,
+    startupResourceBonus: { metal: 0, ore: 0, gas: 0, plasma: 0 },
+    startupHint: "",
+    startupHintUntil: 0,
+    metaStartProtocolApplied: false,
+    metaPointsGainedThisRun: 0
   },
-  resources: { metal: 130, ore: 60, gas: 35, plasma: 8, research: 0 },
+  resources: { ...RUN_BASE_STARTING_RESOURCES },
   power: { available: 0, used: 0 },
   meta: loadMeta(),
   asyncEnabled: localStorage.getItem(ASYNC_KEY) !== "false",
@@ -1174,6 +1210,146 @@ function createDefaultMetaState() {
     talents: createDefaultMetaTalents(),
     unlockedProtocols: [META_DEFAULT_PROTOCOL_ID],
     selectedStartProtocol: META_DEFAULT_PROTOCOL_ID
+  };
+}
+
+function createDefaultStartupFacilityDiscounts() {
+  return { mining: 1, weapon: 1 };
+}
+
+function createDefaultStartupResourceBonus() {
+  return { metal: 0, ore: 0, gas: 0, plasma: 0 };
+}
+
+function normalizeProtocolDiscountValue(rawValue, fallback = 1) {
+  const value = Number(rawValue);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return clamp(value, START_PROTOCOL_FACILITY_DISCOUNT_MIN, 1);
+}
+
+function resetRunStartProtocolRuntimeState(runState = state.run) {
+  if (!isMetaObject(runState)) return;
+  runState.activeStartProtocolId = META_DEFAULT_PROTOCOL_ID;
+  runState.startupFacilityDiscounts = createDefaultStartupFacilityDiscounts();
+  runState.startupHullBonus = 1;
+  runState.startupResourceBonus = createDefaultStartupResourceBonus();
+  runState.startupHint = "";
+  runState.startupHintUntil = 0;
+  runState.metaStartProtocolApplied = false;
+}
+
+function getActiveStartProtocolId(runState = state.run) {
+  const activeId = typeof runState?.activeStartProtocolId === "string"
+    ? runState.activeStartProtocolId
+    : META_DEFAULT_PROTOCOL_ID;
+  return START_PROTOCOL_INDEX[activeId] ? activeId : META_DEFAULT_PROTOCOL_ID;
+}
+
+function getActiveStartProtocol(runState = state.run) {
+  return START_PROTOCOL_INDEX[getActiveStartProtocolId(runState)] || START_PROTOCOL_INDEX[META_DEFAULT_PROTOCOL_ID];
+}
+
+function getActiveProtocolFacilityDiscount(facilityKey, runState = state.run) {
+  const discounts = isMetaObject(runState?.startupFacilityDiscounts)
+    ? runState.startupFacilityDiscounts
+    : null;
+  if (!discounts) return 1;
+  return normalizeProtocolDiscountValue(discounts[facilityKey], 1);
+}
+
+function getRunStartupHullBonus(runState = state.run) {
+  const value = Number(runState?.startupHullBonus);
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  return clamp(value, 1, 1 + START_PROTOCOL_HULL_BONUS_MAX);
+}
+
+function buildStartProtocolHintText(protocol, resourceBonus, discounts, hullBonusPct) {
+  const parts = [];
+  if (resourceBonus.metal > 0) parts.push(`金属 +${resourceBonus.metal}`);
+  if (resourceBonus.ore > 0) parts.push(`矿石 +${resourceBonus.ore}`);
+  if (resourceBonus.gas > 0) parts.push(`气体 +${resourceBonus.gas}`);
+  if (resourceBonus.plasma > 0) parts.push(`等离子 +${resourceBonus.plasma}`);
+  if (discounts.mining < 1) parts.push(`采矿设施建造 -${Math.round((1 - discounts.mining) * 100)}%`);
+  if (discounts.weapon < 1) parts.push(`武器设施建造 -${Math.round((1 - discounts.weapon) * 100)}%`);
+  if (hullBonusPct > 0) parts.push(`核心/框架耐久 +${Math.round(hullBonusPct * 100)}%`);
+  const protocolName = protocol?.name || "标准开局";
+  const routeHint = START_PROTOCOL_HINT_TEXT[protocol?.id] || "";
+  const impact = parts.length ? `开局协议「${protocolName}」已生效：${parts.join("，")}。` : `开局协议「${protocolName}」已生效。`;
+  return routeHint ? `${impact} ${routeHint}` : impact;
+}
+
+function applyMetaStartProtocol(runState = state.run, metaState = state.meta) {
+  if (!isMetaObject(runState)) {
+    return { ok: false, reason: "invalid_run_state" };
+  }
+  if (runState.metaStartProtocolApplied) {
+    return {
+      ok: true,
+      alreadyApplied: true,
+      activeProtocolId: getActiveStartProtocolId(runState)
+    };
+  }
+
+  resetRunStartProtocolRuntimeState(runState);
+  const selectedId = getSelectedStartProtocol(metaState);
+  const protocol = START_PROTOCOL_INDEX[selectedId] || START_PROTOCOL_INDEX[META_DEFAULT_PROTOCOL_ID];
+  const resourceBonus = createDefaultStartupResourceBonus();
+  const facilityDiscounts = createDefaultStartupFacilityDiscounts();
+  let hullBonusPct = 0;
+  let hasEarlyHint = false;
+
+  for (const effect of protocol?.effects || []) {
+    if (!effect || typeof effect.key !== "string") continue;
+    const resourceKey = START_PROTOCOL_RESOURCE_EFFECT_MAP[effect.key];
+    if (resourceKey) {
+      const base = RUN_BASE_STARTING_RESOURCES[resourceKey] || 0;
+      const cap = Math.floor(base * START_PROTOCOL_RESOURCE_BONUS_CAP_RATIO);
+      const value = Math.max(0, Math.floor(Number(effect.value) || 0));
+      if (cap > 0 && value > 0) {
+        resourceBonus[resourceKey] += Math.min(value, cap);
+      }
+      continue;
+    }
+    const facilityKey = START_PROTOCOL_FACILITY_DISCOUNT_MAP[effect.key];
+    if (facilityKey) {
+      facilityDiscounts[facilityKey] = normalizeProtocolDiscountValue(effect.value, 1);
+      continue;
+    }
+    if (effect.key === "startingHullBonus") {
+      const value = Number(effect.value);
+      if (Number.isFinite(value) && value > 0) {
+        hullBonusPct = clamp(hullBonusPct + value, 0, START_PROTOCOL_HULL_BONUS_MAX);
+      }
+      continue;
+    }
+    if (effect.key === "earlyHint") {
+      hasEarlyHint = hasEarlyHint || effect.value !== false;
+    }
+  }
+
+  for (const [resourceKey, bonus] of Object.entries(resourceBonus)) {
+    if (bonus <= 0) continue;
+    const current = Number(state.resources[resourceKey]);
+    state.resources[resourceKey] = (Number.isFinite(current) ? current : 0) + bonus;
+  }
+
+  runState.activeStartProtocolId = protocol?.id || META_DEFAULT_PROTOCOL_ID;
+  runState.startupFacilityDiscounts = facilityDiscounts;
+  runState.startupHullBonus = 1 + hullBonusPct;
+  runState.startupResourceBonus = resourceBonus;
+  runState.metaStartProtocolApplied = true;
+  if (hasEarlyHint) {
+    runState.startupHint = buildStartProtocolHintText(protocol, resourceBonus, facilityDiscounts, hullBonusPct);
+    runState.startupHintUntil = state.time + 90;
+  }
+
+  return {
+    ok: true,
+    activeProtocolId: runState.activeStartProtocolId,
+    startupFacilityDiscounts: { ...runState.startupFacilityDiscounts },
+    startupResourceBonus: { ...runState.startupResourceBonus },
+    startupHullBonus: runState.startupHullBonus,
+    startupHint: runState.startupHint
   };
 }
 
@@ -1524,8 +1700,10 @@ function getMetaEffect(effectKey, context = {}) {
 function grantMetaPoints(amount) {
   const gained = Math.max(0, Math.floor(Number(amount)));
   if (gained <= 0) return 0;
+  ensureRunRuntimeState();
   state.meta = ensureMetaState(state.meta);
   state.meta.points += gained;
+  state.run.metaPointsGainedThisRun += gained;
   saveMeta();
   return gained;
 }
@@ -1881,6 +2059,37 @@ function ensureRunRuntimeState() {
   }
   if (typeof state.run.galaxyChoicesShown !== "boolean") {
     state.run.galaxyChoicesShown = false;
+  }
+  if (typeof state.run.activeStartProtocolId !== "string" || !START_PROTOCOL_INDEX[state.run.activeStartProtocolId]) {
+    state.run.activeStartProtocolId = META_DEFAULT_PROTOCOL_ID;
+  }
+  if (!isMetaObject(state.run.startupFacilityDiscounts)) {
+    state.run.startupFacilityDiscounts = createDefaultStartupFacilityDiscounts();
+  }
+  state.run.startupFacilityDiscounts.mining = normalizeProtocolDiscountValue(state.run.startupFacilityDiscounts.mining, 1);
+  state.run.startupFacilityDiscounts.weapon = normalizeProtocolDiscountValue(state.run.startupFacilityDiscounts.weapon, 1);
+  if (!isMetaObject(state.run.startupResourceBonus)) {
+    state.run.startupResourceBonus = createDefaultStartupResourceBonus();
+  }
+  for (const resourceKey of Object.values(START_PROTOCOL_RESOURCE_EFFECT_MAP)) {
+    const value = Math.floor(Number(state.run.startupResourceBonus[resourceKey]));
+    state.run.startupResourceBonus[resourceKey] = Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  const startupHullBonus = Number(state.run.startupHullBonus);
+  state.run.startupHullBonus = Number.isFinite(startupHullBonus)
+    ? clamp(startupHullBonus, 1, 1 + START_PROTOCOL_HULL_BONUS_MAX)
+    : 1;
+  if (typeof state.run.startupHint !== "string") {
+    state.run.startupHint = "";
+  }
+  if (!Number.isFinite(state.run.startupHintUntil)) {
+    state.run.startupHintUntil = 0;
+  }
+  if (typeof state.run.metaStartProtocolApplied !== "boolean") {
+    state.run.metaStartProtocolApplied = false;
+  }
+  if (!Number.isFinite(state.run.metaPointsGainedThisRun) || state.run.metaPointsGainedThisRun < 0) {
+    state.run.metaPointsGainedThisRun = 0;
   }
   if (state.run.galaxyMap.nodes.length === 0) {
     galaxyNodeIdSeed += 1;
@@ -2270,6 +2479,11 @@ function runProtocolSelectionBuildCostSelfCheck() {
     const runSnapshotBefore = {
       level: state.run.level,
       research: state.resources.research,
+      metal: Math.floor(state.resources.metal),
+      ore: Math.floor(state.resources.ore),
+      gas: Math.floor(state.resources.gas),
+      plasma: Math.floor(state.resources.plasma),
+      activeProtocol: getActiveStartProtocolId(),
       galaxyMap: JSON.stringify(state.run.galaxyMap),
       objective: state.run.objective?.type ?? null,
       encounters: (state.run.encounters || []).length
@@ -2286,6 +2500,11 @@ function runProtocolSelectionBuildCostSelfCheck() {
     const runSnapshotAfter = {
       level: state.run.level,
       research: state.resources.research,
+      metal: Math.floor(state.resources.metal),
+      ore: Math.floor(state.resources.ore),
+      gas: Math.floor(state.resources.gas),
+      plasma: Math.floor(state.resources.plasma),
+      activeProtocol: getActiveStartProtocolId(),
       galaxyMap: JSON.stringify(state.run.galaxyMap),
       objective: state.run.objective?.type ?? null,
       encounters: (state.run.encounters || []).length
@@ -2296,12 +2515,7 @@ function runProtocolSelectionBuildCostSelfCheck() {
       JSON.stringify(costMiningAfterWeapon) === miningBeforeJson &&
       JSON.stringify(costWeaponAfterMining) === weaponBeforeJson &&
       JSON.stringify(costMiningAfterMining) === miningBeforeJson;
-    const runUnchanged =
-      runSnapshotBefore.level === runSnapshotAfter.level &&
-      runSnapshotBefore.research === runSnapshotAfter.research &&
-      runSnapshotBefore.galaxyMap === runSnapshotAfter.galaxyMap &&
-      runSnapshotBefore.objective === runSnapshotAfter.objective &&
-      runSnapshotBefore.encounters === runSnapshotAfter.encounters;
+    const runUnchanged = JSON.stringify(runSnapshotBefore) === JSON.stringify(runSnapshotAfter);
 
     return {
       ok: weaponSelect.ok && miningSelect.ok && buildCostStable && runUnchanged,
@@ -2315,6 +2529,227 @@ function runProtocolSelectionBuildCostSelfCheck() {
       costMiningAfterMining,
       runSnapshotBefore,
       runSnapshotAfter
+    };
+  });
+
+  return { ok: checks.every((entry) => entry.ok), checks };
+}
+
+function runStartProtocolApplicationSelfCheck() {
+  ensureGameplayTestBaseline();
+  const checks = [];
+
+  const runCase = (name, fn) => {
+    let ok = false;
+    let detail = null;
+    try {
+      const result = fn();
+      ok = !!result?.ok;
+      detail = result;
+    } catch (error) {
+      detail = { error: error.message };
+    }
+    checks.push({ name, ok, detail });
+    return ok;
+  };
+
+  const prepareMetaForProtocolCases = () => {
+    state.meta = ensureMetaState({
+      schemaVersion: META_SCHEMA_VERSION,
+      migrationVersion: META_SCHEMA_VERSION,
+      points: 6,
+      talents: {
+        startingCache: 1,
+        coreFortitude: 1,
+        weaponCalibration: 2
+      },
+      selectedStartProtocol: "balanced"
+    });
+    recomputeUnlockedProtocols(state.meta);
+  };
+
+  runCase("selectionDoesNotAffectCurrentRun", () => {
+    prepareMetaForProtocolCases();
+    window.__gameTest.resetRun(501, 0, "tradeHub");
+    const before = {
+      activeProtocol: getActiveStartProtocolId(),
+      selectedProtocol: getSelectedStartProtocol(),
+      buildCost: {
+        weapon: getBuildCost("turret"),
+        mining: getBuildCost("mining")
+      },
+      resources: {
+        metal: Math.floor(state.resources.metal),
+        ore: Math.floor(state.resources.ore),
+        gas: Math.floor(state.resources.gas),
+        plasma: Math.floor(state.resources.plasma),
+        research: Math.floor(state.resources.research)
+      },
+      run: {
+        galaxyMap: JSON.stringify(state.run.galaxyMap),
+        objective: state.run.objective?.type ?? null,
+        encounters: (state.run.encounters || []).length
+      }
+    };
+    const weaponSelect = selectStartProtocol("weaponStart");
+    const miningSelect = selectStartProtocol("miningStart");
+    const after = {
+      activeProtocol: getActiveStartProtocolId(),
+      selectedProtocol: getSelectedStartProtocol(),
+      buildCost: {
+        weapon: getBuildCost("turret"),
+        mining: getBuildCost("mining")
+      },
+      resources: {
+        metal: Math.floor(state.resources.metal),
+        ore: Math.floor(state.resources.ore),
+        gas: Math.floor(state.resources.gas),
+        plasma: Math.floor(state.resources.plasma),
+        research: Math.floor(state.resources.research)
+      },
+      run: {
+        galaxyMap: JSON.stringify(state.run.galaxyMap),
+        objective: state.run.objective?.type ?? null,
+        encounters: (state.run.encounters || []).length
+      }
+    };
+    const stable = JSON.stringify(before.buildCost) === JSON.stringify(after.buildCost)
+      && JSON.stringify(before.resources) === JSON.stringify(after.resources)
+      && JSON.stringify(before.run) === JSON.stringify(after.run)
+      && before.activeProtocol === after.activeProtocol;
+    return {
+      ok: weaponSelect.ok && miningSelect.ok && stable && after.selectedProtocol === "miningStart",
+      weaponSelect,
+      miningSelect,
+      before,
+      after
+    };
+  });
+
+  runCase("newRunAppliesSelectedProtocol", () => {
+    prepareMetaForProtocolCases();
+    selectStartProtocol("balanced");
+    window.__gameTest.resetRun(777, 0, "tradeHub");
+    const baseline = {
+      activeProtocol: getActiveStartProtocolId(),
+      miningCost: getBuildCost("mining"),
+      weaponCost: getBuildCost("turret"),
+      run: {
+        galaxyMap: JSON.stringify(state.run.galaxyMap),
+        objective: state.run.objective?.type ?? null,
+        encounters: (state.run.encounters || []).length,
+        research: Math.floor(state.resources.research)
+      }
+    };
+
+    selectStartProtocol("miningStart");
+    window.__gameTest.resetRun(777, 0, "tradeHub");
+    const miningRun = {
+      activeProtocol: getActiveStartProtocolId(),
+      miningCost: getBuildCost("mining"),
+      weaponCost: getBuildCost("turret"),
+      resources: {
+        metal: Math.floor(state.resources.metal),
+        ore: Math.floor(state.resources.ore),
+        gas: Math.floor(state.resources.gas),
+        plasma: Math.floor(state.resources.plasma),
+        research: Math.floor(state.resources.research)
+      },
+      run: {
+        galaxyMap: JSON.stringify(state.run.galaxyMap),
+        objective: state.run.objective?.type ?? null,
+        encounters: (state.run.encounters || []).length
+      }
+    };
+
+    const expectedMetal = RUN_BASE_STARTING_RESOURCES.metal + 25;
+    const expectedOre = RUN_BASE_STARTING_RESOURCES.ore + 10;
+    const resourceApplied = miningRun.resources.metal === expectedMetal && miningRun.resources.ore === expectedOre;
+    const noGalaxyModAmplify = resourceApplied;
+    const buildDiscountApplied = JSON.stringify(miningRun.miningCost) !== JSON.stringify(baseline.miningCost);
+    const weaponCostUnaffected = JSON.stringify(miningRun.weaponCost) === JSON.stringify(baseline.weaponCost);
+    let galaxyMapSemanticsStable = false;
+    try {
+      const baselineMap = JSON.parse(baseline.run.galaxyMap);
+      const miningMap = JSON.parse(miningRun.run.galaxyMap);
+      const baselineNode = baselineMap?.nodes?.[0] || null;
+      const miningNode = miningMap?.nodes?.[0] || null;
+      galaxyMapSemanticsStable = Boolean(
+        baselineNode
+        && miningNode
+        && baselineMap.nodes.length === 1
+        && miningMap.nodes.length === 1
+        && baselineNode.level === miningNode.level
+        && baselineNode.galaxyType === miningNode.galaxyType
+      );
+    } catch {
+      galaxyMapSemanticsStable = false;
+    }
+    const runNotPolluted = galaxyMapSemanticsStable
+      && miningRun.run.objective === baseline.run.objective
+      && miningRun.run.encounters === baseline.run.encounters
+      && miningRun.resources.research === baseline.run.research;
+
+    return {
+      ok: miningRun.activeProtocol === "miningStart"
+        && resourceApplied
+        && noGalaxyModAmplify
+        && buildDiscountApplied
+        && weaponCostUnaffected
+        && runNotPolluted,
+      baseline,
+      miningRun,
+      expectedMetal,
+      expectedOre
+    };
+  });
+
+  runCase("buildCostReadsActiveProtocolOnly", () => {
+    prepareMetaForProtocolCases();
+    selectStartProtocol("weaponStart");
+    window.__gameTest.resetRun(888, 0, "tradeHub");
+    const before = {
+      activeProtocol: getActiveStartProtocolId(),
+      selectedProtocol: getSelectedStartProtocol(),
+      buildCost: {
+        weapon: getBuildCost("turret"),
+        mining: getBuildCost("mining")
+      }
+    };
+    const selectResult = selectStartProtocol("miningStart");
+    const after = {
+      activeProtocol: getActiveStartProtocolId(),
+      selectedProtocol: getSelectedStartProtocol(),
+      buildCost: {
+        weapon: getBuildCost("turret"),
+        mining: getBuildCost("mining")
+      }
+    };
+    return {
+      ok: selectResult.ok
+        && before.activeProtocol === "weaponStart"
+        && after.activeProtocol === "weaponStart"
+        && after.selectedProtocol === "miningStart"
+        && JSON.stringify(before.buildCost) === JSON.stringify(after.buildCost),
+      before,
+      after,
+      selectResult
+    };
+  });
+
+  runCase("settlementHintsPreview", () => {
+    prepareMetaForProtocolCases();
+    state.run.metaPointsGainedThisRun = 7;
+    state.meta.points = 5;
+    const hints = getMetaSettlementHints();
+    const hasPurchaseHint = hints.recommended.length > 0 || !!hints.nearestShortfall;
+    return {
+      ok: hints.pointsGained === 7
+        && hints.totalPoints === 5
+        && hasPurchaseHint
+        && typeof hints.protocolAdvice?.message === "string"
+        && hints.protocolAdvice.message.length > 0,
+      hints
     };
   });
 
@@ -3647,6 +4082,21 @@ function initStation() {
   cells.set(key(-1, 0), createCell(-1, 0, "frame"));
   cells.set(key(0, 1), createCell(0, 1, "frame"));
   cells.set(key(0, -1), createCell(0, -1, "frame"));
+  const startupHullBonus = getRunStartupHullBonus();
+  if (startupHullBonus > 1) {
+    for (const cell of cells.values()) {
+      if (Number.isFinite(cell.baseMaxHp) && Number.isFinite(cell.maxHp) && Number.isFinite(cell.hp)) {
+        cell.baseMaxHp *= startupHullBonus;
+        cell.maxHp *= startupHullBonus;
+        cell.hp *= startupHullBonus;
+      }
+      if (Number.isFinite(cell.baseMaxFrameHp) && Number.isFinite(cell.maxFrameHp) && Number.isFinite(cell.frameHp)) {
+        cell.baseMaxFrameHp *= startupHullBonus;
+        cell.maxFrameHp *= startupHullBonus;
+        cell.frameHp *= startupHullBonus;
+      }
+    }
+  }
 }
 
 function initWorld() {
@@ -5463,9 +5913,111 @@ function getRunSettlementData() {
   return { base, bonus, total };
 }
 
+function getMetaProtocolSuggestion(metaState = state.meta) {
+  const selectedProtocolId = getSelectedStartProtocol(metaState);
+  const unlockedProtocols = recomputeUnlockedProtocols(metaState);
+  const unlockedSet = new Set(unlockedProtocols);
+  const categoryScores = {
+    resource: 0,
+    defense: 0,
+    weapon: 0,
+    exploration: 0
+  };
+  for (const node of META_TALENT_TREE) {
+    const rank = getMetaTalentRank(node.id, metaState);
+    if (rank <= 0) continue;
+    if (categoryScores[node.category] !== undefined) {
+      categoryScores[node.category] += rank * Math.max(1, node.tier || 1);
+    }
+  }
+  const preferredCategory = Object.entries(categoryScores)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-CN"))[0]?.[0] || "resource";
+  const preferredProtocolByCategory = {
+    resource: "miningStart",
+    defense: "defenseStart",
+    weapon: "weaponStart",
+    exploration: "scoutStart"
+  };
+
+  let targetProtocolId = preferredProtocolByCategory[preferredCategory] || META_DEFAULT_PROTOCOL_ID;
+  if (!START_PROTOCOL_INDEX[targetProtocolId]) {
+    targetProtocolId = META_DEFAULT_PROTOCOL_ID;
+  }
+  if (!unlockedSet.has(targetProtocolId)) {
+    const unlockedNonDefault = unlockedProtocols.find((id) => id !== META_DEFAULT_PROTOCOL_ID);
+    if (unlockedNonDefault) {
+      targetProtocolId = unlockedNonDefault;
+    }
+  }
+  const targetProtocol = START_PROTOCOL_INDEX[targetProtocolId] || START_PROTOCOL_INDEX[META_DEFAULT_PROTOCOL_ID];
+  if (unlockedSet.has(targetProtocol.id)) {
+    if (selectedProtocolId === targetProtocol.id) {
+      return {
+        protocolId: targetProtocol.id,
+        protocolName: targetProtocol.name,
+        status: "selected",
+        message: `下一局协议建议：继续使用「${targetProtocol.name}」。`
+      };
+    }
+    return {
+      protocolId: targetProtocol.id,
+      protocolName: targetProtocol.name,
+      status: "unlocked",
+      message: `下一局协议建议：尝试「${targetProtocol.name}」。`
+    };
+  }
+  const unlockHint = getProtocolUnlockHint(targetProtocol, metaState);
+  return {
+    protocolId: targetProtocol.id,
+    protocolName: targetProtocol.name,
+    status: "locked",
+    message: `下一局协议建议：目标「${targetProtocol.name}」，${unlockHint}。`
+  };
+}
+
+function getMetaSettlementHints(metaState = state.meta, runState = state.run) {
+  const recommendations = [];
+  const shortfalls = [];
+  for (const node of META_TALENT_TREE) {
+    const purchaseState = getMetaPurchaseState(node.id, metaState);
+    if (purchaseState.canBuy) {
+      recommendations.push({
+        nodeId: node.id,
+        name: node.name,
+        category: node.category,
+        tier: node.tier,
+        nextCost: purchaseState.nextCost
+      });
+      continue;
+    }
+    if (purchaseState.reason === "not_enough_points") {
+      shortfalls.push({
+        nodeId: node.id,
+        name: node.name,
+        category: node.category,
+        tier: node.tier,
+        nextCost: purchaseState.nextCost,
+        deficit: purchaseState.deficit
+      });
+    }
+  }
+
+  recommendations.sort((a, b) => a.tier - b.tier || a.nextCost - b.nextCost || a.name.localeCompare(b.name, "zh-CN"));
+  shortfalls.sort((a, b) => a.deficit - b.deficit || a.tier - b.tier || a.nextCost - b.nextCost || a.name.localeCompare(b.name, "zh-CN"));
+
+  return {
+    pointsGained: Math.max(0, Math.floor(Number(runState?.metaPointsGainedThisRun) || 0)),
+    totalPoints: normalizeMetaPoints(metaState?.points),
+    recommended: recommendations.slice(0, 3),
+    nearestShortfall: shortfalls[0] || null,
+    protocolAdvice: getMetaProtocolSuggestion(metaState)
+  };
+}
+
 function updateRunSettlementPanel() {
   if (!runSettlementPanelEl) return;
   const { base, bonus, total } = getRunSettlementData();
+  const hints = getMetaSettlementHints();
   if (runSettlementStatsEl) {
     runSettlementStatsEl.innerHTML = [
       `<div>完成关卡数：<strong>${state.run.completedObjectives}</strong> / ${TOTAL_RUN_LEVELS}</div>`,
@@ -5473,6 +6025,25 @@ function updateRunSettlementPanel() {
       `<div>终局加成：<strong>+${bonus}</strong>（+50%）</div>`,
       `<div>总点数：<strong>${total}</strong> 点</div>`
     ].join("");
+  }
+  if (runSettlementMetaFeedbackEl) {
+    const recommendationHtml = hints.recommended.length
+      ? hints.recommended.map((entry) => {
+        const categoryLabel = META_CATEGORY_LABELS[entry.category] || entry.category;
+        return `<li>可购买「${entry.name}」(${categoryLabel} T${entry.tier})，消耗 ${entry.nextCost} 点</li>`;
+      }).join("")
+      : (hints.nearestShortfall
+        ? `<li>还差 ${hints.nearestShortfall.deficit} 点可购买「${hints.nearestShortfall.name}」</li>`
+        : "<li>当前暂无可购买节点，可继续完成任务累积局外天赋点。</li>");
+    runSettlementMetaFeedbackEl.innerHTML = `
+      <div class="run-settlement-meta-title">局外成长反馈</div>
+      <div>本局获得局外天赋点：<strong>+${hints.pointsGained}</strong></div>
+      <div>当前可用局外天赋点：<strong>${hints.totalPoints}</strong></div>
+      <div class="run-settlement-meta-subtitle">可购买建议</div>
+      <ul class="run-settlement-meta-list">${recommendationHtml}</ul>
+      <div class="run-settlement-meta-subtitle">下一局协议建议</div>
+      <div class="run-settlement-meta-advice">${hints.protocolAdvice.message}</div>
+    `;
   }
 }
 
@@ -5551,6 +6122,7 @@ function syncMoreStatusPanel() {
 
 function initGame() {
   ensureRunRuntimeState();
+  applyMetaStartProtocol();
   initStation();
   initWorld();
   createObjective();
@@ -6844,14 +7416,14 @@ function refund(cost = {}) {
 
 function getBuildCost(facility) {
   const base = TYPES[facility]?.cost || {};
-  // T2：当前局建造成本仅反映 Meta 天赋；开局协议效果留待 T3 在新局 apply 时再纳入。
+  // T3：开局协议折扣只读取当前 run 已应用的 active protocol，不读取 UI 当前 selected protocol。
   let discount = getMetaEffect("metalRefining") * getMetaEffect("buildDiscount");
   if (WEAPON_TYPES.has(facility)) {
     discount *= hasMetaTalent("weaponFrame") ? 0.8 : 1;
-    discount *= getMetaEffect("weaponFacilityDiscount");
+    discount *= getActiveProtocolFacilityDiscount("weapon");
   }
   if (facility === "mining") {
-    discount *= getMetaEffect("miningFacilityDiscount");
+    discount *= getActiveProtocolFacilityDiscount("mining");
   }
   return Object.fromEntries(
     Object.entries(base).map(([name, value]) => [name, Math.ceil(value * discount)])
@@ -8717,7 +9289,13 @@ function nextLevel(galaxyType = "emptyVoid") {
 }
 
 function gameOver() {
-  showToast("核心被摧毁，本局结束。局外点数已保留。");
+  const hints = getMetaSettlementHints();
+  const purchaseHint = hints.recommended.length
+    ? `可考虑先买「${hints.recommended[0].name}」。`
+    : (hints.nearestShortfall
+      ? `还差 ${hints.nearestShortfall.deficit} 点可购买「${hints.nearestShortfall.name}」。`
+      : "继续完成任务可获得更多局外点数。");
+  showToast(`核心被摧毁，本局结束。局外成长 +${hints.pointsGained}（当前 ${hints.totalPoints} 点）。${purchaseHint}`);
   state.paused = true;
   setTimeout(() => {
     location.reload();
@@ -9326,6 +9904,12 @@ function buildGuideText() {
 
 function buildStatusAlerts() {
   const alerts = [];
+  if (state.run.startupHint && state.time <= state.run.startupHintUntil) {
+    alerts.push({
+      level: "good",
+      text: state.run.startupHint
+    });
+  }
   if (state.run.endgame && !state.run.guardianDefeated) {
     alerts.push({
       level: "danger",
@@ -9584,7 +10168,15 @@ function updateHud() {
     objectiveHtml += `<br><span class="good">任务已完成${statusNote}</span>`;
   }
   if (objectiveFailed) {
+    const failureHints = getMetaSettlementHints();
+    const purchaseLine = failureHints.recommended.length
+      ? `可购买：${failureHints.recommended.map((entry) => entry.name).join("、")}`
+      : (failureHints.nearestShortfall
+        ? `还差 ${failureHints.nearestShortfall.deficit} 点可购买「${failureHints.nearestShortfall.name}」`
+        : "当前暂无可购买节点");
     objectiveHtml += `<br><span class="bad">本关无法跃迁，可重启或留在本关。</span>`;
+    objectiveHtml += `<br><span class="warn">局外成长：本局 +${failureHints.pointsGained} 点，当前 ${failureHints.totalPoints} 点；${purchaseLine}</span>`;
+    objectiveHtml += `<br><span class="good">${failureHints.protocolAdvice.message}</span>`;
   }
   setHtmlIfChanged(objectiveEl, "objective", objectiveHtml);
   updateObjectiveChoiceUi();
@@ -9991,9 +10583,11 @@ window.__gameTest = {
     state.input._fLastFireAt = 0;
     state.missile.salvoSize = 1;
     state.meta.points = 0;
-    state.resources.research = 0;
+    state.resources = { ...RUN_BASE_STARTING_RESOURCES };
     state.station.hullMod = 1;
     state.station.weaponMod = 1;
+    state.run.metaPointsGainedThisRun = 0;
+    resetRunStartProtocolRuntimeState(state.run);
     state.fragments = [];
     state.npcs = [];
     state.enemies = [];
@@ -10011,6 +10605,7 @@ window.__gameTest = {
     state.run.currentGalaxyType = safeGalaxyType;
     state.run.galaxyMap = { nodes: [], currentNodeId: null, pendingChoices: [] };
     state.run.galaxyChoicesShown = false;
+    applyMetaStartProtocol(state.run, state.meta);
     galaxyJumpInFlight = false;
     const lvl = levelIndex(level);
     const galaxy = generateGalaxy(lvl, `${seed}:${lvl}`, safeGalaxyType);
@@ -10408,6 +11003,18 @@ window.__gameTest.meta = {
   getSelectedStartProtocol() {
     return getSelectedStartProtocol();
   },
+  getActiveProtocolState() {
+    return {
+      selectedProtocol: getSelectedStartProtocol(),
+      activeProtocol: getActiveStartProtocolId(),
+      applied: !!state.run.metaStartProtocolApplied,
+      startupFacilityDiscounts: { ...(isMetaObject(state.run.startupFacilityDiscounts) ? state.run.startupFacilityDiscounts : createDefaultStartupFacilityDiscounts()) },
+      startupResourceBonus: { ...(isMetaObject(state.run.startupResourceBonus) ? state.run.startupResourceBonus : createDefaultStartupResourceBonus()) },
+      startupHullBonus: getRunStartupHullBonus(),
+      startupHint: state.run.startupHint || "",
+      startupHintUntil: state.run.startupHintUntil || 0
+    };
+  },
   selectProtocol(protocolId) {
     return selectStartProtocol(protocolId);
   },
@@ -10445,6 +11052,9 @@ window.__gameTest.meta = {
   getBuildCost(facility) {
     return getBuildCost(facility);
   },
+  previewSettlementHints() {
+    return getMetaSettlementHints();
+  },
   verifyProtocolSelectionDoesNotAffectCurrentRun() {
     const weaponFacility = "turret";
     const before = {
@@ -10453,6 +11063,7 @@ window.__gameTest.meta = {
       run: {
         level: state.run.level,
         research: state.resources.research,
+        activeProtocol: getActiveStartProtocolId(),
         galaxyMap: JSON.stringify(state.run.galaxyMap),
         objective: state.run.objective?.type ?? null,
         encounters: (state.run.encounters || []).length
@@ -10471,6 +11082,7 @@ window.__gameTest.meta = {
       run: {
         level: state.run.level,
         research: state.resources.research,
+        activeProtocol: getActiveStartProtocolId(),
         galaxyMap: JSON.stringify(state.run.galaxyMap),
         objective: state.run.objective?.type ?? null,
         encounters: (state.run.encounters || []).length
@@ -10490,6 +11102,9 @@ window.__gameTest.meta = {
   },
   runProtocolSelectionBuildCostSelfCheck() {
     return runProtocolSelectionBuildCostSelfCheck();
+  },
+  runStartProtocolApplicationSelfCheck() {
+    return runStartProtocolApplicationSelfCheck();
   },
   resetMeta() {
     state.meta = createDefaultMetaState();

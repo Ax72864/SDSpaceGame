@@ -657,6 +657,45 @@ button:disabled {
   margin: 8px 0 10px;
 }
 
+.run-settlement-meta-feedback {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 191, 138, 0.32);
+  background: rgba(96, 56, 35, 0.28);
+  font-size: 12px;
+  color: #ffd5cd;
+  line-height: 1.5;
+}
+
+.run-settlement-meta-title {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffe9b8;
+}
+
+.run-settlement-meta-subtitle {
+  margin-top: 6px;
+  color: #ffd79e;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.run-settlement-meta-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.run-settlement-meta-list li + li {
+  margin-top: 2px;
+}
+
+.run-settlement-meta-advice {
+  margin-top: 2px;
+  color: #ffe9b8;
+}
+
 #summaryRestartBtn,
 .danger-restart-btn {
   border-color: rgba(255, 118, 118, 0.55);
