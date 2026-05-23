@@ -2229,6 +2229,98 @@ function runGalaxyJumpStateMachineSelfCheck() {
   return { ok: checks.every((entry) => entry.ok), checks };
 }
 
+function runProtocolSelectionBuildCostSelfCheck() {
+  ensureGameplayTestBaseline();
+  const checks = [];
+
+  const runCase = (name, fn) => {
+    let ok = false;
+    let detail = null;
+    try {
+      const result = fn();
+      ok = !!result?.ok;
+      detail = result;
+    } catch (error) {
+      detail = { error: error.message };
+    }
+    checks.push({ name, ok, detail });
+    return ok;
+  };
+
+  runCase("protocolSelectDoesNotChangeCurrentRunBuildCost", () => {
+    window.__gameTest.resetRun(42, 0);
+    window.__gameTest.meta.resetMeta();
+    window.__gameTest.meta.injectOldMeta({
+      schemaVersion: META_SCHEMA_VERSION,
+      migrationVersion: META_SCHEMA_VERSION,
+      points: 0,
+      talents: {
+        startingCache: 1,
+        weaponCalibration: 2
+      },
+      unlockedProtocols: ["balanced", "miningStart", "weaponStart"],
+      selectedStartProtocol: "balanced"
+    });
+
+    const weaponFacility = "turret";
+    const costWeaponBefore = getBuildCost(weaponFacility);
+    const costMiningBefore = getBuildCost("mining");
+    const weaponBeforeJson = JSON.stringify(costWeaponBefore);
+    const miningBeforeJson = JSON.stringify(costMiningBefore);
+    const runSnapshotBefore = {
+      level: state.run.level,
+      research: state.resources.research,
+      galaxyMap: JSON.stringify(state.run.galaxyMap),
+      objective: state.run.objective?.type ?? null,
+      encounters: (state.run.encounters || []).length
+    };
+
+    const weaponSelect = selectStartProtocol("weaponStart");
+    const costWeaponAfterWeapon = getBuildCost(weaponFacility);
+    const costMiningAfterWeapon = getBuildCost("mining");
+
+    const miningSelect = selectStartProtocol("miningStart");
+    const costWeaponAfterMining = getBuildCost(weaponFacility);
+    const costMiningAfterMining = getBuildCost("mining");
+
+    const runSnapshotAfter = {
+      level: state.run.level,
+      research: state.resources.research,
+      galaxyMap: JSON.stringify(state.run.galaxyMap),
+      objective: state.run.objective?.type ?? null,
+      encounters: (state.run.encounters || []).length
+    };
+
+    const buildCostStable =
+      JSON.stringify(costWeaponAfterWeapon) === weaponBeforeJson &&
+      JSON.stringify(costMiningAfterWeapon) === miningBeforeJson &&
+      JSON.stringify(costWeaponAfterMining) === weaponBeforeJson &&
+      JSON.stringify(costMiningAfterMining) === miningBeforeJson;
+    const runUnchanged =
+      runSnapshotBefore.level === runSnapshotAfter.level &&
+      runSnapshotBefore.research === runSnapshotAfter.research &&
+      runSnapshotBefore.galaxyMap === runSnapshotAfter.galaxyMap &&
+      runSnapshotBefore.objective === runSnapshotAfter.objective &&
+      runSnapshotBefore.encounters === runSnapshotAfter.encounters;
+
+    return {
+      ok: weaponSelect.ok && miningSelect.ok && buildCostStable && runUnchanged,
+      weaponSelect,
+      miningSelect,
+      costWeaponBefore,
+      costWeaponAfterWeapon,
+      costWeaponAfterMining,
+      costMiningBefore,
+      costMiningAfterWeapon,
+      costMiningAfterMining,
+      runSnapshotBefore,
+      runSnapshotAfter
+    };
+  });
+
+  return { ok: checks.every((entry) => entry.ok), checks };
+}
+
 function tryPlaceOrbitBody({ rng, anchor, radius, minOrbit, maxOrbit, type, placed }) {
   for (let attempt = 0; attempt < 80; attempt++) {
     const angle = rngFloat(rng, 0, Math.PI * 2);
@@ -6752,13 +6844,14 @@ function refund(cost = {}) {
 
 function getBuildCost(facility) {
   const base = TYPES[facility]?.cost || {};
+  // T2：当前局建造成本仅反映 Meta 天赋；开局协议效果留待 T3 在新局 apply 时再纳入。
   let discount = getMetaEffect("metalRefining") * getMetaEffect("buildDiscount");
   if (WEAPON_TYPES.has(facility)) {
     discount *= hasMetaTalent("weaponFrame") ? 0.8 : 1;
-    discount *= getMetaEffect("weaponFacilityDiscount", { includeProtocol: true });
+    discount *= getMetaEffect("weaponFacilityDiscount");
   }
   if (facility === "mining") {
-    discount *= getMetaEffect("miningFacilityDiscount", { includeProtocol: true });
+    discount *= getMetaEffect("miningFacilityDiscount");
   }
   return Object.fromEntries(
     Object.entries(base).map(([name, value]) => [name, Math.ceil(value * discount)])
@@ -10348,6 +10441,55 @@ window.__gameTest.meta = {
       unlockHint: getProtocolUnlockHint(protocol),
       impactPreview: formatProtocolImpactPreview(protocol)
     }));
+  },
+  getBuildCost(facility) {
+    return getBuildCost(facility);
+  },
+  verifyProtocolSelectionDoesNotAffectCurrentRun() {
+    const weaponFacility = "turret";
+    const before = {
+      weapon: getBuildCost(weaponFacility),
+      mining: getBuildCost("mining"),
+      run: {
+        level: state.run.level,
+        research: state.resources.research,
+        galaxyMap: JSON.stringify(state.run.galaxyMap),
+        objective: state.run.objective?.type ?? null,
+        encounters: (state.run.encounters || []).length
+      }
+    };
+    const selections = [];
+    for (const protocolId of ["weaponStart", "miningStart"]) {
+      if (!isMetaProtocolUnlocked(protocolId)) {
+        return { ok: false, reason: "protocol_locked", protocolId, before };
+      }
+      selections.push({ protocolId, result: selectStartProtocol(protocolId) });
+    }
+    const after = {
+      weapon: getBuildCost(weaponFacility),
+      mining: getBuildCost("mining"),
+      run: {
+        level: state.run.level,
+        research: state.resources.research,
+        galaxyMap: JSON.stringify(state.run.galaxyMap),
+        objective: state.run.objective?.type ?? null,
+        encounters: (state.run.encounters || []).length
+      }
+    };
+    const buildCostStable =
+      JSON.stringify(before.weapon) === JSON.stringify(after.weapon) &&
+      JSON.stringify(before.mining) === JSON.stringify(after.mining);
+    const runUnchanged = JSON.stringify(before.run) === JSON.stringify(after.run);
+    const selectionsOk = selections.every((entry) => entry.result.ok);
+    return {
+      ok: selectionsOk && buildCostStable && runUnchanged,
+      before,
+      after,
+      selections
+    };
+  },
+  runProtocolSelectionBuildCostSelfCheck() {
+    return runProtocolSelectionBuildCostSelfCheck();
   },
   resetMeta() {
     state.meta = createDefaultMetaState();
