@@ -1122,6 +1122,69 @@ h2 {
   color: #8fa8c8;
 }
 
+.combat-status-summary:empty {
+  display: none;
+}
+
+.combat-status-summary {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(120, 160, 210, 0.18);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.combat-status-line {
+  color: #b8cce4;
+}
+
+.combat-status-line + .combat-status-line {
+  margin-top: 4px;
+}
+
+.combat-status-safe {
+  color: #8fa8c8;
+}
+
+.combat-status-composition,
+.combat-status-gap {
+  color: #9eb6d8;
+  font-size: 11px;
+}
+
+.combat-status-level.severity-watch {
+  color: #b8cce4;
+}
+
+.combat-status-level.severity-danger {
+  color: #f0b060;
+}
+
+.combat-status-level.severity-critical {
+  color: #f08080;
+}
+
+.weapons-row .threat-chip {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.weapons-row .threat-chip.severity-watch {
+  color: #b8cce4;
+}
+
+.weapons-row .threat-chip.severity-danger {
+  color: #f0b060;
+}
+
+.weapons-row .threat-chip.severity-critical {
+  color: #f08080;
+}
+
+.alert-threat-summary {
+  font-weight: 600;
+}
+
 .resource-line {
   font-size: 12px;
   line-height: 1.45;

@@ -14,6 +14,7 @@ const statusAlertsEl = document.getElementById("statusAlerts");
 const resourceGuideEl = document.getElementById("resourceGuide");
 const stationDataEl = document.getElementById("stationData");
 const designHealthSummaryEl = document.getElementById("designHealthSummary");
+const combatStatusSummaryEl = document.getElementById("combatStatusSummary");
 const selectedCellPanelEl = document.getElementById("selectedCellPanel");
 const selectedCellInfoEl = document.getElementById("selectedCellInfo");
 const selectedCellDiagnosticsEl = document.getElementById("selectedCellDiagnostics");
@@ -756,6 +757,44 @@ const DESIGN_ISSUE_COPY = Object.freeze({
   repair_gap: "维修跟不上损伤"
 });
 
+const COMBAT_EVENT_BUFFER_CAPACITY = 120;
+const COMBAT_WINDOW_QUIET_SEC = 6;
+const COMBAT_WINDOW_MIN_RECORD_SEC = 2;
+const COMBAT_THREAT_SAMPLE_INTERVAL = 0.18;
+const RECENT_DAMAGE_WINDOW_SEC = 12;
+const THREAT_ALERT_COOLDOWN_SEC = 8;
+const THREAT_STATUS_ALERT_MAX = 1;
+
+const THREAT_KIND_LABELS = Object.freeze({
+  asteroid: "小行星",
+  pirate: "海盗",
+  station: "敌方建筑",
+  guardian: "守护者",
+  "hostile-station": "敌方空间站"
+});
+
+const THREAT_DIRECTION_LABELS = Object.freeze({
+  up: "上方",
+  upRight: "右上",
+  right: "右侧",
+  downRight: "右下",
+  down: "下方",
+  downLeft: "左下",
+  left: "左侧",
+  upLeft: "左上"
+});
+
+const THREAT_DIRECTION_ARROWS = Object.freeze({
+  up: "↑",
+  upRight: "↗",
+  right: "→",
+  downRight: "↘",
+  down: "↓",
+  downLeft: "↙",
+  left: "←",
+  upLeft: "↖"
+});
+
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
 const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
@@ -1332,6 +1371,18 @@ const designIssueAlertRuntime = {
   lastRaisedAt: new Map(),
   lastTime: 0
 };
+
+const combatEventBuffer = [];
+const combatWindowState = {
+  active: false,
+  pendingArchive: false,
+  startedAt: null,
+  lastActiveAt: null,
+  archivedAt: null,
+  current: null,
+  lastArchived: null
+};
+let threatSummaryCache = null;
 
 let fragmentIdSeed = 1;
 let npcIdSeed = 1;
@@ -7527,6 +7578,397 @@ function isEnemyPressureLikely() {
   return hasCombatEncounter || (state.run.endgame && !state.run.guardianDefeated);
 }
 
+function ensureCombatWindowState(now = state.time) {
+  const pressure = isEnemyPressureLikely();
+  if (pressure) {
+    if (!combatWindowState.active) {
+      combatWindowState.active = true;
+      combatWindowState.startedAt = now;
+      combatWindowState.current = null;
+    }
+    combatWindowState.lastActiveAt = now;
+    combatWindowState.pendingArchive = false;
+    return;
+  }
+  if (!combatWindowState.active && !combatWindowState.pendingArchive) return;
+  combatWindowState.pendingArchive = true;
+  if (
+    combatWindowState.lastActiveAt != null
+    && now - combatWindowState.lastActiveAt >= COMBAT_WINDOW_QUIET_SEC
+  ) {
+    combatWindowState.active = false;
+    combatWindowState.pendingArchive = false;
+    combatWindowState.startedAt = null;
+    combatWindowState.lastActiveAt = null;
+    combatWindowState.current = null;
+  }
+}
+
+function getLiveThreatEnemies() {
+  return state.enemies.filter((enemy) => enemy && enemy.hp > 0 && enemy.dead !== true);
+}
+
+function getThreatKindLabel(kind) {
+  return THREAT_KIND_LABELS[kind] || "敌方目标";
+}
+
+function getActivePlayerWeaponRanges() {
+  const ranges = [];
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached || !cell.enabled || !cell.active) continue;
+    if (cell.facility === "turret" || cell.facility === "missile") {
+      ranges.push(getCellStat(cell, "range"));
+    }
+  }
+  return ranges;
+}
+
+function isEnemyWithinPlayerWeaponRange(enemy, weaponRanges = getActivePlayerWeaponRanges()) {
+  if (!enemy || !weaponRanges.length) return false;
+  const distance = dist(state.station.pos, enemy);
+  return weaponRanges.some((range) => distance <= range);
+}
+
+function computeThreatDirectionFromEnemy(enemy) {
+  const dx = enemy.x - state.station.pos.x;
+  const dy = enemy.y - state.station.pos.y;
+  const worldDeg = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+  const stationDeg = ((state.station.angle * 180) / Math.PI + 360) % 360;
+  const relDeg = ((worldDeg - stationDeg) + 360) % 360;
+  let direction = "right";
+  if (relDeg < 22.5 || relDeg >= 337.5) direction = "right";
+  else if (relDeg < 67.5) direction = "downRight";
+  else if (relDeg < 112.5) direction = "down";
+  else if (relDeg < 157.5) direction = "downLeft";
+  else if (relDeg < 202.5) direction = "left";
+  else if (relDeg < 247.5) direction = "upLeft";
+  else if (relDeg < 292.5) direction = "up";
+  else direction = "upRight";
+  return {
+    direction,
+    headingDeg: Math.floor(relDeg),
+    arrow: THREAT_DIRECTION_ARROWS[direction] || "→"
+  };
+}
+
+function getThreatReasonKeyForKind(kind, distance, inWeaponRange) {
+  if (kind === "hostile-station" && inWeaponRange) return "boss_in_weapon_range";
+  if (kind === "hostile-station" || kind === "station") return "hostile_station_pressure";
+  if (kind === "guardian") return "guardian_pressure";
+  if (kind === "asteroid") return "asteroid_collision_risk";
+  if (kind === "pirate") return "pirate_closing";
+  if (distance <= 300) return "multiple_threats_focus_nearest";
+  return "multiple_threats_focus_nearest";
+}
+
+function computeThreatItemSeverity(kind, distance, inWeaponRange) {
+  if (inWeaponRange && (kind === "hostile-station" || kind === "station")) return "critical";
+  switch (kind) {
+    case "asteroid":
+      if (distance <= 100) return "critical";
+      if (distance <= 400) return "warning";
+      return "ok";
+    case "pirate":
+      if (distance <= 250) return "critical";
+      if (distance <= 500) return "warning";
+      return "warning";
+    case "station":
+      if (distance <= 350 || inWeaponRange) return "critical";
+      if (distance <= 600) return "warning";
+      return "warning";
+    case "guardian":
+      if (state.run.endgame && distance <= 400) return "critical";
+      if (state.run.endgame) return "warning";
+      return "warning";
+    case "hostile-station":
+      if (distance <= 400 || inWeaponRange) return "critical";
+      if (distance <= 700) return "warning";
+      return "warning";
+    default:
+      if (distance <= 300) return "critical";
+      if (distance <= 600) return "warning";
+      return "ok";
+  }
+}
+
+function threatSeverityRank(severity) {
+  if (severity === "critical") return 3;
+  if (severity === "warning") return 2;
+  return 1;
+}
+
+function countActiveCombatFacilities() {
+  let activeWeapons = 0;
+  let activeShields = 0;
+  for (const cell of state.station.cells.values()) {
+    if (cell.detached || !cell.enabled || !cell.active) continue;
+    if (cell.facility === "turret" || cell.facility === "missile") activeWeapons += 1;
+    if (cell.facility === "shield") activeShields += 1;
+  }
+  return { activeWeapons, activeShields };
+}
+
+function buildHostileStationBossInfo(enemy) {
+  if (!enemy || enemy.kind !== "hostile-station") return null;
+  const cells = enemy.cells;
+  if (!cells || !cells.size) {
+    return {
+      cellCount: 0,
+      coreAlive: false,
+      weaponCellAlive: 0,
+      shieldAlive: false
+    };
+  }
+  let weaponCellAlive = 0;
+  let shieldAlive = false;
+  for (const cell of cells.values()) {
+    if (!cell || cell.hp <= 0) continue;
+    if (cell.facility === "turret" || cell.facility === "missile") weaponCellAlive += 1;
+    if (cell.facility === "shield") shieldAlive = true;
+  }
+  const coreKey = enemy.coreCellKey || HOSTILE_STATION_CORE_KEY;
+  const core = cells.get(coreKey);
+  return {
+    cellCount: cells.size,
+    coreAlive: !!(core && core.hp > 0),
+    weaponCellAlive,
+    shieldAlive
+  };
+}
+
+function computeOverallThreatLevel({
+  active,
+  nearest,
+  enemyCount,
+  coreDamaged,
+  noDefense,
+  nearestDistance
+}) {
+  if (!active || !nearest) return "safe";
+  const distValue = nearestDistance ?? nearest.distance;
+  const kind = nearest.kind;
+  const inRange = nearest.inWeaponRange;
+  if (coreDamaged && enemyCount >= 1) return "critical";
+  if (kind === "hostile-station" && inRange) return "critical";
+  if (kind === "guardian" && state.run.endgame && distValue <= 400) return "critical";
+  if (distValue <= 200 && noDefense) return "critical";
+  if (distValue <= 300) return "critical";
+  if (distValue <= 500 && (kind === "pirate" || kind === "hostile-station" || kind === "guardian")) return "danger";
+  if (enemyCount >= 3) return "danger";
+  if (kind === "hostile-station") return "danger";
+  if (distValue <= 800 || kind === "asteroid" && distValue <= 400 || enemyCount >= 1) return "watch";
+  return "watch";
+}
+
+function buildThreatCompositionText(byKind) {
+  if (!byKind || typeof byKind !== "object") return "";
+  const parts = [];
+  for (const kind of ["pirate", "asteroid", "station", "guardian", "hostile-station"]) {
+    const count = byKind[kind] || 0;
+    if (count > 0) parts.push(`${getThreatKindLabel(kind)} x${count}`);
+  }
+  if (!parts.length) return "";
+  if (parts.length > 3) return `${parts.slice(0, 3).join(" / ")} 等`;
+  return parts.join(" / ");
+}
+
+function buildThreatSummarySnapshot() {
+  ensureCombatWindowState(state.time);
+  const active = isEnemyPressureLikely();
+  const liveEnemies = getLiveThreatEnemies();
+  const weaponRanges = getActivePlayerWeaponRanges();
+  const byKind = {
+    asteroid: 0,
+    pirate: 0,
+    station: 0,
+    guardian: 0,
+    "hostile-station": 0
+  };
+  const threatItems = [];
+  for (const enemy of liveEnemies) {
+    const kind = enemy.kind || "station";
+    if (Object.prototype.hasOwnProperty.call(byKind, kind)) byKind[kind] += 1;
+    const distance = Math.floor(dist(state.station.pos, enemy));
+    const directionInfo = computeThreatDirectionFromEnemy(enemy);
+    const inWeaponRange = isEnemyWithinPlayerWeaponRange(enemy, weaponRanges);
+    const severity = computeThreatItemSeverity(kind, distance, inWeaponRange);
+    threatItems.push({
+      kind,
+      kindLabel: getThreatKindLabel(kind),
+      distance,
+      direction: directionInfo.direction,
+      headingDeg: directionInfo.headingDeg,
+      arrow: directionInfo.arrow,
+      severity,
+      inWeaponRange,
+      reasonKey: getThreatReasonKeyForKind(kind, distance, inWeaponRange)
+    });
+  }
+  threatItems.sort((a, b) => {
+    const severityDiff = threatSeverityRank(b.severity) - threatSeverityRank(a.severity);
+    if (severityDiff !== 0) return severityDiff;
+    return a.distance - b.distance;
+  });
+  const nearest = threatItems.length ? { ...threatItems[0] } : null;
+  const threats = threatItems.slice(0, 3).map((entry) => ({
+    kind: entry.kind,
+    kindLabel: entry.kindLabel,
+    distance: entry.distance,
+    direction: entry.direction,
+    severity: entry.severity,
+    inWeaponRange: entry.inWeaponRange,
+    reasonKey: entry.reasonKey
+  }));
+  const reasonKeys = [];
+  const seenReasonKeys = new Set();
+  for (const entry of threats) {
+    if (!entry.reasonKey || seenReasonKeys.has(entry.reasonKey)) continue;
+    seenReasonKeys.add(entry.reasonKey);
+    reasonKeys.push(entry.reasonKey);
+  }
+  const core = state.station.cells.get(key(0, 0));
+  const coreDamaged = !!(core && core.maxHp > 0 && core.hp / core.maxHp < 0.35);
+  const { activeWeapons, activeShields } = countActiveCombatFacilities();
+  const noDefense = active && activeWeapons === 0 && activeShields === 0;
+  const enemyNear = !!(nearest && nearest.distance <= 300);
+  const threatLevel = nearest
+    ? computeOverallThreatLevel({
+      active,
+      nearest,
+      enemyCount: liveEnemies.length,
+      coreDamaged,
+      noDefense,
+      nearestDistance: nearest.distance
+    })
+    : (active ? "watch" : "safe");
+  let bossEnemy = null;
+  for (const enemy of liveEnemies) {
+    if (enemy.kind === "hostile-station") {
+      bossEnemy = enemy;
+      break;
+    }
+  }
+  return {
+    generatedAt: state.time,
+    active,
+    threatLevel,
+    enemyCount: liveEnemies.length,
+    byKind,
+    compositionText: buildThreatCompositionText(byKind),
+    nearest,
+    threats,
+    reasonKeys,
+    flags: {
+      coreDamaged,
+      noDefense,
+      enemyNear
+    },
+    bossInfo: bossEnemy ? buildHostileStationBossInfo(bossEnemy) : null,
+    endgame: {
+      inEndgame: state.run.endgame === true,
+      guardianAlive: state.enemies.some((enemy) => enemy.kind === "guardian" && enemy.hp > 0),
+      guardianDefeated: state.run.guardianDefeated === true
+    }
+  };
+}
+
+function getThreatSummary() {
+  const now = state.time;
+  if (threatSummaryCache && now < threatSummaryCache.sampledAt) {
+    threatSummaryCache = null;
+  }
+  if (
+    threatSummaryCache
+    && now - threatSummaryCache.sampledAt < COMBAT_THREAT_SAMPLE_INTERVAL
+  ) {
+    return threatSummaryCache.value;
+  }
+  const snapshot = deepFreezeForDiagnostics(buildThreatSummarySnapshot());
+  threatSummaryCache = { sampledAt: now, value: snapshot };
+  return snapshot;
+}
+
+function buildThreatHudFragment(threat = getThreatSummary()) {
+  if (!threat?.active || !threat.nearest) return "";
+  const nearest = threat.nearest;
+  const dirLabel = THREAT_DIRECTION_LABELS[nearest.direction] || "";
+  const prefix = threat.threatLevel === "critical"
+    ? "紧急"
+    : threat.threatLevel === "danger"
+      ? "警戒"
+      : "留意";
+  return ` · <span class="threat-chip severity-${threat.threatLevel}">${prefix}：威胁 ${threat.enemyCount} · 最近 ${nearest.kindLabel} ${nearest.distance}m ${nearest.arrow || ""} ${dirLabel}</span>`;
+}
+
+function buildCombatThreatSummaryHtml(threat = getThreatSummary()) {
+  if (!threat) return "";
+  if (!threat.active) {
+    return '<div class="combat-status-line combat-status-safe">战斗：安全 · 暂无接近威胁</div>';
+  }
+  if (threat.enemyCount === 0) {
+    return '<div class="combat-status-line combat-status-level severity-watch">战斗：留意 · 可能有敌袭接近</div>';
+  }
+  const lines = [];
+  const levelLabel = {
+    safe: "安全",
+    watch: "留意",
+    danger: "警戒",
+    critical: "紧急"
+  }[threat.threatLevel] || "留意";
+  lines.push(`<div class="combat-status-line combat-status-level severity-${threat.threatLevel}">战斗：${levelLabel} · ${threat.enemyCount} 个敌对目标</div>`);
+  if (threat.nearest) {
+    const dirLabel = THREAT_DIRECTION_LABELS[threat.nearest.direction] || "";
+    lines.push(
+      `<div class="combat-status-line">最近：${threat.nearest.kindLabel} ${threat.nearest.distance}m ${threat.nearest.arrow || ""} ${dirLabel}接近</div>`
+    );
+  }
+  if (threat.compositionText) {
+    lines.push(`<div class="combat-status-line combat-status-composition">构成：${threat.compositionText}</div>`);
+  }
+  if (threat.flags?.noDefense && (threat.threatLevel === "danger" || threat.threatLevel === "critical")) {
+    lines.push('<div class="combat-status-line combat-status-gap">短板：当前无有效火力或护盾</div>');
+  } else if (threat.flags?.coreDamaged && threat.threatLevel === "critical") {
+    lines.push('<div class="combat-status-line combat-status-gap">风险：核心附近承压</div>');
+  }
+  return lines.join("");
+}
+
+function buildThreatSummaryAlerts(threat = getThreatSummary()) {
+  const now = state.time;
+  if (now < designIssueAlertRuntime.lastTime) {
+    designIssueAlertRuntime.activeKeys.clear();
+    designIssueAlertRuntime.lastRaisedAt.clear();
+  }
+  designIssueAlertRuntime.lastTime = now;
+
+  if (!threat?.active || !threat.nearest || threat.enemyCount === 0) {
+    return [];
+  }
+  if (threat.threatLevel === "safe" || threat.threatLevel === "watch") {
+    return [];
+  }
+
+  const reasonKey = `threat_${threat.threatLevel}_${threat.nearest.reasonKey || "nearest"}`;
+  const wasActive = designIssueAlertRuntime.activeKeys.has(reasonKey);
+  const lastRaisedAt = designIssueAlertRuntime.lastRaisedAt.get(reasonKey);
+  if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < THREAT_ALERT_COOLDOWN_SEC) {
+    return [];
+  }
+  if (!wasActive) {
+    designIssueAlertRuntime.lastRaisedAt.set(reasonKey, now);
+  }
+  designIssueAlertRuntime.activeKeys.add(reasonKey);
+
+  const prefix = threat.threatLevel === "critical" ? "紧急：" : "警戒：";
+  const dirLabel = THREAT_DIRECTION_LABELS[threat.nearest.direction] || "";
+  const text = `${prefix}${threat.enemyCount} 个敌对目标 · 最近 ${threat.nearest.kindLabel} ${threat.nearest.distance}m ${dirLabel}接近`;
+  return [{
+    level: threat.threatLevel === "critical" ? "danger" : "warn",
+    cssClass: "alert-threat-summary",
+    text
+  }];
+}
+
 function getStationDesignHealth() {
   const now = state.time;
   if (designHealthSnapshotCache && now < designHealthSnapshotCache.sampledAt) {
@@ -11886,6 +12328,10 @@ function buildStatusAlerts() {
   if (designIssueAlerts.length) {
     alerts.push(...designIssueAlerts);
   }
+  const threatAlerts = buildThreatSummaryAlerts(getThreatSummary());
+  if (threatAlerts.length) {
+    alerts.unshift(...threatAlerts.slice(0, THREAT_STATUS_ALERT_MAX));
+  }
   if (state.buildHint && !state.lastBuildError) {
     alerts.push({
       level: state.bridgePreview?.tier === "ready" ? "good" : "warn",
@@ -12170,6 +12616,11 @@ function updateHud() {
     "designHealthSummary",
     buildStationDesignHealthSummaryHtml(getStationDesignHealth())
   );
+  setHtmlIfChanged(
+    combatStatusSummaryEl,
+    "combatStatusSummary",
+    buildCombatThreatSummaryHtml(getThreatSummary())
+  );
   updateSelectedCellPanel(selected);
 
   const runInfo = [
@@ -12251,6 +12702,7 @@ function updateWeaponsRow() {
   if (html) {
     html += ` <span class="hint">F=齐射 · [/]=调档 · 右键锁敌</span>`;
   }
+  html += buildThreatHudFragment();
 
   setHtmlIfChanged(weaponsRowEl, "weaponsRow", html);
 }
@@ -13891,6 +14343,9 @@ window.__gameTest.playtest = {
   getPowerMargin() {
     return safeDeepCloneForTest(getPowerMargin());
   },
+  getThreatSummary() {
+    return safeDeepCloneForTest(getThreatSummary());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
@@ -13908,6 +14363,7 @@ window.__gameTest.playtest = {
     const health = getStationDesignHealth();
     const reachability = getResourceReachability();
     const power = getPowerMargin();
+    const threat = getThreatSummary();
 
     return {
       version: "v0.11.0-playtest-readiness",
@@ -13956,6 +14412,9 @@ window.__gameTest.playtest = {
         awaiting: !!state.run.awaitingObjectiveChoice,
         dismissed: !!state.run.objectiveChoiceDismissed,
         complete: isObjectiveComplete()
+      },
+      combat: {
+        threat: safeDeepCloneForTest(threat)
       }
     };
   },
