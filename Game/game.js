@@ -2467,7 +2467,7 @@ function ensureCellBaseStats(cell) {
   if (!cell || !cell.facility) return;
   const def = TYPES[cell.facility];
   if (!def) return;
-  const metaFactor = 1 + (state.meta?.hull || 0) * 0.1;
+  const metaFactor = getMetaEffect("hullIntegrity");
   if (!Number.isFinite(cell.baseMaxHp)) {
     cell.baseMaxHp = (def.hp ?? def.baseStats?.maxHp ?? 0) * metaFactor;
   }
