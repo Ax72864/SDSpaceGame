@@ -736,6 +736,26 @@ const STATION_DESIGN_HEALTH_STATUS_LABELS = Object.freeze({
   bad: "短板"
 });
 
+const DESIGN_HEALTH_SAMPLE_INTERVAL = 0.18;
+const DESIGN_ISSUE_ALERT_MAX = 2;
+const DESIGN_ISSUE_ALERT_COOLDOWN_SEC = 8;
+const DESIGN_ISSUE_PRIORITY = Object.freeze({
+  enemy_incoming_no_defense: 1,
+  mass_blackout: 3,
+  mining_no_target: 4,
+  weapons_offline: 5,
+  shield_offline: 6,
+  repair_gap: 7
+});
+const DESIGN_ISSUE_COPY = Object.freeze({
+  enemy_incoming_no_defense: "敌袭临近：无火力或无防御",
+  mass_blackout: "多处断电影响核心能力",
+  mining_no_target: "采矿站未覆盖资源",
+  weapons_offline: "武器全部断电",
+  shield_offline: "护盾断电",
+  repair_gap: "维修跟不上损伤"
+});
+
 const WEAPON_TYPES = new Set(["turret", "missile", "shield"]);
 const GLOBAL_WEAPON_MOD_TYPES = new Set(["turret", "missile"]);
 const CLAMPED_STAT_KEYS = new Set(["damage", "reload", "range", "maxShield", "maxHp", "regen", "thrust"]);
@@ -1304,6 +1324,13 @@ const state = {
   spawnTimer: LEVEL0_INITIAL_SPAWN_TIMER,
   hudCenterAlertQueue: [], // v0.8.0：中央闪烁告警队列（priority 降序）
   hudCenterAlertCurrent: null // v0.8.0：当前正在显示的中央告警
+};
+
+let designHealthSnapshotCache = null;
+const designIssueAlertRuntime = {
+  activeKeys: new Set(),
+  lastRaisedAt: new Map(),
+  lastTime: 0
 };
 
 let fragmentIdSeed = 1;
@@ -7312,19 +7339,219 @@ function getPlacementDiagnostics(facility, gridX, gridY) {
   };
 }
 
-function createStationDesignHealthEntry(key, status, summary, detail, reasonKey) {
-  return {
+function mapHealthStatusToSeverity(status) {
+  if (status === "bad") return "critical";
+  if (status === "warn") return "warning";
+  return "ok";
+}
+
+function mapDesignSeverityToAlertLevel(severity) {
+  if (severity === "critical") return "danger";
+  if (severity === "warning") return "warn";
+  return "good";
+}
+
+function deepFreezeForDiagnostics(value) {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  if (Array.isArray(value)) {
+    for (const entry of value) deepFreezeForDiagnostics(entry);
+  } else {
+    for (const entry of Object.values(value)) deepFreezeForDiagnostics(entry);
+  }
+  return value;
+}
+
+function getDesignIssuePriority(issueKey) {
+  return DESIGN_ISSUE_PRIORITY[issueKey] || 99;
+}
+
+function createStationDesignHealthEntry(key, status, summary, detail, reasonKey, payload = null) {
+  const entry = {
     key,
     status,
+    severity: mapHealthStatusToSeverity(status),
     label: STATION_DESIGN_HEALTH_LABELS[key] || key,
     summary,
     detail,
     reasonKey
   };
+  if (payload && typeof payload === "object") Object.assign(entry, payload);
+  return entry;
+}
+
+function createDesignIssue(key, severity, reasonKey, payload = null) {
+  return {
+    key,
+    severity,
+    reasonKey: reasonKey || key,
+    priority: getDesignIssuePriority(key),
+    message: DESIGN_ISSUE_COPY[key] || reasonKey || key,
+    payload: payload && typeof payload === "object" ? payload : {}
+  };
+}
+
+function computeResourceReachabilitySnapshot(miningStatus = getMiningStationStatus()) {
+  const miners = miningStatus.miners.map((cell) => {
+    const position = cellWorldPosition(cell);
+    const target = getMiningCellTarget(cell);
+    const nearest = getNearestResourceBody(position);
+    const powerStarved = cell.enabled && !cell.active && (TYPES[cell.facility]?.powerUse || 0) > 0;
+    let reasonKey = "harvesting";
+    if (!cell.enabled) reasonKey = "disabled_manual";
+    else if (powerStarved) reasonKey = "power_starved";
+    else if (target) reasonKey = "harvesting";
+    else if (nearest && nearest.distance > nearest.range) reasonKey = "out_of_range";
+    else if (!nearest) reasonKey = "no_resource_body";
+    else reasonKey = "target_depleted";
+    return {
+      cellKey: key(cell.x, cell.y),
+      facility: cell.facility,
+      enabled: !!cell.enabled,
+      active: !!cell.active,
+      detached: !!cell.detached,
+      target: target
+        ? {
+            bodyName: target.body.name,
+            resource: target.body.resource,
+            distance: target.distance,
+            range: target.range
+          }
+        : null,
+      nearest: nearest
+        ? {
+            bodyName: nearest.body.name,
+            resource: nearest.body.resource,
+            distance: nearest.distance,
+            range: nearest.range,
+            gap: Math.max(0, Math.ceil(nearest.distance - nearest.range)),
+            inRange: nearest.distance <= nearest.range
+          }
+        : null,
+      reasonKey
+    };
+  });
+  const minerCount = miningStatus.miners.length;
+  const activeCount = miningStatus.activeMiners.length;
+  const harvestingCount = miningStatus.harvesting.length;
+  const outOfRangeCount = miners.filter((entry) => entry.reasonKey === "out_of_range").length;
+  const inactiveCount = Math.max(0, minerCount - harvestingCount);
+  const inactiveRatio = minerCount > 0 ? inactiveCount / minerCount : 1;
+  const allOutOfRange = minerCount > 0 && outOfRangeCount === minerCount;
+  let severity = "ok";
+  let reasonKey = "mining_covered";
+  if (minerCount === 0) {
+    severity = "critical";
+    reasonKey = "no_mining_station";
+  } else if (harvestingCount === 0) {
+    severity = "critical";
+    reasonKey = allOutOfRange ? "all_miners_out_of_range" : "all_miners_not_harvesting";
+  } else if (inactiveRatio >= 0.5) {
+    severity = "warning";
+    reasonKey = "mining_partial_outage";
+  }
+  return {
+    generatedAt: state.time,
+    miners,
+    overall: {
+      minerCount,
+      activeCount,
+      harvestingCount,
+      outOfRangeCount,
+      hasMiner: minerCount > 0,
+      anyHarvesting: harvestingCount > 0,
+      allOutOfRange,
+      inactiveRatio,
+      severity,
+      reasonKey
+    }
+  };
+}
+
+function computePowerMarginSnapshot({
+  powerStarved = getInactiveDueToPower(),
+  manualOffCount = getManualOffFacilities().length,
+  miningStatus,
+  weaponCount = 0,
+  activeWeaponCount = 0,
+  shieldCount = 0,
+  activeShieldCount = 0,
+  repairCount = 0,
+  activeRepairCount = 0
+} = {}) {
+  const used = state.power.used;
+  const available = state.power.available;
+  const margin = available - used;
+  const tight = used >= available - 0.25 && available > 0;
+  const capabilityBlackout = [];
+  if (miningStatus && miningStatus.miners.length > 0 && miningStatus.activeMiners.length === 0) capabilityBlackout.push("mining");
+  if (weaponCount > 0 && activeWeaponCount === 0) capabilityBlackout.push("weapon");
+  if (shieldCount > 0 && activeShieldCount === 0) capabilityBlackout.push("defense");
+  if (repairCount > 0 && activeRepairCount === 0) capabilityBlackout.push("repair");
+  const starvedFacilities = powerStarved.map((cell) => ({
+    cellKey: key(cell.x, cell.y),
+    facility: cell.facility,
+    facilityName: TYPES[cell.facility]?.name || cell.facility
+  }));
+  let severity = "ok";
+  let reasonKey = "margin_safe";
+  if (margin < 0 || available <= 0 || powerStarved.length >= 3 || capabilityBlackout.length > 0) {
+    severity = "critical";
+    reasonKey = margin < 0 ? "power_negative" : capabilityBlackout.length > 0 ? "core_capability_blackout" : "mass_blackout";
+  } else if (tight || powerStarved.length > 0) {
+    severity = "warning";
+    reasonKey = powerStarved.length > 0 ? "partial_blackout" : "margin_tight";
+  }
+  return {
+    generatedAt: state.time,
+    used,
+    available,
+    margin,
+    tight,
+    starvedCount: powerStarved.length,
+    manualOffCount,
+    starvedFacilities,
+    coreCapabilityBlackout: capabilityBlackout,
+    severity,
+    reasonKey
+  };
+}
+
+function isEnemyPressureLikely() {
+  const hasActiveEnemy = state.enemies.some((enemy) => enemy && enemy.hp > 0 && enemy.dead !== true);
+  if (hasActiveEnemy) return true;
+  const hasCombatEncounter = Array.isArray(state.run.encounters) && state.run.encounters.some((encounter) => {
+    if (!encounter || encounter.completed || encounter.failed || encounter.expired) return false;
+    return encounter.type === "ambush" || encounter.type === "distress" || encounter.type === "guardian";
+  });
+  return hasCombatEncounter || (state.run.endgame && !state.run.guardianDefeated);
 }
 
 function getStationDesignHealth() {
-  return computeStationDesignHealthSnapshot();
+  const now = state.time;
+  if (designHealthSnapshotCache && now < designHealthSnapshotCache.sampledAt) {
+    designHealthSnapshotCache = null;
+  }
+  if (
+    designHealthSnapshotCache
+    && now - designHealthSnapshotCache.sampledAt < DESIGN_HEALTH_SAMPLE_INTERVAL
+  ) {
+    return designHealthSnapshotCache.value;
+  }
+  const snapshot = deepFreezeForDiagnostics(computeStationDesignHealthSnapshot());
+  designHealthSnapshotCache = {
+    sampledAt: now,
+    value: snapshot
+  };
+  return snapshot;
+}
+
+function getResourceReachability() {
+  return getStationDesignHealth().resourceReachability;
+}
+
+function getPowerMargin() {
+  return getStationDesignHealth().powerMargin;
 }
 
 function computeStationDesignHealthSnapshot() {
@@ -7335,6 +7562,7 @@ function computeStationDesignHealthSnapshot() {
   const miningInactiveRatio = miningStatus.miners.length > 0
     ? miningInactiveCount / miningStatus.miners.length
     : 1;
+  const resourceReachability = computeResourceReachabilitySnapshot(miningStatus);
 
   const thrusterCells = stationCells.filter((cell) => cell.facility === "thruster");
   const activeThrusterCount = thrusterCells.filter((cell) => cell.enabled && cell.active).length;
@@ -7372,15 +7600,21 @@ function computeStationDesignHealthSnapshot() {
     }
   }
 
-  const powerMargin = state.power.available - state.power.used;
-  const powerStarvedCount = getInactiveDueToPower().length;
+  const powerStarved = getInactiveDueToPower();
   const manualOffCount = getManualOffFacilities().length;
-  const coreCapabilityBlackout = (
-    (miningStatus.miners.length > 0 && miningStatus.activeMiners.length === 0)
-    || ((turretCells.length + missileCells.length) > 0 && activeWeaponCount === 0)
-    || (shieldCells.length > 0 && activeShieldCount === 0)
-    || (repairCells.length > 0 && activeRepairCells.length === 0)
-  );
+  const powerSnapshot = computePowerMarginSnapshot({
+    powerStarved,
+    manualOffCount,
+    miningStatus,
+    weaponCount: turretCells.length + missileCells.length,
+    activeWeaponCount,
+    shieldCount: shieldCells.length,
+    activeShieldCount,
+    repairCount: repairCells.length,
+    activeRepairCount: activeRepairCells.length
+  });
+  const powerMargin = powerSnapshot.margin;
+  const powerStarvedCount = powerSnapshot.starvedCount;
 
   let powerStatus = "good";
   let powerSummary = "电力余量充足";
@@ -7389,10 +7623,10 @@ function computeStationDesignHealthSnapshot() {
     powerStatus = "bad";
     powerSummary = "电力出现赤字";
     powerReasonKey = "power_negative";
-  } else if (powerStarvedCount >= 3 || coreCapabilityBlackout) {
+  } else if (powerStarvedCount >= 3 || powerSnapshot.coreCapabilityBlackout.length > 0) {
     powerStatus = "bad";
     powerSummary = "多处断电影响核心";
-    powerReasonKey = coreCapabilityBlackout ? "core_capability_blackout" : "mass_blackout";
+    powerReasonKey = powerSnapshot.coreCapabilityBlackout.length > 0 ? "core_capability_blackout" : "mass_blackout";
   } else if (powerMargin < 5 || powerStarvedCount > 0) {
     powerStatus = "warn";
     powerSummary = "电力紧张";
@@ -7403,7 +7637,16 @@ function computeStationDesignHealthSnapshot() {
     powerStatus,
     powerSummary,
     `余量 ${powerMargin.toFixed(1)}，断电 ${powerStarvedCount}，手动关闭 ${manualOffCount}。`,
-    powerReasonKey
+    powerReasonKey,
+    {
+      used: powerSnapshot.used,
+      available: powerSnapshot.available,
+      margin: powerSnapshot.margin,
+      tight: powerSnapshot.tight,
+      starvedCount: powerSnapshot.starvedCount,
+      manualOffCount: powerSnapshot.manualOffCount,
+      coreCapabilityBlackout: [...powerSnapshot.coreCapabilityBlackout]
+    }
   );
 
   let miningStatusLevel = "good";
@@ -7416,7 +7659,7 @@ function computeStationDesignHealthSnapshot() {
   } else if (miningStatus.harvesting.length === 0) {
     miningStatusLevel = "bad";
     miningSummary = "无有效采矿";
-    miningReasonKey = "all_miners_not_harvesting";
+    miningReasonKey = resourceReachability.overall.allOutOfRange ? "all_miners_out_of_range" : "all_miners_not_harvesting";
   } else if (miningInactiveRatio >= 0.5) {
     miningStatusLevel = "warn";
     miningSummary = "采矿覆盖不足";
@@ -7427,7 +7670,16 @@ function computeStationDesignHealthSnapshot() {
     miningStatusLevel,
     miningSummary,
     `采矿站 ${miningStatus.miners.length}，有效 ${miningStatus.harvesting.length}，断电 ${miningStatus.inactivePower.length}。`,
-    miningReasonKey
+    miningReasonKey,
+    {
+      minerCount: miningStatus.miners.length,
+      activeCount: miningStatus.activeMiners.length,
+      inactivePowerCount: miningStatus.inactivePower.length,
+      manualOffCount: miningStatus.manualOff.length,
+      harvestingCount: miningStatus.harvesting.length,
+      inactiveRatio: miningInactiveRatio,
+      coverageOk: miningStatus.harvesting.length > 0
+    }
   );
 
   let thrustStatus = "good";
@@ -7449,7 +7701,12 @@ function computeStationDesignHealthSnapshot() {
     thrustStatus,
     thrustSummary,
     `推进器 ${thrusterCells.length}，通电 ${activeThrusterCount}，喷口遮挡 ${blockedThrusterCount}。`,
-    thrustReasonKey
+    thrustReasonKey,
+    {
+      thrusterCount: thrusterCells.length,
+      activeCount: activeThrusterCount,
+      blockedCount: blockedThrusterCount
+    }
   );
 
   let firepowerStatus = "good";
@@ -7469,7 +7726,14 @@ function computeStationDesignHealthSnapshot() {
     firepowerStatus,
     firepowerSummary,
     `炮塔 ${activeTurretCount}/${turretCells.length}，导弹井 ${activeMissileCount}/${missileCells.length}。`,
-    firepowerReasonKey
+    firepowerReasonKey,
+    {
+      turretCount: turretCells.length,
+      missileCount: missileCells.length,
+      activeTurretCount,
+      activeMissileCount,
+      activeWeaponCount
+    }
   );
 
   let defenseStatus = "good";
@@ -7491,7 +7755,13 @@ function computeStationDesignHealthSnapshot() {
     defenseStatus,
     defenseSummary,
     `护盾 ${activeShieldCount}/${shieldCells.length}，装甲 ${armorCells.length}，护盾恢复中 ${recoveringShieldCount}。`,
-    defenseReasonKey
+    defenseReasonKey,
+    {
+      shieldCount: shieldCells.length,
+      armorCount: armorCells.length,
+      activeShieldCount,
+      recoveringShieldCount
+    }
   );
 
   let repairStatus = "good";
@@ -7519,19 +7789,90 @@ function computeStationDesignHealthSnapshot() {
     repairStatus,
     repairSummary,
     `维修站 ${activeRepairCells.length}/${repairCells.length}，受损 ${damagedCells.length}，未覆盖 ${uncoveredDamagedCount}。`,
-    repairReasonKey
+    repairReasonKey,
+    {
+      repairCount: repairCells.length,
+      activeRepairCount: activeRepairCells.length,
+      damagedCount: damagedCells.length,
+      uncoveredDamagedCount
+    }
   );
 
   const categories = [powerEntry, miningEntry, thrustEntry, firepowerEntry, defenseEntry, repairEntry];
+  const shortItems = categories.map((entry) => ({
+    key: entry.key === "firepower" ? "weapon" : entry.key,
+    severity: entry.severity,
+    reasonKey: entry.reasonKey || null,
+    summary: entry.summary,
+    detail: entry.detail,
+    status: entry.status
+  }));
+
+  const criticalIssues = [];
+  if (isEnemyPressureLikely() && (firepowerStatus === "bad" || defenseStatus === "bad")) {
+    criticalIssues.push(createDesignIssue("enemy_incoming_no_defense", "critical", "enemy_incoming_no_defense", {
+      firepowerStatus: firepowerEntry.status,
+      defenseStatus: defenseEntry.status
+    }));
+  }
+  if (powerSnapshot.severity === "critical") {
+    criticalIssues.push(createDesignIssue("mass_blackout", "critical", powerReasonKey, {
+      margin: powerSnapshot.margin,
+      starvedCount: powerSnapshot.starvedCount,
+      capabilityBlackout: [...powerSnapshot.coreCapabilityBlackout]
+    }));
+  }
+  if (resourceReachability.overall.minerCount > 0 && resourceReachability.overall.allOutOfRange) {
+    criticalIssues.push(createDesignIssue("mining_no_target", "critical", "all_miners_out_of_range", {
+      minerCount: resourceReachability.overall.minerCount
+    }));
+  }
+  if ((turretCells.length + missileCells.length) > 0 && activeWeaponCount === 0) {
+    criticalIssues.push(createDesignIssue("weapons_offline", "critical", "all_weapons_offline", {
+      weaponCount: turretCells.length + missileCells.length
+    }));
+  }
+  if (shieldCells.length > 0 && activeShieldCount === 0) {
+    criticalIssues.push(createDesignIssue("shield_offline", "critical", "shield_offline", {
+      shieldCount: shieldCells.length
+    }));
+  }
+  if ((repairStatus === "warn" || repairStatus === "bad") && damagedCells.length >= 3) {
+    criticalIssues.push(createDesignIssue("repair_gap", "warning", repairReasonKey, {
+      damagedCount: damagedCells.length,
+      uncoveredDamagedCount
+    }));
+  }
+
+  const dedupedIssues = [];
+  const seenIssueKeys = new Set();
+  for (const issue of criticalIssues) {
+    if (seenIssueKeys.has(issue.key)) continue;
+    seenIssueKeys.add(issue.key);
+    dedupedIssues.push(issue);
+  }
+  dedupedIssues.sort((a, b) => (a.priority - b.priority) || a.key.localeCompare(b.key));
+
   return {
     generatedAt: state.time,
+    schemaVersion: "v0.12.0-station-design-feedback",
+    sampleInterval: DESIGN_HEALTH_SAMPLE_INTERVAL,
     power: powerEntry,
     mining: miningEntry,
     thrust: thrustEntry,
     firepower: firepowerEntry,
+    weapon: firepowerEntry,
     defense: defenseEntry,
     repair: repairEntry,
-    categories
+    categories,
+    shortItems,
+    criticalIssues: dedupedIssues,
+    resourceReachability,
+    powerMargin: powerSnapshot,
+    summary: {
+      criticalCount: categories.filter((entry) => entry.status === "bad").length,
+      warningCount: categories.filter((entry) => entry.status === "warn").length
+    }
   };
 }
 
@@ -11431,8 +11772,70 @@ function buildGuideText() {
   };
 }
 
+function buildLowNoiseDesignIssueAlerts(health = getStationDesignHealth()) {
+  const now = state.time;
+  if (now < designIssueAlertRuntime.lastTime) {
+    designIssueAlertRuntime.activeKeys.clear();
+    designIssueAlertRuntime.lastRaisedAt.clear();
+  }
+  designIssueAlertRuntime.lastTime = now;
+
+  const issues = Array.isArray(health?.criticalIssues) ? health.criticalIssues : [];
+  if (!issues.length) {
+    designIssueAlertRuntime.activeKeys.clear();
+    return [];
+  }
+  const sorted = [];
+  const seen = new Set();
+  for (const issue of issues) {
+    const issueKey = issue?.key || issue?.reasonKey;
+    if (!issueKey || seen.has(issueKey)) continue;
+    seen.add(issueKey);
+    sorted.push(issue);
+  }
+  sorted.sort((a, b) => {
+    const priorityA = getDesignIssuePriority(a.key || a.reasonKey);
+    const priorityB = getDesignIssuePriority(b.key || b.reasonKey);
+    if (priorityA !== priorityB) return priorityA - priorityB;
+    return String(a.key || a.reasonKey).localeCompare(String(b.key || b.reasonKey));
+  });
+
+  const nextActiveKeys = new Set();
+  const alerts = [];
+  for (const issue of sorted) {
+    if (alerts.length >= DESIGN_ISSUE_ALERT_MAX) break;
+    const issueKey = issue.key || issue.reasonKey;
+    if (!issueKey) continue;
+    const cooldown = Number.isFinite(issue.cooldownSec) ? issue.cooldownSec : DESIGN_ISSUE_ALERT_COOLDOWN_SEC;
+    const wasActive = designIssueAlertRuntime.activeKeys.has(issueKey);
+    const lastRaisedAt = designIssueAlertRuntime.lastRaisedAt.get(issueKey);
+    if (!wasActive && Number.isFinite(lastRaisedAt) && now - lastRaisedAt < cooldown) {
+      continue;
+    }
+    if (!wasActive) {
+      designIssueAlertRuntime.lastRaisedAt.set(issueKey, now);
+    }
+    nextActiveKeys.add(issueKey);
+    alerts.push({
+      level: mapDesignSeverityToAlertLevel(issue.severity),
+      cssClass: "alert-design-issue",
+      text: issue.message || DESIGN_ISSUE_COPY[issue.key] || issue.reasonKey || issue.key
+    });
+  }
+
+  designIssueAlertRuntime.activeKeys = nextActiveKeys;
+  for (const [issueKey, lastRaisedAt] of designIssueAlertRuntime.lastRaisedAt) {
+    if (now - lastRaisedAt > DESIGN_ISSUE_ALERT_COOLDOWN_SEC * 6) {
+      designIssueAlertRuntime.lastRaisedAt.delete(issueKey);
+    }
+  }
+  return alerts;
+}
+
 function buildStatusAlerts() {
   const alerts = [];
+  const designHealth = getStationDesignHealth();
+  const designIssueAlerts = buildLowNoiseDesignIssueAlerts(designHealth);
   if (state.run.startupHint && state.time <= state.run.startupHintUntil) {
     alerts.push({
       level: "good",
@@ -11479,6 +11882,9 @@ function buildStatusAlerts() {
       level: "danger",
       text: state.lastBuildError
     });
+  }
+  if (designIssueAlerts.length) {
+    alerts.push(...designIssueAlerts);
   }
   if (state.buildHint && !state.lastBuildError) {
     alerts.push({
@@ -13479,6 +13885,12 @@ window.__gameTest.playtest = {
   getStationDesignHealth() {
     return safeDeepCloneForTest(getStationDesignHealth());
   },
+  getResourceReachability() {
+    return safeDeepCloneForTest(getResourceReachability());
+  },
+  getPowerMargin() {
+    return safeDeepCloneForTest(getPowerMargin());
+  },
   snapshot() {
     const activeMainPanel = getActiveMainPanel();
     const objectiveChoiceOpen = !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden");
@@ -13493,6 +13905,9 @@ window.__gameTest.playtest = {
       overlapCount: countSimultaneouslyOpenMainPanels()
     };
     panels.openPanels = listOpenPanelsForSnapshot(panels);
+    const health = getStationDesignHealth();
+    const reachability = getResourceReachability();
+    const power = getPowerMargin();
 
     return {
       version: "v0.11.0-playtest-readiness",
@@ -13524,7 +13939,11 @@ window.__gameTest.playtest = {
       },
       resource: summarizeResourceForPlaytestSnapshot(),
       design: {
-        health: safeDeepCloneForTest(getStationDesignHealth())
+        health: safeDeepCloneForTest(health),
+        resource: safeDeepCloneForTest(reachability),
+        reachability: safeDeepCloneForTest(reachability),
+        power: safeDeepCloneForTest(power),
+        criticalIssues: safeDeepCloneForTest(health?.criticalIssues || [])
       },
       objective: summarizeObjectiveForPlaytestSnapshot(),
       guide: summarizeGuideForPlaytestSnapshot(),
