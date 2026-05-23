@@ -3021,11 +3021,17 @@ function countFragmentCells() {
 }
 
 function countPlayerFragments() {
-  return state.fragments.filter((fragment) => fragment.origin !== "wreck").length;
+  return state.fragments.filter(
+    (fragment) => fragment.origin !== "wreck" && fragment.origin !== "enemy-wreck"
+  ).length;
 }
 
 function countWreckFragments() {
   return state.fragments.filter((fragment) => fragment.origin === "wreck").length;
+}
+
+function countEnemyWreckFragments() {
+  return state.fragments.filter((fragment) => fragment.origin === "enemy-wreck").length;
 }
 
 function isWreckLikeOrigin(origin) {
@@ -3611,6 +3617,7 @@ function buildFragmentHudAlerts() {
   const alerts = [];
   const playerCount = countPlayerFragments();
   const wreckCount = countWreckFragments();
+  const enemyWreckCount = countEnemyWreckFragments();
   if (playerCount >= FRAGMENT_HUD_WARN_COUNT) {
     alerts.push({
       level: "danger",
@@ -3623,10 +3630,16 @@ function buildFragmentHudAlerts() {
   const originLabel =
     hud.origin === "wreck" ? "古老残骸" : hud.origin === "enemy-wreck" ? "敌方残骸" : "我方残骸";
   let text = `最近${originLabel} ${hud.direction} · ${hud.distanceRounded} px · ${hud.facilityCount} 设施`;
-  if (wreckCount > 0 && playerCount > 0) {
-    text = `古老残骸 ${wreckCount} 段 · 我方 ${playerCount} 段 · ${text}`;
+  const segments = [];
+  if (wreckCount > 0) segments.push(`古老残骸 ${wreckCount} 段`);
+  if (enemyWreckCount > 0) segments.push(`敌方残骸 ${enemyWreckCount} 段`);
+  if (playerCount > 0) segments.push(`我方 ${playerCount} 段`);
+  if (segments.length > 1) {
+    text = `${segments.join(" · ")} · ${text}`;
   } else if (wreckCount > 1) {
     text = `古老残骸 ×${wreckCount} · ${text}`;
+  } else if (enemyWreckCount > 1) {
+    text = `敌方残骸 ×${enemyWreckCount} · ${text}`;
   } else if (playerCount > 1) {
     text = `我方残骸 ×${playerCount} · ${text}`;
   }
