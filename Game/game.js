@@ -3749,8 +3749,8 @@ function ensureMetaPanelUi() {
     <div class="meta-panel-drawer">
       <div class="meta-panel__header">
         <div>
-          <h2 id="metaPanelTitle">局外成长 Meta</h2>
-          <p class="meta-panel__subtitle">局外天赋点与本局科研点相互独立</p>
+          <h2 id="metaPanelTitle">局外天赋</h2>
+          <p class="meta-panel__subtitle">局外天赋点来自结算；局内科研点只在本局研发，两者互不转换</p>
         </div>
         <button type="button" class="meta-panel-close" aria-label="关闭">×</button>
       </div>
@@ -4152,30 +4152,105 @@ function resetObjectiveChoiceState() {
   state.run.objectiveChoiceDismissed = false;
 }
 
+function isRunSettlementPanelOpen() {
+  return !!(runSettlementPanelEl && !runSettlementPanelEl.classList.contains("hidden"));
+}
+
+function hasStableResourceHarvest() {
+  return getMiningStationStatus().harvesting.length > 0;
+}
+
+function buildPanelAwareGuide() {
+  if (isRunSettlementPanelOpen()) {
+    const isFailure = state.run.settlementMode === "failure";
+    return {
+      goal: "查看本局结算",
+      next: isFailure
+        ? "确认本局结果与获得的局外天赋点；这局仍可通过局外天赋强化下一局，再点「重新开始新局」或打开局外天赋。"
+        : "确认本局结果、获得的局外天赋点，以及下一步是新局、局外天赋购买或开局协议选择。"
+    };
+  }
+  if (isGalaxyMapPanelOpen()) {
+    return {
+      goal: "选择下一跳目的地",
+      next: "比较候选星系的奖励和风险；按 Esc 或「暂时停留」可返回当前星系，不会消耗跃迁选择。"
+    };
+  }
+  if (isMetaPanelOpen()) {
+    if (metaPanelUi.activeTab === "protocols") {
+      return {
+        goal: "选择下一局开局协议",
+        next: "协议只影响下一局开局；未解锁协议会显示需要的局外天赋。当前局不变更。"
+      };
+    }
+    if (metaPanelUi.activeTab === "info") {
+      return {
+        goal: "了解局外成长规则",
+        next: "局外天赋点来自结算，可购买永久天赋；局内科研点只在本局用于研发，两者互不转换。"
+      };
+    }
+    return {
+      goal: "使用局外天赋点强化下一局",
+      next: "购买可用天赋会让下一局更强或更稳定；局内科研点不会变成局外天赋点。"
+    };
+  }
+  return null;
+}
+
+function buildEarlyMineObjectiveGuide(objective, powerCount, miningCount) {
+  if (miningCount === 0) {
+    if (powerCount === 0) {
+      return {
+        goal: "先建立采矿能力",
+        next: "先在已连接框架上建造「发电站」，再选「采矿站」放在矿石或金属资源点旁。"
+      };
+    }
+    return {
+      goal: "先建立采矿能力",
+      next: "选择「采矿站」，放在矿石或金属资源点旁；采矿站会帮助你持续获得建造资源。"
+    };
+  }
+  const status = getMiningStationStatus();
+  const nearest = getNearestResourceBody();
+  if (status.harvesting.length === 0 && nearest && nearest.distance > nearest.range) {
+    return {
+      goal: "靠近带彩色外环的资源点",
+      next: "橙色外环产矿石，银色外环产金属；驾驶工站进入外环后，采矿站和工站采集更有效。"
+    };
+  }
+  if (objective && objective.progress < objective.target) {
+    return {
+      goal: "完成当前星系任务",
+      next: `任务目标：${objective.text}。按任务提示补齐采集目标；完成后会出现跃迁选择。`
+    };
+  }
+  return null;
+}
+
 function buildCompletedObjectiveGuide() {
   if (state.run.endgame && state.run.guardianDefeated) {
     if (state.run.settlementShown) {
       return {
-        goal: "终局结算已完成",
-        next: "在结算面板选择「开始新局」或「留在终结星系自由游玩」。"
+        goal: "查看本局结算",
+        next: "确认本局结果与局外天赋点；可选择「开始新局」、打开局外天赋购买，或「留在终结星系自由游玩」。"
       };
     }
     if (state.run.endgameExplore) {
       return {
         goal: "终结星系自由游玩中",
-        next: "可继续战斗和采集累积局外点数，右侧「再次开始新局」可随时重开。"
+        next: "可继续战斗和采集累积局外天赋点；右侧「再次开始新局」可随时重开。"
       };
     }
   }
   if (state.run.awaitingObjectiveChoice) {
     return {
       goal: "星系任务已完成",
-      next: "在「星系任务」下方选择「跃迁下一星系」或「暂时停留」。"
+      next: "可以跃迁下一星系，也可以暂时停留整理防御和资源。"
     };
   }
   return {
     goal: "任务已完成，可随时跃迁",
-    next: "在「星系任务」面板点「跃迁下一星系」；也可继续采集、扩建或战斗。"
+    next: "在「星系任务」下方点「跃迁下一星系」；Esc 或「暂时停留」不会确认跃迁。"
   };
 }
 
@@ -6078,8 +6153,8 @@ function updateRunSettlementPanel() {
   }
   if (hintEl) {
     hintEl.textContent = isFailureMode
-      ? "核心已爆毁。请根据局外成长建议调整下一局策略。"
-      : "守护者已击毁，是否开始新局？";
+      ? "核心已爆毁。这局仍积累了局外天赋点，可以强化下一局再挑战。"
+      : "通关奖励已转化为局外天赋点，可以规划下一条路线。";
   }
   if (restartBtn) {
     restartBtn.textContent = isFailureMode ? "重新开始新局" : "开始新局";
@@ -6110,13 +6185,14 @@ function updateRunSettlementPanel() {
         ? `<li>还差 ${hints.nearestShortfall.deficit} 点可购买「${hints.nearestShortfall.name}」</li>`
         : "<li>当前暂无可购买节点，可继续完成任务累积局外天赋点。</li>");
     runSettlementMetaFeedbackEl.innerHTML = `
-      <div class="run-settlement-meta-title">局外成长反馈</div>
+      <div class="run-settlement-meta-title">局外成长</div>
       <div>本局获得局外天赋点：<strong>+${hints.pointsGained}</strong></div>
       <div>当前可用局外天赋点：<strong>${hints.totalPoints}</strong></div>
       <div class="run-settlement-meta-subtitle">可购买建议</div>
       <ul class="run-settlement-meta-list">${recommendationHtml}</ul>
       <div class="run-settlement-meta-subtitle">下一局协议建议</div>
       <div class="run-settlement-meta-advice">${hints.protocolAdvice.message}</div>
+      <div class="run-settlement-meta-next">下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。</div>
     `;
   }
 }
@@ -9909,6 +9985,9 @@ function pickNextForObjective(objective) {
 }
 
 function buildGuideText() {
+  const panelGuide = buildPanelAwareGuide();
+  if (panelGuide) return panelGuide;
+
   const objective = state.run.objective;
   if (isObjectiveComplete()) {
     return buildCompletedObjectiveGuide();
@@ -9925,14 +10004,19 @@ function buildGuideText() {
   const thrusterCount = countFacility("thruster");
   const isEarlyRun = state.run.level === 0 && state.run.completedObjectives === 0;
 
+  if (isEarlyRun && objective?.type === "mine") {
+    const mineGuide = buildEarlyMineObjectiveGuide(objective, powerCount, miningCount);
+    if (mineGuide) return mineGuide;
+  }
+
   if (isEarlyRun) {
-    if (frameCount <= 6) {
+    if (frameCount <= 6 && objective?.type !== "mine") {
       return {
         goal: "扩建空间站骨架",
         next: "选中「框架」，在核心外围已连接的空格点击建造。"
       };
     }
-    if (powerCount === 0) {
+    if (powerCount === 0 && objective?.type !== "mine") {
       return {
         goal: "为设施提供电力",
         next: "在已连接框架上建造「发电站」，否则采矿/推进器等无法运作。"
@@ -9945,23 +10029,9 @@ function buildGuideText() {
         next: "移开推进器外侧格上的结构，保证喷口方向无遮挡。"
       };
     }
-    if (objective?.type === "mine" && miningCount === 0) {
-      return {
-        goal: `完成星系任务：${objective.text}`,
-        next: "建造「采矿站」后，驾驶空间站进入资源天体的彩色外环范围即可采集。"
-      };
-    }
-    if (objective?.type === "mine" && miningCount > 0 && objective.progress < objective.target * 0.25) {
-      return {
-        goal: `完成星系任务：${objective.text}`,
-        next: state.target || hasKeyboardThrust()
-          ? `${getMoveControlHint()}，进入最近资源点的外环；右侧「资源采集」可看距离与状态。`
-          : `${getMoveControlHint()}，或点空白设航行目标；进入彩色外环后采矿站会自动采集。`
-      };
-    }
     if (objective?.type === "explore" && !state.target) {
       return {
-        goal: `完成星系任务：${objective.text}`,
+        goal: "完成当前星系任务",
         next: `${getMoveControlHint()}，或点空白处设定航行目标，朝金色信标环前进。`
       };
     }
@@ -9973,15 +10043,30 @@ function buildGuideText() {
     }
     if (!state.target && !hasKeyboardThrust() && length(state.station.vel) < 3) {
       return {
-        goal: objective ? `完成星系任务：${objective.text}` : "熟悉基本操作",
-        next: `${getMoveControlHint()}；鼠标指向决定朝向；拖动画布可手动旋转与缩放。`
+        goal: objective ? "完成当前星系任务" : "熟悉基本操作",
+        next: objective
+          ? `${getMoveControlHint()}，按任务提示推进「${objective.text}」。`
+          : `${getMoveControlHint()}；鼠标指向决定朝向；拖动画布可手动旋转与缩放。`
       };
     }
   }
 
+  if (miningCount > 0 && !hasStableResourceHarvest()) {
+    const nearest = getNearestResourceBody();
+    if (nearest && nearest.distance > nearest.range) {
+      return {
+        goal: "靠近带彩色外环的资源点",
+        next: "橙色外环产矿石，银色外环产金属；驾驶工站进入外环后，采矿站采集更有效。"
+      };
+    }
+  }
+
+  const nextStep = pickNextForObjective(objective);
   return {
-    goal: objective ? `星系任务：${objective.text}` : "维持空间站运转",
-    next: pickNextForObjective(objective)
+    goal: objective ? "完成当前星系任务" : "维持空间站运转",
+    next: objective
+      ? (nextStep || `任务目标：${objective.text}；完成后会出现跃迁选择。`)
+      : (nextStep || "扩建设施、完成任务或应对来敌。")
   };
 }
 
@@ -10014,12 +10099,12 @@ function buildStatusAlerts() {
     if (state.run.awaitingObjectiveChoice) {
       alerts.push({
         level: "good",
-        text: "星系任务已完成：请在下方选择「跃迁下一星系」或「暂时停留」。"
+        text: "星系任务已完成：可以跃迁下一星系，也可以暂时停留整理防御和资源。"
       });
     } else {
       alerts.push({
         level: "good",
-        text: "任务已完成，可随时跃迁；继续采集、扩建或战斗均可。"
+        text: "任务已完成，可随时跃迁；Esc 或「暂时停留」不会确认跃迁。"
       });
     }
   } else if (isObjectiveFailed()) {
@@ -10094,6 +10179,13 @@ function buildResourceGuideHtml() {
   const nearest = getNearestResourceBody();
   const status = getMiningStationStatus();
   const lines = [];
+  const objective = state.run.objective;
+  const miningEstablished = status.harvesting.length > 0;
+  const objectiveProgressed = objective && objective.progress >= objective.target * 0.25;
+
+  if (miningEstablished && (isObjectiveComplete() || objectiveProgressed)) {
+    return `<div class="resource-line resource-active good">资源采集已建立：继续完成星系任务，或补充防御后准备跃迁。</div>`;
+  }
 
   if (status.harvesting.length) {
     const groups = new Map();
@@ -10112,11 +10204,11 @@ function buildResourceGuideHtml() {
     const visual = RESOURCE_VISUAL[body.resource] || RESOURCE_VISUAL.ore;
     const inRange = distance <= range;
     const gap = Math.max(0, Math.ceil(distance - range));
-    lines.push(`<div class="resource-line"><span class="resource-dot resource-${visual.css}"></span>最近资源点：<strong>${body.name}</strong> · ${visual.label} · 剩余 ${Math.floor(body.amount)}</div>`);
-    lines.push(`<div class="resource-line resource-meta">距离 ${Math.floor(distance)} / 采矿范围 ${Math.floor(range)}${inRange ? " · <span class='good'>已进入范围</span>" : ` · <span class='warn'>还需靠近 ${gap}</span>`}</div>`);
-    if (!inRange) {
-      lines.push(`<div class="resource-line resource-meta">驾驶空间站进入彩色外环；采矿站需建在框架上并通电。</div>`);
-    }
+    const ringHint = body.resource === "ore" || body.resource === "metal"
+      ? "，适合补采矿站成本"
+      : "";
+    lines.push(`<div class="resource-line"><span class="resource-dot resource-${visual.css}"></span>附近资源：<strong>${visual.label}外环</strong>${ringHint} · ${body.name} · 剩余 ${Math.floor(body.amount)}</div>`);
+    lines.push(`<div class="resource-line resource-meta">把采矿站放在外环旁，并驾驶工站进入外环。距离 ${Math.floor(distance)} / 采矿范围 ${Math.floor(range)}${inRange ? " · <span class='good'>已进入范围</span>" : ` · <span class='warn'>还需靠近 ${gap}</span>`}</div>`);
   } else {
     lines.push(`<div class="resource-line">当前星系暂无可用资源天体。</div>`);
   }
@@ -10133,6 +10225,10 @@ function buildResourceGuideHtml() {
     } else if (nearest && nearest.body.amount <= 0) {
       lines.push(`<div class="resource-line warn">最近资源点已采空，请前往其他带彩色外环的天体。</div>`);
     }
+  }
+
+  if (nearest || status.miners.length === 0) {
+    lines.push(`<div class="resource-line resource-meta resource-color-legend">橙=矿石，银=金属，绿=气体，紫=等离子。</div>`);
   }
 
   return lines.join("");
@@ -10997,6 +11093,36 @@ window.__gameTest = {
   },
   runMetaS2RegressionSelfCheck() {
     return runMetaS2RegressionSelfCheck();
+  },
+  guideSnapshot() {
+    const guide = buildGuideText();
+    const goal = guide?.goal ?? "";
+    const next = guide?.next ?? "";
+    const resourceGuideHtml = buildResourceGuideHtml();
+    const hasUndefined = [goal, next, resourceGuideHtml].some(
+      (value) => value == null || String(value).includes("undefined")
+    );
+    return {
+      goal,
+      next,
+      resourceGuideHtml,
+      panels: {
+        settlementOpen: isRunSettlementPanelOpen(),
+        galaxyMapOpen: isGalaxyMapPanelOpen(),
+        metaOpen: isMetaPanelOpen(),
+        metaTab: metaPanelUi.activeTab,
+        objectiveChoiceVisible: !document.getElementById("objectiveChoicePanel")?.classList.contains("hidden")
+      },
+      state: {
+        level: state.run.level,
+        objectiveComplete: isObjectiveComplete(),
+        awaitingObjectiveChoice: state.run.awaitingObjectiveChoice,
+        settlementShown: state.run.settlementShown,
+        miningCount: countFacility("mining"),
+        harvestingCount: getMiningStationStatus().harvesting.length
+      },
+      hasUndefined
+    };
   },
   getCellStat,
   applyModification,

@@ -725,6 +725,15 @@ button:disabled {
   color: #ffe9b8;
 }
 
+.run-settlement-meta-next {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 191, 138, 0.18);
+  color: #ffe9b8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 #summaryRestartBtn,
 .danger-restart-btn {
   border-color: rgba(255, 118, 118, 0.55);
@@ -892,6 +901,11 @@ h2 {
 .resource-line.resource-meta {
   color: #8fa8c8;
   font-size: 11px;
+}
+
+.resource-color-legend {
+  margin-top: 4px;
+  color: #8fb6a0;
 }
 
 .resource-line.resource-active {
