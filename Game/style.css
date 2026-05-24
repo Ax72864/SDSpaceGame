@@ -611,6 +611,10 @@ button:disabled {
   bottom: 12px;
   width: min(390px, calc(100vw - 24px));
   padding: 12px;
+  max-height: min(68vh, calc(100vh - 112px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .status-panel {
@@ -810,6 +814,8 @@ button:disabled {
 
 .more-status-body {
   padding-top: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .more-status-body > h2:first-child {
@@ -850,6 +856,7 @@ h2 {
 .facility-card-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
 }
@@ -909,6 +916,7 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   color: #edf4ff;
+  overflow-wrap: anywhere;
 }
 
 .facility-card-count {
@@ -920,6 +928,7 @@ h2 {
 .facility-card-purpose {
   font-size: 10px;
   color: #9eb0cb;
+  overflow-wrap: anywhere;
 }
 
 .facility-card-meta {
@@ -928,6 +937,7 @@ h2 {
   gap: 4px 8px;
   font-size: 10px;
   color: #b7c8e6;
+  min-width: 0;
 }
 
 .facility-card-cost {
@@ -957,6 +967,7 @@ h2 {
   font-size: 10px;
   line-height: 1.35;
   color: #9eb6d8;
+  overflow-wrap: anywhere;
 }
 
 .facility-card-tip.is-recommend {
@@ -1007,6 +1018,8 @@ h2 {
   color: #b7c8e6;
   font-size: 13px;
   line-height: 1.55;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .guide-box {
@@ -1098,6 +1111,7 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1114,12 +1128,14 @@ h2 {
 .design-health-summary-text {
   font-size: 12px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .design-health-detail {
   font-size: 11px;
   line-height: 1.35;
   color: #8fa8c8;
+  overflow-wrap: anywhere;
 }
 
 .combat-status-summary:empty {
@@ -1132,10 +1148,13 @@ h2 {
   border-top: 1px solid rgba(120, 160, 210, 0.18);
   font-size: 12px;
   line-height: 1.45;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .combat-status-line {
   color: #b8cce4;
+  overflow-wrap: anywhere;
 }
 
 .combat-status-line + .combat-status-line {
@@ -1220,6 +1239,8 @@ h2 {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px dashed rgba(120, 160, 210, 0.2);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .combat-review-summary:empty {
@@ -1237,6 +1258,7 @@ h2 {
   font-size: 11px;
   line-height: 1.4;
   color: #9eb6d8;
+  overflow-wrap: anywhere;
 }
 
 .combat-review-item.severity-warning {
@@ -1530,6 +1552,8 @@ h2 {
   border-radius: 8px;
   background: rgba(8, 20, 34, 0.72);
   border: 1px solid rgba(117, 245, 255, 0.12);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .selected-cell-diagnostics.hidden {
@@ -1540,6 +1564,7 @@ h2 {
   font-size: 12px;
   line-height: 1.45;
   color: #b8d4ea;
+  overflow-wrap: anywhere;
 }
 
 .diag-line + .diag-line {
@@ -2340,7 +2365,7 @@ h2 {
   .build-panel .hint {
     font-size: 11px;
     line-height: 1.4;
-    max-height: 8.4em;
+    max-height: 5.6em;
     overflow-y: auto;
   }
 
@@ -2349,8 +2374,10 @@ h2 {
     right: 8px;
     bottom: 8px;
     width: auto;
-    max-height: 33vh;
+    max-height: min(34vh, 250px);
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -2537,6 +2564,21 @@ h2 {
     padding: 8px 9px;
     background: linear-gradient(180deg, rgba(76, 22, 30, 0), rgba(76, 22, 30, 0.98) 34%);
   }
+
+  .combat-status-summary,
+  .combat-review-summary,
+  .design-health-summary,
+  .selected-cell-diagnostics {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .combat-status-line + .combat-status-line,
+  .combat-review-item + .combat-review-item,
+  .design-health-item + .design-health-item,
+  .diag-line + .diag-line {
+    margin-top: 3px;
+  }
 }
 
 @media (max-width: 900px) and (min-width: 761px) {
@@ -2613,7 +2655,10 @@ h2 {
   }
 
   .facility-card-purpose {
-    display: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .facility-card-tip {
@@ -2665,6 +2710,8 @@ h2 {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   font-size: 12px;
   line-height: 1.45;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
 }
 
 .release-candidate-panel.hidden,
@@ -2677,12 +2724,18 @@ h2 {
 }
 
 .release-candidate-panel__header {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin: -10px -12px 8px;
+  padding: 10px 12px 8px;
+  background: rgba(8, 16, 32, 0.97);
+  border-bottom: 1px solid rgba(143, 201, 255, 0.12);
 }
 
 .release-candidate-panel__title {
@@ -2696,6 +2749,7 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .release-candidate-panel__actions button {
@@ -2743,6 +2797,7 @@ h2 {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
   font-family: Consolas, "Courier New", monospace;
   font-size: 10px;
   color: rgba(220, 232, 255, 0.9);
@@ -2761,6 +2816,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   font-weight: 600;
   color: #dce8ff;
@@ -2786,15 +2842,67 @@ h2 {
 
 @media (max-width: 760px) {
   .release-candidate-panel {
+    top: 8px;
     right: 8px;
     left: 8px;
+    bottom: auto;
     width: auto;
-    max-height: min(55vh, calc(100vh - 80px));
-    bottom: 48px;
+    max-height: min(42vh, calc(100vh - 320px));
+    padding: 9px 10px 10px;
+    font-size: 11px;
+  }
+
+  .release-candidate-panel__header {
+    top: -9px;
+    margin: -9px -10px 7px;
+    padding: 9px 10px 7px;
+  }
+
+  .release-candidate-panel__title {
+    font-size: 12px;
+  }
+
+  .release-candidate-panel__actions {
+    width: 100%;
+  }
+
+  .release-candidate-panel__actions button {
+    flex: 1 1 86px;
+    min-height: 32px;
+    padding: 4px 6px;
+  }
+
+  .release-candidate-panel__notice,
+  .release-candidate-panel__status {
+    font-size: 10px;
+  }
+
+  .release-candidate-panel__section {
+    margin-top: 8px;
+    padding-top: 6px;
+  }
+
+  .release-candidate-panel__section h4 {
+    margin-bottom: 4px;
+  }
+
+  .release-candidate-manual-list {
+    gap: 6px;
   }
 
   .release-candidate-toggle {
     right: 8px;
     bottom: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .release-candidate-panel {
+    max-height: min(38vh, calc(100vh - 330px));
+  }
+
+  .release-candidate-manual-item__status {
+    width: 100%;
+    min-height: 32px;
   }
 }

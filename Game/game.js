@@ -17372,6 +17372,16 @@ function formatReleaseCandidateCheckLine(entry) {
   return `- [${status}] ${entry.label || entry.id}: ${summary}`;
 }
 
+function escapeReleaseCandidateHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
 function renderReleaseCandidateAutomaticSection(result) {
   if (!releaseCandidatePanelEl) return;
   const region = releaseCandidatePanelEl.querySelector('[data-rc-region="automatic"]');
@@ -17384,7 +17394,7 @@ function renderReleaseCandidateAutomaticSection(result) {
   }
   const lines = automaticChecks.map(formatReleaseCandidateCheckLine);
   const okLine = `ok=${result?.ok === true ? "true" : "false"} · 耗时 ${result?.durationMs ?? "?"}ms`;
-  region.innerHTML = `<p class="release-candidate-panel__meta">${okLine}</p><pre class="release-candidate-panel__pre">${lines.join("\n")}</pre>`;
+  region.innerHTML = `<p class="release-candidate-panel__meta">${escapeReleaseCandidateHtml(okLine)}</p><pre class="release-candidate-panel__pre">${escapeReleaseCandidateHtml(lines.join("\n"))}</pre>`;
 }
 
 function renderReleaseCandidateBrowserSection(result) {
@@ -17413,7 +17423,7 @@ function renderReleaseCandidateBrowserSection(result) {
     }
   }
   lines.push("", "注意：DevTools Console 面板需 PM 手工记录，自动检查不覆盖。");
-  region.innerHTML = `<pre class="release-candidate-panel__pre">${lines.join("\n")}</pre>`;
+  region.innerHTML = `<pre class="release-candidate-panel__pre">${escapeReleaseCandidateHtml(lines.join("\n"))}</pre>`;
 }
 
 function setReleaseCandidatePanelStatus(message) {
