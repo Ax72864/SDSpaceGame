@@ -6898,6 +6898,19 @@ class Renderer {
     };
   }
 
+  worldToScreen(world) {
+    const camX = state.camera.x + (state.camera.shakeX || 0);
+    const camY = state.camera.y + (state.camera.shakeY || 0);
+    const deviceX = (world.x - camX) * state.camera.zoom + this.width / 2;
+    const deviceY = (world.y - camY) * state.camera.zoom + this.height / 2;
+    return {
+      deviceX,
+      deviceY,
+      clientX: deviceX / this.dpr,
+      clientY: deviceY / this.dpr
+    };
+  }
+
   pushVertex(p, color) {
     const clip = this.worldToClip(p);
     this.vertices.push(clip.x, clip.y, color[0], color[1], color[2], color[3]);
@@ -10378,6 +10391,217 @@ function resolvePlacementArgsForTest(facilityOrGrid, gridX, gridY) {
     }
   }
   return getPlacementDiagnostics(facility, x, y);
+}
+
+function resolveGridArgForTest(gridKeyOrXY) {
+  if (gridKeyOrXY == null) {
+    if (state.input.mouseWorld) {
+      const grid = worldToGrid(state.input.mouseWorld);
+      return { x: grid.x, y: grid.y, gridKey: key(grid.x, grid.y) };
+    }
+    return { x: 0, y: 0, gridKey: key(0, 0) };
+  }
+  if (typeof gridKeyOrXY === "string") {
+    const parsed = parseKey(gridKeyOrXY);
+    return { x: parsed.x, y: parsed.y, gridKey: gridKeyOrXY };
+  }
+  if (typeof gridKeyOrXY === "object" && Number.isFinite(gridKeyOrXY.x) && Number.isFinite(gridKeyOrXY.y)) {
+    return { x: gridKeyOrXY.x, y: gridKeyOrXY.y, gridKey: key(gridKeyOrXY.x, gridKeyOrXY.y) };
+  }
+  return { x: 0, y: 0, gridKey: key(0, 0) };
+}
+
+function getGridWorldCenterForTest(gridX, gridY) {
+  return cellWorldPosition({ x: gridX, y: gridY, detached: false });
+}
+
+function isGridWorldPointVisible(world) {
+  if (!renderer) return false;
+  const screen = renderer.worldToScreen(world);
+  return screen.deviceX >= 0
+    && screen.deviceX <= renderer.width
+    && screen.deviceY >= 0
+    && screen.deviceY <= renderer.height;
+}
+
+function getGridCellSnapshotForTest(gridX, gridY) {
+  const gridKey = key(gridX, gridY);
+  const cell = state.station.cells.get(gridKey);
+  return {
+    gridKey,
+    gridX,
+    gridY,
+    exists: !!cell,
+    facility: cell?.facility ?? null,
+    detached: cell?.detached ?? false,
+    active: cell?.active ?? false
+  };
+}
+
+function getViewportDiagnosticsForTest() {
+  if (!renderer) return null;
+  return {
+    deviceWidth: renderer.width,
+    deviceHeight: renderer.height,
+    dpr: renderer.dpr,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio || 1
+  };
+}
+
+function getCameraDiagnosticsForTest() {
+  return {
+    x: state.camera.x,
+    y: state.camera.y,
+    shakeX: state.camera.shakeX || 0,
+    shakeY: state.camera.shakeY || 0,
+    zoom: state.camera.zoom
+  };
+}
+
+function buildGridInteractionDiagnostics(gridKeyOrXY, options = {}) {
+  const { x, y, gridKey } = resolveGridArgForTest(gridKeyOrXY);
+  const world = getGridWorldCenterForTest(x, y);
+  const screen = renderer ? renderer.worldToScreen(world) : null;
+  const cellSnapshot = getGridCellSnapshotForTest(x, y);
+  const selectedBuild = options.facility ?? state.selectedBuild ?? null;
+  const placement = selectedBuild
+    ? getPlacementDiagnostics(selectedBuild, x, y)
+    : null;
+  return {
+    gridKey,
+    gridX: x,
+    gridY: y,
+    world,
+    screen: screen
+      ? {
+        clientX: screen.clientX,
+        clientY: screen.clientY,
+        deviceX: screen.deviceX,
+        deviceY: screen.deviceY
+      }
+      : null,
+    viewport: getViewportDiagnosticsForTest(),
+    visible: isGridWorldPointVisible(world),
+    cell: cellSnapshot,
+    selectedBuild,
+    selectedCell: state.selectedCell || null,
+    placement,
+    clickPath: {
+      screenInput: screen ? { x: screen.clientX, y: screen.clientY } : null,
+      resolvedWorld: world,
+      resolvedGrid: { x, y, gridKey },
+      wouldCallBuildAt: !!selectedBuild
+    },
+    camera: getCameraDiagnosticsForTest(),
+    lastBuildError: state.lastBuildError || null,
+    buildHint: state.buildHint || null
+  };
+}
+
+function buildGridScreenPointDiagnostics(gridKeyOrXY) {
+  const { x, y, gridKey } = resolveGridArgForTest(gridKeyOrXY);
+  const world = getGridWorldCenterForTest(x, y);
+  const screen = renderer ? renderer.worldToScreen(world) : null;
+  return {
+    gridKey,
+    gridX: x,
+    gridY: y,
+    world,
+    clientX: screen?.clientX ?? null,
+    clientY: screen?.clientY ?? null,
+    deviceX: screen?.deviceX ?? null,
+    deviceY: screen?.deviceY ?? null,
+    visible: isGridWorldPointVisible(world),
+    viewport: getViewportDiagnosticsForTest(),
+    camera: getCameraDiagnosticsForTest()
+  };
+}
+
+function buildPointerGridDiagnostics(screenPoint) {
+  const hasScreen = screenPoint && Number.isFinite(screenPoint.x) && Number.isFinite(screenPoint.y);
+  const screen = hasScreen ? { x: screenPoint.x, y: screenPoint.y } : null;
+  const inputSource = screen ? "screen" : "mouseWorld";
+  const world = screen
+    ? (renderer ? renderer.screenToWorld(screen) : null)
+    : state.input.mouseWorld;
+  if (!world) {
+    return {
+      inputSource,
+      screen,
+      world: null,
+      grid: null,
+      gridKey: null,
+      error: "no_pointer_position"
+    };
+  }
+  const grid = worldToGrid(world);
+  const gridKey = key(grid.x, grid.y);
+  const cell = state.station.cells.get(gridKey);
+  const roundTrip = buildGridScreenPointDiagnostics(grid);
+  const roundTripScreen = roundTrip.clientX != null
+    ? { x: roundTrip.clientX, y: roundTrip.clientY }
+    : null;
+  return {
+    inputSource,
+    screen,
+    world: { x: world.x, y: world.y },
+    grid,
+    gridKey,
+    cell: cell
+      ? {
+        facility: cell.facility,
+        detached: cell.detached,
+        active: cell.active
+      }
+      : null,
+    selectedBuild: state.selectedBuild || null,
+    placement: state.selectedBuild
+      ? getPlacementDiagnostics(state.selectedBuild, grid.x, grid.y)
+      : null,
+    roundTripFromGridCenter: {
+      clientX: roundTrip.clientX,
+      clientY: roundTrip.clientY,
+      deltaFromInput: screen && roundTripScreen
+        ? {
+          dx: screen.x - roundTripScreen.x,
+          dy: screen.y - roundTripScreen.y,
+          distance: Math.hypot(screen.x - roundTripScreen.x, screen.y - roundTripScreen.y)
+        }
+        : null
+    },
+    handleCanvasClickWouldResolve: {
+      gridKey,
+      gridX: grid.x,
+      gridY: grid.y,
+      wouldBuild: !!state.selectedBuild,
+      facility: state.selectedBuild || null
+    },
+    viewport: getViewportDiagnosticsForTest(),
+    camera: getCameraDiagnosticsForTest()
+  };
+}
+
+function buildGridClickAlignmentDiagnostics(targetGridKeyOrXY, screenPoint) {
+  const target = buildGridScreenPointDiagnostics(targetGridKeyOrXY);
+  const pointer = buildPointerGridDiagnostics(screenPoint);
+  const hasScreen = screenPoint && Number.isFinite(screenPoint.x) && Number.isFinite(screenPoint.y);
+  const screenDelta = hasScreen && target.clientX != null
+    ? {
+      dx: screenPoint.x - target.clientX,
+      dy: screenPoint.y - target.clientY,
+      distance: Math.hypot(screenPoint.x - target.clientX, screenPoint.y - target.clientY)
+    }
+    : null;
+  return {
+    targetGridKey: target.gridKey,
+    pointerGridKey: pointer.gridKey ?? null,
+    aligned: !!pointer.gridKey && target.gridKey === pointer.gridKey,
+    screenDelta,
+    target,
+    pointer
+  };
 }
 
 function buildFacilityCardInnerHtml(entry) {
@@ -17626,6 +17850,18 @@ window.__gameTest.playtest = {
   },
   getPlacementDiagnostics(facilityOrGrid, gridX, gridY) {
     return safeDeepCloneForTest(resolvePlacementArgsForTest(facilityOrGrid, gridX, gridY));
+  },
+  getGridScreenPoint(gridKeyOrXY) {
+    return safeDeepCloneForTest(buildGridScreenPointDiagnostics(gridKeyOrXY));
+  },
+  getGridInteractionDiagnostics(gridKeyOrXY, options) {
+    return safeDeepCloneForTest(buildGridInteractionDiagnostics(gridKeyOrXY, options || {}));
+  },
+  getPointerGridDiagnostics(screenPoint) {
+    return safeDeepCloneForTest(buildPointerGridDiagnostics(screenPoint));
+  },
+  compareGridClickAlignment(targetGridKeyOrXY, screenPoint) {
+    return safeDeepCloneForTest(buildGridClickAlignmentDiagnostics(targetGridKeyOrXY, screenPoint));
   },
   getStationDesignHealth() {
     return safeDeepCloneForTest(getStationDesignHealth());
