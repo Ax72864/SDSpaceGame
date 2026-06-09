@@ -7702,6 +7702,203 @@ function buildFrameExpansionPathSteps(parent, targetKey) {
   return steps;
 }
 
+function isExpansionFrameStepBuilt(step) {
+  if (!step) return false;
+  const cell = state.station.cells.get(step.gridKey);
+  return !!(cell && !cell.detached);
+}
+
+function normalizeExpansionStepsToBuildOrder(steps) {
+  if (!Array.isArray(steps) || steps.length <= 1) return steps || [];
+  const first = steps[0];
+  const last = steps[steps.length - 1];
+  const firstConnected = hasConnectedNeighbor(first.gridX, first.gridY) || isExpansionFrameStepBuilt(first);
+  const lastConnected = hasConnectedNeighbor(last.gridX, last.gridY) || isExpansionFrameStepBuilt(last);
+  if (!firstConnected && lastConnected) return [...steps].reverse();
+  return steps;
+}
+
+function getOrderedExpansionFrameSteps(suggestedExpansionPath) {
+  if (!suggestedExpansionPath) return [];
+  const raw = suggestedExpansionPath.frameSteps || [];
+  return normalizeExpansionStepsToBuildOrder(raw);
+}
+
+function buildMiningBuildPlanStepScreenPoint(gridKeyOrXY) {
+  const screen = buildGridScreenPointDiagnostics(gridKeyOrXY);
+  return {
+    gridKey: screen.gridKey,
+    gridX: screen.gridX,
+    gridY: screen.gridY,
+    world: screen.world,
+    clientX: screen.clientX,
+    clientY: screen.clientY,
+    deviceX: screen.deviceX,
+    deviceY: screen.deviceY,
+    visible: screen.visible
+  };
+}
+
+function evaluateMiningUpgradePrecondition(gridX, gridY) {
+  const gridKey = key(gridX, gridY);
+  const cell = state.station.cells.get(gridKey);
+  if (!cell || cell.detached) {
+    return { valid: false, reasonKey: "needs_frame", connectedToCore: hasConnectedNeighbor(gridX, gridY) };
+  }
+  if (cell.facility === "mining") {
+    return { valid: false, reasonKey: "already_mining", connectedToCore: true };
+  }
+  if (cell.facility !== "frame") {
+    return {
+      valid: false,
+      reasonKey: "not_frame",
+      blockingFacility: cell.facility,
+      connectedToCore: hasConnectedNeighbor(gridX, gridY)
+    };
+  }
+  return { valid: true, reasonKey: "frame_ready", connectedToCore: hasConnectedNeighbor(gridX, gridY) };
+}
+
+function computeMiningBuildPlan(options = {}) {
+  const diagnostics = options.diagnostics || computeMiningCoverageDiagnostics(options);
+  const { bestCandidate, suggestedExpansionPath, affordability } = diagnostics;
+  const base = {
+    version: "v1.0.0-mining-build-plan",
+    readOnly: true,
+    capturedAt: Date.now(),
+    applicable: false,
+    targetGridKey: null,
+    finalAction: null,
+    buildOrder: "connected_to_target",
+    totalSteps: 0,
+    completedSteps: 0,
+    currentStepIndex: null,
+    currentStep: null,
+    selectedBuildRecommended: state.selectedBuild || null,
+    affordability: affordability || null,
+    expectedTotalCost: affordability?.totalCost || {},
+    canAffordAll: !!(affordability?.affordable),
+    currentResources: affordability?.currentResources || {
+      metal: Math.floor(state.resources.metal || 0),
+      ore: Math.floor(state.resources.ore || 0)
+    },
+    steps: [],
+    selectionDiagnostics: {
+      selectedBuild: state.selectedBuild || null,
+      buildModeActive: Boolean(state.selectedBuild),
+      paused: !!state.paused
+    },
+    reasonKey: null
+  };
+
+  if (!bestCandidate?.canReachInRange || !suggestedExpansionPath) {
+    return { ...base, reasonKey: "no_actionable_path" };
+  }
+
+  const targetKey = suggestedExpansionPath.targetGridKey || bestCandidate.gridKey;
+  const finalAction = suggestedExpansionPath.finalAction || bestCandidate.miningAction || null;
+  const orderedFrameSteps = getOrderedExpansionFrameSteps(suggestedExpansionPath);
+  const pendingFrameSteps = orderedFrameSteps.filter((step) => !isExpansionFrameStepBuilt(step));
+  const steps = [];
+  let runningMetal = base.currentResources.metal;
+  let runningOre = base.currentResources.ore;
+
+  for (const frameStep of pendingFrameSteps) {
+    const placement = getPlacementDiagnostics("frame", frameStep.gridX, frameStep.gridY);
+    const frameCost = getBuildCost("frame");
+    const metalNeed = frameCost.metal || 0;
+    const oreNeed = frameCost.ore || 0;
+    const canAffordStep = runningMetal >= metalNeed && runningOre >= oreNeed;
+    const connectedNow = hasConnectedNeighbor(frameStep.gridX, frameStep.gridY);
+    steps.push({
+      stepIndex: steps.length + 1,
+      build: "frame",
+      gridKey: frameStep.gridKey,
+      gridX: frameStep.gridX,
+      gridY: frameStep.gridY,
+      selectedBuild: "frame",
+      screenPoint: buildMiningBuildPlanStepScreenPoint(frameStep.gridKey),
+      precondition: {
+        mustSelectBuild: "frame",
+        requiresConnectedNeighbor: true,
+        connectedNow,
+        placementValid: placement.placement.valid,
+        placementReasonKey: placement.placement.reasonKey || null,
+        alreadyBuilt: false
+      },
+      expectedCost: { ...frameCost },
+      canAffordStep,
+      actionable: connectedNow && placement.placement.valid && canAffordStep
+    });
+    if (canAffordStep) {
+      runningMetal -= metalNeed;
+      runningOre -= oreNeed;
+    }
+  }
+
+  const targetParsed = parseKey(targetKey);
+  const targetCell = state.station.cells.get(targetKey);
+  const needsMiningStep = finalAction !== "already_mining";
+  if (needsMiningStep) {
+    const miningUpgrade = evaluateMiningUpgradePrecondition(targetParsed.x, targetParsed.y);
+    const miningCost = getBuildCost("mining");
+    const metalNeed = miningCost.metal || 0;
+    const oreNeed = miningCost.ore || 0;
+    const canAffordStep = runningMetal >= metalNeed && runningOre >= oreNeed;
+    const frameReady = miningUpgrade.valid;
+    const framesComplete = pendingFrameSteps.length === 0;
+    steps.push({
+      stepIndex: steps.length + 1,
+      build: "mining",
+      gridKey: targetKey,
+      gridX: targetParsed.x,
+      gridY: targetParsed.y,
+      selectedBuild: "mining",
+      screenPoint: buildMiningBuildPlanStepScreenPoint(targetKey),
+      precondition: {
+        mustSelectBuild: "mining",
+        requiresFrame: true,
+        frameReady,
+        framesComplete,
+        placementValid: miningUpgrade.valid,
+        placementReasonKey: miningUpgrade.reasonKey || null,
+        finalAction
+      },
+      expectedCost: { ...miningCost },
+      canAffordStep,
+      actionable: frameReady && framesComplete && miningUpgrade.valid && canAffordStep
+    });
+  }
+
+  const completedSteps = orderedFrameSteps.length - pendingFrameSteps.length
+    + (targetCell?.facility === "mining" ? 1 : 0);
+  const currentStep = steps.find((step) => step.actionable) || steps.find((step) => {
+    if (step.build === "frame") {
+      const cell = state.station.cells.get(step.gridKey);
+      return !(cell && !cell.detached);
+    }
+    return targetCell?.facility !== "mining";
+  }) || null;
+
+  return {
+    ...base,
+    applicable: steps.length > 0,
+    targetGridKey: targetKey,
+    finalAction,
+    totalSteps: steps.length,
+    completedSteps,
+    currentStepIndex: currentStep?.stepIndex ?? null,
+    currentStep,
+    selectedBuildRecommended: currentStep?.selectedBuild || null,
+    steps,
+    reasonKey: steps.length ? "ready" : "already_complete"
+  };
+}
+
+function captureMiningBuildPlanForTest(options = {}) {
+  return safeDeepCloneForTest(computeMiningBuildPlan(options));
+}
+
 function findFrameExpansionPathToGrid(targetX, targetY) {
   const targetKey = key(targetX, targetY);
   const targetCell = state.station.cells.get(targetKey);
@@ -8025,24 +8222,61 @@ function failureSafeSummary(reachability) {
 function buildMiningExpansionGuidanceHtml(diagnostics) {
   if (!diagnostics || diagnostics.reachability?.anyHarvesting) return "";
   const lines = [];
-  const { bestCandidate, suggestedExpansionPath, affordability, failure, mobileApproachHint, nearestResource } = diagnostics;
+  const {
+    bestCandidate,
+    suggestedExpansionPath,
+    affordability,
+    failure,
+    mobileApproachHint,
+    buildPlan
+  } = diagnostics;
+  const plan = buildPlan || computeMiningBuildPlan({ diagnostics });
 
   if (failure?.summary && failure.reasonKey !== "harvesting") {
     lines.push(`<div class="resource-line warn">${failure.summary}</div>`);
   }
 
   if (bestCandidate?.canReachInRange && suggestedExpansionPath) {
-    const frameSteps = suggestedExpansionPath.totalFrameSteps ?? 0;
-    const targetKey = bestCandidate.gridKey;
+    const targetKey = suggestedExpansionPath.targetGridKey || bestCandidate.gridKey;
     const pathKeys = (suggestedExpansionPath.frameSteps || [])
       .map((step) => step.gridKey)
       .filter(Boolean);
-    const pathSummary = pathKeys.length > 0
-      ? `路径：${pathKeys.join(" → ")} → ${targetKey}`
-      : frameSteps > 0
-        ? `路径：先铺 ${frameSteps} 格框架 → ${targetKey} 建采矿站`
+    const uniquePathKeys = pathKeys.filter((gridKey, index) => gridKey !== targetKey || index < pathKeys.length - 1);
+    const pathSummary = uniquePathKeys.length > 0
+      ? `路径：${uniquePathKeys.join(" → ")}${uniquePathKeys[uniquePathKeys.length - 1] !== targetKey ? ` → ${targetKey}` : ""}`
+      : plan.currentStep?.build === "mining"
+        ? `覆盖候选：框架已就绪，在 ${targetKey} 建采矿站`
         : `覆盖候选：可在 ${targetKey} 入圈${bestCandidate.miningAction === "upgrade_to_mining" ? "，升级为采矿站即可" : "，直接建采矿站"}`;
     lines.push(`<div class="resource-line mining-path-chip">${pathSummary}</div>`);
+
+    if (plan.applicable && plan.steps.length > 0) {
+      const previewSteps = plan.steps.slice(0, 5);
+      const stepChips = previewSteps.map((step) => {
+        const isCurrent = step.stepIndex === plan.currentStepIndex;
+        const cls = isCurrent ? "mining-build-step-chip current" : "mining-build-step-chip";
+        const buildName = step.build === "mining" ? "采矿站" : "框架";
+        return `<span class="${cls}">${step.stepIndex}. ${buildName}@${step.gridKey}</span>`;
+      }).join("");
+      const more = plan.steps.length > previewSteps.length
+        ? `<span class="mining-build-step-more">…共 ${plan.totalSteps} 步</span>`
+        : "";
+      lines.push(`<div class="resource-line mining-build-plan-row"><strong>按顺序建造：</strong>${stepChips}${more}</div>`);
+      if (plan.currentStep) {
+        const currentName = plan.currentStep.build === "mining" ? "采矿站" : "框架";
+        const affordHint = plan.currentStep.canAffordStep ? "" : "（当前资源不足，可先等核心产金属）";
+        lines.push(
+          `<div class="resource-line mining-build-current-step">当前第 ${plan.currentStep.stepIndex} 步：必须先选「${currentName}」并点击 <strong>${plan.currentStep.gridKey}</strong>${affordHint}</div>`
+        );
+        if (plan.currentStep.precondition && !plan.currentStep.precondition.connectedNow && plan.currentStep.build === "frame") {
+          lines.push(`<div class="resource-line warn">该格尚未邻接已连接结构，请按顺序从靠近核心的一端开始铺框架。</div>`);
+        }
+        if (plan.selectedBuildRecommended && state.selectedBuild !== plan.selectedBuildRecommended) {
+          lines.push(
+            `<div class="resource-line warn mining-selection-hint">建造选择：当前为「${TYPES[state.selectedBuild]?.name || state.selectedBuild || "指针"}」，本步应选「${currentName}」。</div>`
+          );
+        }
+      }
+    }
   } else if (bestCandidate && !bestCandidate.canReachInRange) {
     lines.push(`<div class="resource-line warn">入圈格 ${bestCandidate.gridKey} 存在，但扩建路径被占用或不可达。</div>`);
   }
@@ -8158,12 +8392,15 @@ function computeMiningCoverageDiagnostics(options = {}) {
   candidates = candidates.slice(0, maxCandidates);
 
   const bestCandidate = candidates.find((entry) => entry.canReachInRange) || candidates[0] || null;
+  const rawExpansionSteps = bestCandidate?.expansionPath?.steps || [];
+  const orderedExpansionSteps = normalizeExpansionStepsToBuildOrder(rawExpansionSteps);
   const suggestedExpansionPath = bestCandidate?.canReachInRange
     ? {
       targetGridKey: bestCandidate.gridKey,
-      frameSteps: bestCandidate.expansionPath?.steps || [],
+      frameSteps: orderedExpansionSteps,
       finalAction: bestCandidate.miningAction,
-      totalFrameSteps: bestCandidate.expansionPath?.frameSteps ?? 0
+      totalFrameSteps: orderedExpansionSteps.length,
+      buildOrder: "connected_to_target"
     }
     : null;
   const failure = summarizeMiningCoverageFailure(reachability, miningStatus, candidates, bestCandidate);
@@ -8184,9 +8421,17 @@ function computeMiningCoverageDiagnostics(options = {}) {
       targetGridKey: suggestedExpansionPath.targetGridKey,
       stepGridKeys: (suggestedExpansionPath.frameSteps || []).map((step) => step.gridKey),
       frameCount: suggestedExpansionPath.totalFrameSteps ?? 0,
-      finalAction: suggestedExpansionPath.finalAction || bestCandidate?.miningAction || null
+      finalAction: suggestedExpansionPath.finalAction || bestCandidate?.miningAction || null,
+      buildOrder: suggestedExpansionPath.buildOrder || "connected_to_target"
     }
     : null;
+  const buildPlan = computeMiningBuildPlan({ diagnostics: {
+    bestCandidate,
+    suggestedExpansionPath,
+    affordability,
+    reachability,
+    miningStatus
+  } });
 
   return {
     version: "v1.0.0-mining-coverage-diagnostics",
@@ -8239,6 +8484,7 @@ function computeMiningCoverageDiagnostics(options = {}) {
     affordability,
     mobileApproachHint,
     ghostPath,
+    buildPlan,
     failure,
     rules: {
       miningRangeOffset: MINING_RANGE_OFFSET,
@@ -14598,9 +14844,10 @@ function renderBridgePreview() {
 function renderMiningExpansionGhostPath() {
   const status = getMiningStationStatus();
   if (status.harvesting.length > 0) return;
-  const diagnostics = getMiningCoverageDiagnosticsForUi();
+  const diagnostics = getMiningCoverageDiagnosticsForUi({ forceRefresh: true });
   const path = diagnostics.suggestedExpansionPath;
   const best = diagnostics.bestCandidate;
+  const plan = diagnostics.buildPlan || computeMiningBuildPlan({ diagnostics });
   if (!path || !best?.canReachInRange) return;
 
   const stationTransform = {
@@ -14609,21 +14856,40 @@ function renderMiningExpansionGhostPath() {
     origin: { x: 0, y: 0 }
   };
   const ghostAlpha = 0.28 + 0.12 * Math.sin(state.time * 2.6);
+  const currentStep = plan.currentStep;
+  const pendingFrameSteps = (path.frameSteps || []).filter((step) => !isExpansionFrameStepBuilt(step));
 
-  for (const step of path.frameSteps || []) {
+  for (const step of pendingFrameSteps) {
     const p = cellWorldPositionByTransform(
       { x: step.gridX, y: step.gridY, detached: false },
       stationTransform
     );
-    renderer.ring(p, CELL * 0.4, 2.2, [0.35, 0.88, 0.72, ghostAlpha], 22);
+    const isCurrent = currentStep?.build === "frame" && currentStep.gridKey === step.gridKey;
+    const alpha = isCurrent ? 0.55 + ghostAlpha * 0.45 : ghostAlpha * 0.65;
+    const radius = isCurrent ? CELL * 0.48 : CELL * 0.4;
+    const width = isCurrent ? 3.2 : 2.2;
+    renderer.ring(p, radius, width, [0.35, 0.88, 0.72, alpha], 22);
+    if (isCurrent) {
+      renderer.ring(p, CELL * 0.22, 2, [0.75, 1, 0.86, 0.72], 16);
+    }
   }
 
-  const targetP = cellWorldPositionByTransform(
-    { x: best.gridX, y: best.gridY, detached: false },
-    stationTransform
-  );
-  renderDashedRing(targetP, CELL * 0.52, 2.4, [0.45, 0.95, 0.82, 0.42 + ghostAlpha * 0.35], 22);
-  renderer.ring(targetP, CELL * 0.18, 2, [0.55, 1, 0.78, 0.55 + ghostAlpha * 0.25], 16);
+  const targetKey = path.targetGridKey || best.gridKey;
+  const showMiningTarget = !currentStep || currentStep.build === "mining" || pendingFrameSteps.length === 0;
+  if (showMiningTarget) {
+    const targetP = cellWorldPositionByTransform(
+      { x: best.gridX, y: best.gridY, detached: false },
+      stationTransform
+    );
+    const miningCurrent = currentStep?.build === "mining" && currentStep.gridKey === targetKey;
+    const dashAlpha = miningCurrent ? 0.72 : 0.42 + ghostAlpha * 0.35;
+    renderDashedRing(targetP, CELL * (miningCurrent ? 0.58 : 0.52), miningCurrent ? 3.4 : 2.4, [0.45, 0.95, 0.82, dashAlpha], 22);
+    if (miningCurrent) {
+      renderer.ring(targetP, CELL * 0.24, 2.4, [0.75, 1, 0.86, 0.78], 16);
+    } else if (pendingFrameSteps.length === 0) {
+      renderer.ring(targetP, CELL * 0.18, 2, [0.55, 1, 0.78, 0.55 + ghostAlpha * 0.25], 16);
+    }
+  }
 }
 
 function captureMiningExpansionGhostPathForTest() {
@@ -14631,6 +14897,7 @@ function captureMiningExpansionGhostPathForTest() {
   return safeDeepCloneForTest({
     visible: !!(diagnostics.suggestedExpansionPath && diagnostics.bestCandidate?.canReachInRange),
     ghostPath: diagnostics.ghostPath,
+    buildPlan: diagnostics.buildPlan,
     affordability: diagnostics.affordability,
     mobileApproachHint: diagnostics.mobileApproachHint
   });
@@ -18561,6 +18828,9 @@ window.__gameTest.playtest = {
   },
   captureMiningExpansionGhostPath() {
     return captureMiningExpansionGhostPathForTest();
+  },
+  getMiningBuildPlan(options) {
+    return captureMiningBuildPlanForTest(options || {});
   },
   getPowerMargin() {
     return safeDeepCloneForTest(getPowerMargin());

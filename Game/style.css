@@ -1382,6 +1382,48 @@ h2 {
   border-left: 2px solid rgba(118, 194, 255, 0.35);
 }
 
+.mining-build-plan-row {
+  color: #b8f5d8;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.mining-build-step-chip {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(24, 52, 38, 0.45);
+  border: 1px solid rgba(117, 245, 180, 0.18);
+  color: #8dffd2;
+}
+
+.mining-build-step-chip.current {
+  background: rgba(36, 92, 62, 0.55);
+  border-color: rgba(143, 255, 196, 0.55);
+  color: #d8ffe9;
+  box-shadow: 0 0 8px rgba(117, 245, 180, 0.22);
+}
+
+.mining-build-step-more {
+  color: #9ed4ff;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.mining-build-current-step {
+  color: #e8fff4;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(28, 68, 48, 0.42);
+  border: 1px solid rgba(143, 255, 196, 0.28);
+}
+
+.mining-selection-hint {
+  font-size: 11px;
+}
+
 .resource-dot {
   display: inline-block;
   width: 8px;
