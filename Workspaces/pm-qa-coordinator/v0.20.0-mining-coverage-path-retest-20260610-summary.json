@@ -1,0 +1,179 @@
+{
+  "task": "v0.20.0 #6 原路径复测采矿覆盖与收益归因",
+  "time": "2026-06-10 02:13-02:19 UTC+8",
+  "entry": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+  "browser": "visible Chrome via CDP",
+  "profiles": [
+    "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v020-retest-clean-20260610-021531-9941",
+    "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v020-retest-paused-20260610-021649-9942",
+    "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v020-retest-finalattempt-20260610-021842-9943"
+  ],
+  "constraints": {
+    "tempProfile": true,
+    "didNotClearUserProfile": true,
+    "noBuildAt": true,
+    "noDirectStateMutation": true,
+    "gameFilesModified": false
+  },
+  "primaryAttempt": {
+    "port": 9942,
+    "method": "pause during build, DOM build selection, CDP pointer click on canvas coordinates, unpause for wait",
+    "initial": {
+      "resources": {
+        "metal": 130,
+        "ore": 60,
+        "gas": 35,
+        "plasma": 8,
+        "research": 0,
+        "powerUsed": 0,
+        "powerAvailable": 6
+      },
+      "nearestResource": {
+        "bodyName": "恒星-1",
+        "resource": "plasma",
+        "distance": 610.6730175437406,
+        "range": 279.6785895805806,
+        "gap": 331,
+        "amount": 9999
+      },
+      "bestCandidate": {
+        "gridKey": "-3,-12",
+        "distance": 265.13065870999867,
+        "range": 279.6785895805806,
+        "gap": 0,
+        "frameSteps": 14
+      }
+    },
+    "steps": [
+      {
+        "target": "1,0",
+        "facility": "power",
+        "result": "built",
+        "aligned": true,
+        "resourcesAfter": {
+          "metal": 108,
+          "ore": 52
+        }
+      },
+      {
+        "target": "-1,1",
+        "facility": "mining",
+        "result": "not_built",
+        "aligned": true,
+        "placement": "valid_affordable_out_of_range_warning",
+        "failure": "screen point was under HUD-covered area; canvas click did not create the mining station"
+      },
+      {
+        "targetPath": [
+          "-2,0",
+          "-3,0",
+          "-3,-1",
+          "-3,-2",
+          "-3,-3",
+          "-3,-4",
+          "-3,-5",
+          "-3,-6",
+          "-3,-7",
+          "-3,-8",
+          "-3,-9",
+          "-3,-10",
+          "-3,-11"
+        ],
+        "facility": "frame",
+        "result": "built_until_resource_low",
+        "resourcesAfter": {
+          "metal": 4,
+          "ore": 52
+        }
+      },
+      {
+        "target": "-3,-12",
+        "facility": "frame",
+        "result": "not_built",
+        "failure": "metal_cost_blocked",
+        "missing": {
+          "metal": 4
+        }
+      }
+    ],
+    "beforeWait": {
+      "resources": {
+        "metal": 4,
+        "ore": 52,
+        "gas": 35,
+        "plasma": 8,
+        "research": 0,
+        "powerUsed": 0,
+        "powerAvailable": 6
+      },
+      "miningStatus": {
+        "minerCount": 0,
+        "activeCount": 0,
+        "harvestingCount": 0
+      },
+      "targetResourceAmount": {
+        "恒星-1/plasma": 9999
+      }
+    },
+    "afterWait": {
+      "waitSeconds": 12,
+      "resources": {
+        "metal": 14,
+        "ore": 54,
+        "gas": 36,
+        "plasma": 8,
+        "research": 0,
+        "powerUsed": 0,
+        "powerAvailable": 16
+      },
+      "miningStatus": {
+        "minerCount": 0,
+        "activeCount": 0,
+        "harvestingCount": 0
+      },
+      "targetResourceAmount": {
+        "恒星-1/plasma": 9999
+      },
+      "attribution": "resource growth is natural/core income; no mining station existed and body amount did not decrease"
+    },
+    "runtime": {
+      "runtimeErrors": 0,
+      "pmErrors": 0,
+      "consoleRuntimeErrors": 0
+    },
+    "storage": {
+      "localStorageLength": 0,
+      "sessionStorageLength": 0,
+      "keys": []
+    }
+  },
+  "discardedOrSecondaryAttempts": [
+    {
+      "port": 9936,
+      "reason": "page had already reached runSettlement before sampling; discarded as polluted state"
+    },
+    {
+      "port": 9941,
+      "reason": "unpaused camera/station movement caused grid click drift; recorded as input-mapping failure"
+    },
+    {
+      "port": 9943,
+      "reason": "candidate mining final-attempt run selected mining at the candidate grid, but prerequisite frame/path did not exist because pointer delivery was inconsistent from the first step; kept only as auxiliary evidence that candidate mining was attempted and did not prove success"
+    }
+  ],
+  "conclusion": {
+    "coverageClosed": false,
+    "incomeAttributionClosed": false,
+    "failureClass": [
+      "input_targeting_hud_overlap_for_original_mining",
+      "frame_path_cost_blocked_before_candidate",
+      "no_mining_station_at_wait"
+    ],
+    "notFailureClass": [
+      "runtime_error",
+      "power_shortage_after_unpause",
+      "body_amount_decrease_without_attribution"
+    ],
+    "recommendation": "Keep #7 blocked. Next retest needs a reliable visible input route for the original -1,1 grid or a planned UX/input fix; do not unlock combat/Meta evidence from this run."
+  }
+}
