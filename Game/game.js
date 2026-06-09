@@ -7640,6 +7640,412 @@ function computeResourceReachabilitySnapshot(miningStatus = getMiningStationStat
   };
 }
 
+function getConnectedStationGridKeysForDiagnostics() {
+  const visited = new Set();
+  const queue = [key(0, 0)];
+  while (queue.length) {
+    const currentKey = queue.shift();
+    if (visited.has(currentKey)) continue;
+    const cell = state.station.cells.get(currentKey);
+    if (!cell || cell.detached) continue;
+    visited.add(currentKey);
+    const parsed = parseKey(currentKey);
+    for (const n of neighbors(parsed.x, parsed.y)) {
+      const nextKey = key(n.x, n.y);
+      if (state.station.cells.has(nextKey) && !visited.has(nextKey)) queue.push(nextKey);
+    }
+  }
+  return visited;
+}
+
+function computeHypotheticalMiningRangeAtGrid(gridX, gridY, targetBody = null) {
+  const worldPos = cellWorldPosition({ x: gridX, y: gridY, detached: false });
+  let body = targetBody;
+  let distance;
+  let range;
+  if (body) {
+    distance = dist(worldPos, body);
+    range = getMiningRange(body);
+  } else {
+    const nearest = getNearestResourceBody(worldPos);
+    if (!nearest) return null;
+    body = nearest.body;
+    distance = nearest.distance;
+    range = nearest.range;
+  }
+  return {
+    bodyName: body.name,
+    resource: body.resource,
+    bodyX: body.x,
+    bodyY: body.y,
+    bodyR: body.r,
+    distance,
+    range,
+    gap: Math.max(0, Math.ceil(distance - range)),
+    inRange: distance <= range
+  };
+}
+
+function buildFrameExpansionPathSteps(parent, targetKey) {
+  const steps = [];
+  let current = targetKey;
+  while (parent.has(current)) {
+    const parsed = parseKey(current);
+    steps.unshift({
+      gridKey: current,
+      gridX: parsed.x,
+      gridY: parsed.y,
+      action: "build_frame"
+    });
+    current = parent.get(current);
+  }
+  return steps;
+}
+
+function findFrameExpansionPathToGrid(targetX, targetY) {
+  const targetKey = key(targetX, targetY);
+  const targetCell = state.station.cells.get(targetKey);
+  if (targetCell && !targetCell.detached) {
+    if (targetCell.facility === "mining") {
+      return { reachable: true, steps: [], reasonKey: "already_mining", frameSteps: 0 };
+    }
+    if (targetCell.facility === "frame") {
+      return { reachable: true, steps: [], reasonKey: "upgrade_frame_to_mining", frameSteps: 0 };
+    }
+    return {
+      reachable: false,
+      steps: [],
+      reasonKey: "occupied_by_facility",
+      frameSteps: null,
+      blockingFacility: targetCell.facility
+    };
+  }
+
+  const connectedKeys = getConnectedStationGridKeysForDiagnostics();
+  const visited = new Set(connectedKeys);
+  const parent = new Map();
+  const queue = [];
+
+  for (const cellKey of connectedKeys) {
+    const parsed = parseKey(cellKey);
+    for (const n of neighbors(parsed.x, parsed.y)) {
+      const nKey = key(n.x, n.y);
+      if (visited.has(nKey)) continue;
+      const nCell = state.station.cells.get(nKey);
+      if (nCell && !nCell.detached) continue;
+      visited.add(nKey);
+      parent.set(nKey, cellKey);
+      queue.push(nKey);
+      if (nKey === targetKey) {
+        const steps = buildFrameExpansionPathSteps(parent, targetKey);
+        return {
+          reachable: true,
+          steps,
+          reasonKey: steps.length === 0 ? "adjacent_to_connected" : "frame_chain",
+          frameSteps: steps.length
+        };
+      }
+    }
+  }
+
+  while (queue.length) {
+    const currentKey = queue.shift();
+    const parsed = parseKey(currentKey);
+    for (const n of neighbors(parsed.x, parsed.y)) {
+      const nKey = key(n.x, n.y);
+      if (visited.has(nKey)) continue;
+      const nCell = state.station.cells.get(nKey);
+      if (nCell && !nCell.detached) continue;
+      visited.add(nKey);
+      parent.set(nKey, currentKey);
+      queue.push(nKey);
+      if (nKey === targetKey) {
+        const steps = buildFrameExpansionPathSteps(parent, targetKey);
+        return {
+          reachable: true,
+          steps,
+          reasonKey: steps.length === 0 ? "adjacent_to_connected" : "frame_chain",
+          frameSteps: steps.length
+        };
+      }
+    }
+  }
+
+  return { reachable: false, steps: [], reasonKey: "no_frame_path", frameSteps: null };
+}
+
+function buildMiningCoverageCandidateSnapshot(gridX, gridY, targetBody = null) {
+  const gridKey = key(gridX, gridY);
+  const cell = state.station.cells.get(gridKey);
+  const framePlacement = evaluatePlacementGrid("frame", gridX, gridY);
+  const miningPlacement = evaluatePlacementGrid("mining", gridX, gridY);
+  const miningRange = computeHypotheticalMiningRangeAtGrid(gridX, gridY, targetBody);
+  const expansionPath = findFrameExpansionPathToGrid(gridX, gridY);
+
+  let cellState = "empty";
+  if (cell && !cell.detached) cellState = cell.facility;
+
+  let expandable = false;
+  let miningAction = null;
+  if (cellState === "empty") {
+    expandable = framePlacement.valid || expansionPath.reachable;
+    if (miningRange?.inRange && expansionPath.reachable) {
+      miningAction = expansionPath.frameSteps === 0 ? "build_mining_on_frame" : "expand_frame_then_mining";
+    }
+  } else if (cellState === "frame") {
+    expandable = miningPlacement.valid;
+    if (miningPlacement.valid && miningRange?.inRange) miningAction = "upgrade_to_mining";
+  } else if (cellState === "mining") {
+    miningAction = "already_mining";
+  }
+
+  const canReachInRange = !!(
+    miningRange?.inRange
+    && (miningAction === "already_mining" || miningAction === "upgrade_to_mining" || expansionPath.reachable)
+  );
+
+  return {
+    gridKey,
+    gridX,
+    gridY,
+    cellState,
+    occupied: !!(cell && !cell.detached),
+    expandable,
+    framePlacement,
+    miningPlacement,
+    miningRange,
+    expansionPath,
+    miningAction,
+    canReachInRange
+  };
+}
+
+function summarizeMiningCoverageFailure(reachability, miningStatus, candidates, bestCandidate) {
+  const overall = reachability.overall;
+  if (overall.harvestingCount > 0) {
+    return {
+      reasonKey: "harvesting",
+      summary: "采矿正常",
+      blocking: false,
+      nextAction: null
+    };
+  }
+  if (overall.minerCount === 0) {
+    return {
+      reasonKey: "no_mining_station",
+      summary: "尚未建造采矿站",
+      blocking: true,
+      nextAction: "build_mining_on_connected_frame"
+    };
+  }
+  if (reachability.miners.length > 0 && reachability.miners.every((entry) => entry.reasonKey === "disabled_manual")) {
+    return {
+      reasonKey: "disabled_manual",
+      summary: "采矿站已全部手动关闭",
+      blocking: true,
+      nextAction: "enable_mining_facility"
+    };
+  }
+  if (miningStatus.inactivePower.length > 0 && miningStatus.activeMiners.length === 0) {
+    return {
+      reasonKey: "power_starved",
+      summary: "采矿站因电力不足未运作",
+      blocking: true,
+      nextAction: "add_power_or_reduce_load"
+    };
+  }
+  if (bestCandidate?.canReachInRange) {
+    const frameSteps = bestCandidate.expansionPath?.frameSteps ?? 0;
+    return {
+      reasonKey: "needs_expansion",
+      summary: frameSteps > 0
+        ? `当前矿站未覆盖资源外环；可先铺 ${frameSteps} 步框架到 ${bestCandidate.gridKey} 再建采矿站`
+        : `当前矿站未覆盖资源外环；可在 ${bestCandidate.gridKey} 扩建或升级采矿站`,
+      blocking: true,
+      nextAction: frameSteps > 0 ? "expand_frame_chain" : "place_or_upgrade_mining",
+      targetGridKey: bestCandidate.gridKey
+    };
+  }
+  const inRangeBlocked = candidates.filter((entry) => entry.miningRange?.inRange && !entry.canReachInRange);
+  if (inRangeBlocked.length > 0) {
+    return {
+      reasonKey: "in_range_blocked",
+      summary: "附近存在入圈格，但扩建路径被占用或不可达",
+      blocking: true,
+      nextAction: "clear_path_or_reselect_site",
+      blockedCandidates: inRangeBlocked.slice(0, 3).map((entry) => entry.gridKey)
+    };
+  }
+  if (candidates.length === 0) {
+    const nearest = getNearestResourceBody();
+    const gap = nearest ? Math.max(0, Math.ceil(nearest.distance - nearest.range)) : null;
+    return {
+      reasonKey: "no_in_range_candidate",
+      summary: gap != null
+        ? `当前结构附近无入圈候选格；最近资源还差 ${gap}，需移动工站或重新选址`
+        : "当前星系暂无可用资源天体",
+      blocking: true,
+      nextAction: "relocate_station_or_move_closer",
+      gap
+    };
+  }
+  return {
+    reasonKey: overall.reasonKey || "all_miners_out_of_range",
+    summary: "采矿站未覆盖资源外环",
+    blocking: true,
+    nextAction: "move_closer_or_expand"
+  };
+}
+
+function computeMiningCoverageDiagnostics(options = {}) {
+  const maxCandidates = Number.isFinite(options.maxCandidates) ? options.maxCandidates : 12;
+  const searchPadding = Number.isFinite(options.searchPadding) ? options.searchPadding : 10;
+  const targetBodyName = typeof options.targetBodyName === "string" ? options.targetBodyName : null;
+  const minerGridKey = options.minerGridKey ?? options.gridKey ?? null;
+
+  const miningStatus = getMiningStationStatus();
+  const reachability = computeResourceReachabilitySnapshot(miningStatus);
+
+  let targetBody = null;
+  if (targetBodyName) {
+    targetBody = getHarvestableBodies().find((body) => body.name === targetBodyName) || null;
+  }
+
+  let focusMiner = null;
+  if (minerGridKey != null) {
+    const parsed = typeof minerGridKey === "string" ? parseKey(minerGridKey) : minerGridKey;
+    focusMiner = miningStatus.miners.find((cell) => cell.x === parsed.x && cell.y === parsed.y) || null;
+  }
+
+  const referencePos = focusMiner ? cellWorldPosition(focusMiner) : state.station.pos;
+  const nearestFromReference = getNearestResourceBody(referencePos);
+  if (!targetBody) targetBody = nearestFromReference?.body ?? null;
+
+  const connectedKeys = getConnectedStationGridKeysForDiagnostics();
+  let minX = 0;
+  let maxX = 0;
+  let minY = 0;
+  let maxY = 0;
+  if (connectedKeys.size > 0) {
+    minX = Infinity;
+    maxX = -Infinity;
+    minY = Infinity;
+    maxY = -Infinity;
+    for (const cellKey of connectedKeys) {
+      const parsed = parseKey(cellKey);
+      minX = Math.min(minX, parsed.x);
+      maxX = Math.max(maxX, parsed.x);
+      minY = Math.min(minY, parsed.y);
+      maxY = Math.max(maxY, parsed.y);
+    }
+  }
+  if (targetBody) {
+    const bodyGrid = worldToGrid({ x: targetBody.x, y: targetBody.y });
+    minX = Math.min(minX, bodyGrid.x);
+    maxX = Math.max(maxX, bodyGrid.x);
+    minY = Math.min(minY, bodyGrid.y);
+    maxY = Math.max(maxY, bodyGrid.y);
+  }
+  minX -= searchPadding;
+  maxX += searchPadding;
+  minY -= searchPadding;
+  maxY += searchPadding;
+
+  const candidateMap = new Map();
+  for (let gx = minX; gx <= maxX; gx++) {
+    for (let gy = minY; gy <= maxY; gy++) {
+      const miningRange = computeHypotheticalMiningRangeAtGrid(gx, gy, targetBody);
+      if (!miningRange?.inRange) continue;
+      const gridKey = key(gx, gy);
+      if (!candidateMap.has(gridKey)) {
+        candidateMap.set(gridKey, buildMiningCoverageCandidateSnapshot(gx, gy, targetBody));
+      }
+    }
+  }
+
+  let candidates = [...candidateMap.values()];
+  candidates.sort((a, b) => {
+    const reachA = a.canReachInRange ? 0 : 1;
+    const reachB = b.canReachInRange ? 0 : 1;
+    if (reachA !== reachB) return reachA - reachB;
+    const stepsA = a.expansionPath?.frameSteps ?? 999;
+    const stepsB = b.expansionPath?.frameSteps ?? 999;
+    if (stepsA !== stepsB) return stepsA - stepsB;
+    const gapA = a.miningRange?.gap ?? 999;
+    const gapB = b.miningRange?.gap ?? 999;
+    if (gapA !== gapB) return gapA - gapB;
+    return (a.miningRange?.distance ?? 999) - (b.miningRange?.distance ?? 999);
+  });
+  candidates = candidates.slice(0, maxCandidates);
+
+  const bestCandidate = candidates.find((entry) => entry.canReachInRange) || candidates[0] || null;
+  const suggestedExpansionPath = bestCandidate?.canReachInRange
+    ? {
+      targetGridKey: bestCandidate.gridKey,
+      frameSteps: bestCandidate.expansionPath?.steps || [],
+      finalAction: bestCandidate.miningAction,
+      totalFrameSteps: bestCandidate.expansionPath?.frameSteps ?? 0
+    }
+    : null;
+  const failure = summarizeMiningCoverageFailure(reachability, miningStatus, candidates, bestCandidate);
+
+  return {
+    version: "v0.20.0-mining-coverage-diagnostics",
+    readOnly: true,
+    capturedAt: Date.now(),
+    options: {
+      maxCandidates,
+      searchPadding,
+      targetBodyName,
+      minerGridKey
+    },
+    miningStatus: {
+      minerCount: miningStatus.miners.length,
+      activeCount: miningStatus.activeMiners.length,
+      harvestingCount: miningStatus.harvesting.length,
+      inactivePowerCount: miningStatus.inactivePower.length,
+      manualOffCount: miningStatus.manualOff.length
+    },
+    reachability: reachability.overall,
+    miners: reachability.miners,
+    focusMiner: focusMiner
+      ? reachability.miners.find((entry) => entry.cellKey === key(focusMiner.x, focusMiner.y)) || null
+      : null,
+    nearestResource: nearestFromReference
+      ? {
+        bodyName: nearestFromReference.body.name,
+        resource: nearestFromReference.body.resource,
+        x: nearestFromReference.body.x,
+        y: nearestFromReference.body.y,
+        r: nearestFromReference.body.r,
+        distance: nearestFromReference.distance,
+        range: nearestFromReference.range,
+        gap: Math.max(0, Math.ceil(nearestFromReference.distance - nearestFromReference.range)),
+        inRange: nearestFromReference.distance <= nearestFromReference.range
+      }
+      : null,
+    targetResource: targetBody
+      ? {
+        bodyName: targetBody.name,
+        resource: targetBody.resource,
+        x: targetBody.x,
+        y: targetBody.y,
+        r: targetBody.r,
+        range: getMiningRange(targetBody)
+      }
+      : null,
+    candidates,
+    bestCandidate,
+    suggestedExpansionPath,
+    failure,
+    rules: {
+      miningRangeOffset: MINING_RANGE_OFFSET,
+      rangeFormula: "body.r + MINING_RANGE_OFFSET",
+      note: "只读诊断，不修改 state/storage，不调用 buildAt"
+    }
+  };
+}
+
 function computePowerMarginSnapshot({
   powerStarved = getInactiveDueToPower(),
   manualOffCount = getManualOffFacilities().length,
@@ -14578,6 +14984,7 @@ function buildResourceGuideHtml() {
       lines.push(`<div class="resource-line warn">采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。</div>`);
     } else if (nearest && nearest.distance > nearest.range) {
       lines.push(`<div class="resource-line warn">采矿站就绪，请进入「${nearest.body.name}」的彩色外环（还差 ${Math.ceil(nearest.distance - nearest.range)}）。</div>`);
+      lines.push(`<div class="resource-line warn">当前矿站不会产出；需沿框架扩建到彩色外环内，或驾驶工站靠近资源后重建采矿站。</div>`);
     } else if (nearest && nearest.body.amount <= 0) {
       lines.push(`<div class="resource-line warn">最近资源点已采空，请前往其他带彩色外环的天体。</div>`);
     }
@@ -16768,6 +17175,7 @@ function collectReleaseHookStatus(baseSnapshot, buildHooks, metaHooks, galaxyHoo
   const designHooks = {
     getStationDesignHealth: typeof playtestApi?.getStationDesignHealth === "function",
     getResourceReachability: typeof playtestApi?.getResourceReachability === "function",
+    getMiningCoverageDiagnostics: typeof playtestApi?.getMiningCoverageDiagnostics === "function",
     getPowerMargin: typeof playtestApi?.getPowerMargin === "function"
   };
   const combatHooks = {
@@ -17877,6 +18285,9 @@ window.__gameTest.playtest = {
   },
   getResourceReachability() {
     return safeDeepCloneForTest(getResourceReachability());
+  },
+  getMiningCoverageDiagnostics(options) {
+    return safeDeepCloneForTest(computeMiningCoverageDiagnostics(options || {}));
   },
   getPowerMargin() {
     return safeDeepCloneForTest(getPowerMargin());
