@@ -7897,6 +7897,185 @@ function summarizeMiningCoverageFailure(reachability, miningStatus, candidates, 
   };
 }
 
+function computeMiningExpansionAffordability(bestCandidate, suggestedExpansionPath) {
+  const frameCost = getBuildCost("frame");
+  const miningCost = getBuildCost("mining");
+  const currentResources = {
+    metal: Math.floor(state.resources.metal || 0),
+    ore: Math.floor(state.resources.ore || 0)
+  };
+  const base = {
+    applicable: false,
+    frameCount: 0,
+    frameCostPerStep: { ...frameCost },
+    miningCost: { ...miningCost },
+    totalCost: {},
+    metalNeeded: 0,
+    oreNeeded: 0,
+    affordable: false,
+    pathAffordable: false,
+    missingResources: [],
+    currentResources,
+    suggestMoveRebuild: false
+  };
+  if (!bestCandidate?.canReachInRange || !suggestedExpansionPath) {
+    base.suggestMoveRebuild = true;
+    return base;
+  }
+
+  const finalAction = suggestedExpansionPath.finalAction || bestCandidate.miningAction;
+  if (finalAction === "already_mining") {
+    return {
+      ...base,
+      applicable: true,
+      affordable: true,
+      pathAffordable: true
+    };
+  }
+
+  const frameCount = suggestedExpansionPath.totalFrameSteps ?? bestCandidate.expansionPath?.frameSteps ?? 0;
+  const totalCost = {};
+  if (frameCount > 0) {
+    for (const [name, value] of Object.entries(frameCost)) {
+      totalCost[name] = (totalCost[name] || 0) + value * frameCount;
+    }
+  }
+  if (finalAction !== "already_mining") {
+    for (const [name, value] of Object.entries(miningCost)) {
+      totalCost[name] = (totalCost[name] || 0) + value;
+    }
+  }
+
+  const missingResources = getBuildPaletteMissingResources(totalCost);
+  const affordable = missingResources.length === 0;
+  return {
+    applicable: true,
+    frameCount,
+    frameCostPerStep: frameCost,
+    miningCost,
+    totalCost,
+    metalNeeded: totalCost.metal || 0,
+    oreNeeded: totalCost.ore || 0,
+    affordable,
+    pathAffordable: affordable,
+    missingResources,
+    currentResources,
+    suggestMoveRebuild: !affordable
+  };
+}
+
+function computeMobileApproachHint(nearestResource, bestCandidate, affordability, failure) {
+  const gap = nearestResource?.gap ?? null;
+  const show = !!(
+    failure?.nextAction === "relocate_station_or_move_closer"
+    || !bestCandidate?.canReachInRange
+    || (affordability?.applicable && !affordability.pathAffordable)
+  );
+  return {
+    show,
+    summary: gap != null
+      ? `或：驾驶工站靠近资源外环（还差 ${gap}），再原地重建采矿站`
+      : "或：驾驶工站靠近资源外环，再原地重建采矿站",
+    gap,
+    inRangeAfterMove: !!(nearestResource && nearestResource.inRange)
+  };
+}
+
+function getMiningCoverageDiagnosticsForUi(options = {}) {
+  const cacheKey = options.forceRefresh ? null : state.hud?.miningCoverageCache;
+  if (cacheKey && state.time - cacheKey.at < 0.25) return cacheKey.data;
+  const data = computeMiningCoverageDiagnostics(options);
+  if (!state.hud) state.hud = {};
+  state.hud.miningCoverageCache = { at: state.time, data };
+  return data;
+}
+
+function buildMiningStatusChipHtml(status, reachability) {
+  let chipClass = "mining-status-chip";
+  let chipText = "未建采矿站";
+  if (status.harvesting.length > 0) {
+    chipClass += " good";
+    chipText = `采矿中 ×${status.harvesting.length}`;
+  } else if (status.miners.length === 0) {
+    chipClass += " neutral";
+    chipText = "未建采矿站";
+  } else if (status.manualOff.length === status.miners.length) {
+    chipClass += " muted";
+    chipText = "采矿关闭";
+  } else if (status.inactivePower.length > 0 && status.activeMiners.length === 0) {
+    chipClass += " critical";
+    chipText = "采矿缺电";
+  } else {
+    chipClass += " warn";
+    chipText = "未覆盖外环";
+  }
+  const detail = reachability?.anyHarvesting
+    ? ""
+    : failureSafeSummary(reachability);
+  return `<div class="resource-line mining-status-row"><span class="${chipClass}">${chipText}</span>${detail ? `<span class="mining-status-detail">${detail}</span>` : ""}</div>`;
+}
+
+function failureSafeSummary(reachability) {
+  if (!reachability) return "";
+  if (reachability.minerCount === 0) return "先在连接结构上建采矿站";
+  if (reachability.allOutOfRange) return "需扩到外环内或移动工站";
+  return "";
+}
+
+function buildMiningExpansionGuidanceHtml(diagnostics) {
+  if (!diagnostics || diagnostics.reachability?.anyHarvesting) return "";
+  const lines = [];
+  const { bestCandidate, suggestedExpansionPath, affordability, failure, mobileApproachHint, nearestResource } = diagnostics;
+
+  if (failure?.summary && failure.reasonKey !== "harvesting") {
+    lines.push(`<div class="resource-line warn">${failure.summary}</div>`);
+  }
+
+  if (bestCandidate?.canReachInRange && suggestedExpansionPath) {
+    const frameSteps = suggestedExpansionPath.totalFrameSteps ?? 0;
+    const targetKey = bestCandidate.gridKey;
+    const pathKeys = (suggestedExpansionPath.frameSteps || [])
+      .map((step) => step.gridKey)
+      .filter(Boolean);
+    const pathSummary = pathKeys.length > 0
+      ? `路径：${pathKeys.join(" → ")} → ${targetKey}`
+      : frameSteps > 0
+        ? `路径：先铺 ${frameSteps} 格框架 → ${targetKey} 建采矿站`
+        : `覆盖候选：可在 ${targetKey} 入圈${bestCandidate.miningAction === "upgrade_to_mining" ? "，升级为采矿站即可" : "，直接建采矿站"}`;
+    lines.push(`<div class="resource-line mining-path-chip">${pathSummary}</div>`);
+  } else if (bestCandidate && !bestCandidate.canReachInRange) {
+    lines.push(`<div class="resource-line warn">入圈格 ${bestCandidate.gridKey} 存在，但扩建路径被占用或不可达。</div>`);
+  }
+
+  if (affordability?.applicable) {
+    const frameCount = affordability.frameCount || 0;
+    const metalNeed = affordability.metalNeeded || 0;
+    const oreNeed = affordability.oreNeeded || 0;
+    const metalHave = affordability.currentResources?.metal ?? 0;
+    const oreHave = affordability.currentResources?.ore ?? 0;
+    const costParts = [];
+    if (frameCount > 0) costParts.push(`${frameCount} 框架`);
+    if (oreNeed > 0 || affordability.miningCost?.ore) costParts.push("1 采矿站");
+    const costLabel = costParts.length ? costParts.join(" + ") : "采矿站";
+    if (affordability.pathAffordable) {
+      lines.push(
+        `<div class="resource-line good mining-cost-chip">路径可支付：${costLabel} 需 金属 ${metalNeed} / 矿石 ${oreNeed}（当前 金属 ${metalHave} / 矿石 ${oreHave}）。</div>`
+      );
+    } else {
+      const missingSummary = formatMissingResourceGaps(affordability.missingResources) || "资源不足";
+      lines.push(
+        `<div class="resource-line warn mining-cost-chip">建议路径可达，但当前付不起：${costLabel} 需 金属 ${metalNeed} / 矿石 ${oreNeed}（当前 金属 ${metalHave} / 矿石 ${oreHave}），还缺 ${missingSummary}。</div>`
+      );
+    }
+  }
+
+  if (mobileApproachHint?.show && (!affordability?.pathAffordable || !bestCandidate?.canReachInRange)) {
+    lines.push(`<div class="resource-line mining-move-hint">${mobileApproachHint.summary}</div>`);
+  }
+
+  return lines.join("");
+}
+
 function computeMiningCoverageDiagnostics(options = {}) {
   const maxCandidates = Number.isFinite(options.maxCandidates) ? options.maxCandidates : 12;
   const searchPadding = Number.isFinite(options.searchPadding) ? options.searchPadding : 10;
@@ -7988,9 +8167,29 @@ function computeMiningCoverageDiagnostics(options = {}) {
     }
     : null;
   const failure = summarizeMiningCoverageFailure(reachability, miningStatus, candidates, bestCandidate);
+  const affordability = computeMiningExpansionAffordability(bestCandidate, suggestedExpansionPath);
+  const mobileApproachHint = computeMobileApproachHint(
+    nearestFromReference
+      ? {
+        gap: Math.max(0, Math.ceil(nearestFromReference.distance - nearestFromReference.range)),
+        inRange: nearestFromReference.distance <= nearestFromReference.range
+      }
+      : null,
+    bestCandidate,
+    affordability,
+    failure
+  );
+  const ghostPath = suggestedExpansionPath
+    ? {
+      targetGridKey: suggestedExpansionPath.targetGridKey,
+      stepGridKeys: (suggestedExpansionPath.frameSteps || []).map((step) => step.gridKey),
+      frameCount: suggestedExpansionPath.totalFrameSteps ?? 0,
+      finalAction: suggestedExpansionPath.finalAction || bestCandidate?.miningAction || null
+    }
+    : null;
 
   return {
-    version: "v0.20.0-mining-coverage-diagnostics",
+    version: "v1.0.0-mining-coverage-diagnostics",
     readOnly: true,
     capturedAt: Date.now(),
     options: {
@@ -8037,6 +8236,9 @@ function computeMiningCoverageDiagnostics(options = {}) {
     candidates,
     bestCandidate,
     suggestedExpansionPath,
+    affordability,
+    mobileApproachHint,
+    ghostPath,
     failure,
     rules: {
       miningRangeOffset: MINING_RANGE_OFFSET,
@@ -14173,6 +14375,7 @@ function render() {
   renderNpcs();
   renderEncounters();
   renderStation();
+  renderMiningExpansionGhostPath();
   renderBridgePreview();
   renderMiningEffects();
   renderEnemies();
@@ -14390,6 +14593,47 @@ function renderBridgePreview() {
   if (!preview?.worldP) return;
   const ringColor = preview.tier === "ready" ? BRIDGE_PREVIEW_RING_READY : BRIDGE_PREVIEW_RING_NEAR;
   renderer.ring(preview.worldP, CELL * 0.55, 3.5, ringColor, 28);
+}
+
+function renderMiningExpansionGhostPath() {
+  const status = getMiningStationStatus();
+  if (status.harvesting.length > 0) return;
+  const diagnostics = getMiningCoverageDiagnosticsForUi();
+  const path = diagnostics.suggestedExpansionPath;
+  const best = diagnostics.bestCandidate;
+  if (!path || !best?.canReachInRange) return;
+
+  const stationTransform = {
+    pos: state.station.pos,
+    angle: state.station.angle,
+    origin: { x: 0, y: 0 }
+  };
+  const ghostAlpha = 0.28 + 0.12 * Math.sin(state.time * 2.6);
+
+  for (const step of path.frameSteps || []) {
+    const p = cellWorldPositionByTransform(
+      { x: step.gridX, y: step.gridY, detached: false },
+      stationTransform
+    );
+    renderer.ring(p, CELL * 0.4, 2.2, [0.35, 0.88, 0.72, ghostAlpha], 22);
+  }
+
+  const targetP = cellWorldPositionByTransform(
+    { x: best.gridX, y: best.gridY, detached: false },
+    stationTransform
+  );
+  renderDashedRing(targetP, CELL * 0.52, 2.4, [0.45, 0.95, 0.82, 0.42 + ghostAlpha * 0.35], 22);
+  renderer.ring(targetP, CELL * 0.18, 2, [0.55, 1, 0.78, 0.55 + ghostAlpha * 0.25], 16);
+}
+
+function captureMiningExpansionGhostPathForTest() {
+  const diagnostics = computeMiningCoverageDiagnostics();
+  return safeDeepCloneForTest({
+    visible: !!(diagnostics.suggestedExpansionPath && diagnostics.bestCandidate?.canReachInRange),
+    ghostPath: diagnostics.ghostPath,
+    affordability: diagnostics.affordability,
+    mobileApproachHint: diagnostics.mobileApproachHint
+  });
 }
 
 function renderFragments() {
@@ -14944,9 +15188,16 @@ function buildResourceGuideHtml() {
   const objective = state.run.objective;
   const miningEstablished = status.harvesting.length > 0;
   const objectiveProgressed = objective && objective.progress >= objective.target * 0.25;
+  const coverageDiagnostics = miningEstablished ? null : getMiningCoverageDiagnosticsForUi();
 
   if (miningEstablished && (isObjectiveComplete() || objectiveProgressed)) {
     return `<div class="resource-line resource-active good">资源采集已建立：继续完成星系任务，或补充防御后准备跃迁。</div>`;
+  }
+
+  if (coverageDiagnostics) {
+    lines.push(buildMiningStatusChipHtml(status, coverageDiagnostics.reachability));
+    const guidance = buildMiningExpansionGuidanceHtml(coverageDiagnostics);
+    if (guidance) lines.push(guidance);
   }
 
   if (status.harvesting.length) {
@@ -14975,16 +15226,28 @@ function buildResourceGuideHtml() {
     lines.push(`<div class="resource-line">当前星系暂无可用资源天体。</div>`);
   }
 
-  if (status.miners.length === 0) {
-    lines.push(`<div class="resource-line resource-meta">尚未建造采矿站 — 选「采矿站」建在框架上，再进入资源外环。</div>`);
+  if (!coverageDiagnostics) {
+    if (status.miners.length === 0) {
+      lines.push(`<div class="resource-line resource-meta">尚未建造采矿站 — 选「采矿站」建在框架上，再进入资源外环。</div>`);
+    } else if (status.harvesting.length === 0) {
+      if (status.manualOff.length === status.miners.length) {
+        lines.push(`<div class="resource-line warn">采矿站已全部手动关闭 — 选中格子点「开关设施」恢复。</div>`);
+      } else if (status.inactivePower.length > 0 && status.activeMiners.length === 0) {
+        lines.push(`<div class="resource-line warn">采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。</div>`);
+      } else if (nearest && nearest.distance > nearest.range) {
+        lines.push(`<div class="resource-line warn">采矿站就绪，请进入「${nearest.body.name}」的彩色外环（还差 ${Math.ceil(nearest.distance - nearest.range)}）。</div>`);
+        lines.push(`<div class="resource-line warn">当前矿站不会产出；需沿框架扩建到彩色外环内，或驾驶工站靠近资源后重建采矿站。</div>`);
+      } else if (nearest && nearest.body.amount <= 0) {
+        lines.push(`<div class="resource-line warn">最近资源点已采空，请前往其他带彩色外环的天体。</div>`);
+      }
+    }
+  } else if (status.miners.length === 0) {
+    lines.push(`<div class="resource-line resource-meta">尚未建造采矿站 — 选「采矿站」建在连接框架上。</div>`);
   } else if (status.harvesting.length === 0) {
     if (status.manualOff.length === status.miners.length) {
       lines.push(`<div class="resource-line warn">采矿站已全部手动关闭 — 选中格子点「开关设施」恢复。</div>`);
     } else if (status.inactivePower.length > 0 && status.activeMiners.length === 0) {
       lines.push(`<div class="resource-line warn">采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。</div>`);
-    } else if (nearest && nearest.distance > nearest.range) {
-      lines.push(`<div class="resource-line warn">采矿站就绪，请进入「${nearest.body.name}」的彩色外环（还差 ${Math.ceil(nearest.distance - nearest.range)}）。</div>`);
-      lines.push(`<div class="resource-line warn">当前矿站不会产出；需沿框架扩建到彩色外环内，或驾驶工站靠近资源后重建采矿站。</div>`);
     } else if (nearest && nearest.body.amount <= 0) {
       lines.push(`<div class="resource-line warn">最近资源点已采空，请前往其他带彩色外环的天体。</div>`);
     }
@@ -18288,6 +18551,9 @@ window.__gameTest.playtest = {
   },
   getMiningCoverageDiagnostics(options) {
     return safeDeepCloneForTest(computeMiningCoverageDiagnostics(options || {}));
+  },
+  captureMiningExpansionGhostPath() {
+    return captureMiningExpansionGhostPathForTest();
   },
   getPowerMargin() {
     return safeDeepCloneForTest(getPowerMargin());

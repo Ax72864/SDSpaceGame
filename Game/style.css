@@ -1314,6 +1314,74 @@ h2 {
   color: #ffd080;
 }
 
+.mining-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 4px;
+}
+
+.mining-status-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+
+.mining-status-chip.good {
+  color: #8dffd2;
+  background: rgba(45, 120, 86, 0.35);
+  border-color: rgba(117, 245, 180, 0.35);
+}
+
+.mining-status-chip.warn {
+  color: #ffd080;
+  background: rgba(120, 86, 32, 0.35);
+  border-color: rgba(255, 196, 96, 0.35);
+}
+
+.mining-status-chip.critical {
+  color: #ffb0a0;
+  background: rgba(120, 40, 32, 0.35);
+  border-color: rgba(255, 120, 96, 0.35);
+}
+
+.mining-status-chip.neutral,
+.mining-status-chip.muted {
+  color: #a7bdd9;
+  background: rgba(48, 68, 98, 0.35);
+  border-color: rgba(118, 194, 255, 0.22);
+}
+
+.mining-status-detail {
+  color: #9ed4ff;
+  font-size: 11px;
+}
+
+.mining-path-chip {
+  color: #8dffd2;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(28, 58, 42, 0.35);
+  border: 1px dashed rgba(117, 245, 180, 0.24);
+}
+
+.mining-cost-chip {
+  font-size: 11px;
+}
+
+.mining-move-hint {
+  color: #9ed4ff;
+  font-size: 11px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(118, 194, 255, 0.35);
+}
+
 .resource-dot {
   display: inline-block;
   width: 8px;
