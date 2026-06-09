@@ -1,0 +1,120 @@
+{
+  "version": "v1.0.0-release-candidate",
+  "task": "#5 mining coverage default layer retest",
+  "runAtIso": "2026-06-10T03:20:22+08:00",
+  "browser": "Chrome/148.0.7778.217",
+  "url": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+  "profile": "temporary Chrome profile",
+  "constraints": {
+    "interaction": "visible Chrome with CDP Input.dispatchMouseEvent",
+    "diagnosticHooks": "read-only",
+    "didNotCallBuildAtDirectly": true,
+    "didNotWriteGameStateDirectly": true,
+    "modifiedGameFiles": false
+  },
+  "uiDiagnostics": {
+    "miningStatusChip": "present before harvesting",
+    "pathChip": "present before harvesting",
+    "costChip": "present before harvesting",
+    "costGap": "not shown because pathAffordable=true and missingResources=[]",
+    "mobileApproachHint": {
+      "hookPresent": true,
+      "shownInUi": false,
+      "reason": "recommended path was affordable and reachable"
+    },
+    "ghostPathHook": {
+      "visible": true,
+      "initialTargetGridKey": "-5,4",
+      "initialFrameCount": 8
+    },
+    "runtimeErrors": []
+  },
+  "attempts": [
+    {
+      "name": "default-window",
+      "result": "blocked",
+      "initialPath": ["-2,0", "-3,0", "-4,0", "-5,0", "-5,-1", "-5,-2"],
+      "initialTargetGridKey": "-5,-2",
+      "initialAffordable": true,
+      "blockedAt": "-5,0",
+      "failureReason": "grid screen point hit the left build panel instead of CANVAS#game"
+    },
+    {
+      "name": "wide-window",
+      "viewport": {
+        "width": 1427,
+        "height": 907,
+        "devicePixelRatio": 2
+      },
+      "result": "passed",
+      "initialTargetGridKey": "-5,4",
+      "initialAffordable": true,
+      "initialCost": {
+        "metal": 92,
+        "ore": 10
+      },
+      "actions": [
+        { "facility": "frame", "gridKey": "-2,0", "hit": "CANVAS#game" },
+        { "facility": "frame", "gridKey": "-1,-2", "hit": "CANVAS#game" },
+        { "facility": "frame", "gridKey": "0,-3", "hit": "CANVAS#game" },
+        { "facility": "frame", "gridKey": "0,-4", "hit": "CANVAS#game" },
+        { "facility": "frame", "gridKey": "0,-5", "hit": "CANVAS#game" },
+        { "facility": "frame", "gridKey": "0,-6", "hit": "CANVAS#game" },
+        { "facility": "frame", "gridKey": "0,-7", "hit": "CANVAS#game" },
+        { "facility": "mining", "gridKey": "0,-7", "hit": "CANVAS#game" }
+      ],
+      "miningCell": {
+        "gridKey": "0,-7",
+        "facility": "mining",
+        "active": true,
+        "enabled": true,
+        "detached": false
+      },
+      "harvestBeforeWait": {
+        "harvestingCount": 1,
+        "target": {
+          "name": "小行星-3",
+          "resource": "metal",
+          "bodyAmount": 332.533
+        },
+        "resources": {
+          "metal": 92.009,
+          "ore": 57.315,
+          "gas": 39.876,
+          "plasma": 9.016,
+          "research": 0
+        }
+      },
+      "harvestAfter8s": {
+        "harvestingCount": 1,
+        "target": {
+          "name": "小行星-3",
+          "resource": "metal",
+          "bodyAmount": 280.311
+        },
+        "resources": {
+          "metal": 151.059,
+          "ore": 58.761,
+          "gas": 40.841,
+          "plasma": 9.217,
+          "research": 0
+        }
+      },
+      "attribution": {
+        "bodyAmountDelta": -52.222,
+        "targetResourceDelta": 59.05,
+        "passed": true
+      }
+    }
+  ],
+  "conclusion": {
+    "miningRevenueClosed": true,
+    "failurePathClosed": true,
+    "unlockTask7MiningGate": true,
+    "residualRisks": [
+      "default window can place recommended grid points under the build panel",
+      "exact mining=-1,1 coordinate did not appear in this generated run",
+      "mobile approach hint still needs a separate non-affordable or unreachable scenario"
+    ]
+  }
+}
