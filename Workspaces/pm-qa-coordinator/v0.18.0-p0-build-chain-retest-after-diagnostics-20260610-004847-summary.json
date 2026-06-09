@@ -1,0 +1,285 @@
+{
+  "version": "v0.18.0-p0-build-chain-retest",
+  "task": "#5 canvas pointer event rerun after coordinate diagnostics",
+  "createdAt": "2026-06-10T00:48:47+08:00",
+  "environment": {
+    "os": "Windows 10.0.26200",
+    "browser": "Visible Chrome",
+    "cdpPort": 9370,
+    "entry": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "viewport": {
+      "innerWidth": 1387,
+      "innerHeight": 1007,
+      "devicePixelRatio": 2
+    },
+    "input": "Visible Chrome/CDP Runtime.evaluate dispatches PointerEvent to canvas#game at getGridScreenPoint centers; CDP key events select build cards; no buildAt and no state-mutating playtest helper used",
+    "storagePolicy": "Temporary Chrome profile; no real user profile or save cleared",
+    "localStorageLength": 0,
+    "sessionStorageLength": 0
+  },
+  "baseline": {
+    "resources": {
+      "metal": 130.92,
+      "ore": 60.2,
+      "gas": 35.13,
+      "plasma": 8.03,
+      "research": 0
+    },
+    "counts": {
+      "core": 1,
+      "frame": 4
+    }
+  },
+  "steps": [
+    {
+      "facility": "power",
+      "targetGridKey": "-1,-1",
+      "facilityClickClient": {
+        "x": 660.7009324957864,
+        "y": 498.3750598881844
+      },
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "-1,-1",
+        "distance": 0
+      },
+      "beforeFrameResources": {
+        "metal": 131.05,
+        "ore": 60.22,
+        "gas": 35.15,
+        "plasma": 8.03,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 123.05,
+        "ore": 60.22,
+        "gas": 35.15,
+        "plasma": 8.03,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 101.19,
+        "ore": 52.25,
+        "gas": 35.17,
+        "plasma": 8.04,
+        "research": 0
+      },
+      "afterFacilityCell": {
+        "gridKey": "-1,-1",
+        "facility": "power",
+        "exists": true
+      },
+      "result": "passed"
+    },
+    {
+      "facility": "mining",
+      "targetGridKey": "-1,1",
+      "facilityClickClient": {
+        "x": 695.9065990111426,
+        "y": 482.3086220250171
+      },
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "-1,1",
+        "distance": 0
+      },
+      "beforeFrameResources": {
+        "metal": 101.19,
+        "ore": 52.25,
+        "gas": 35.17,
+        "plasma": 8.04,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 93.32,
+        "ore": 52.28,
+        "gas": 35.19,
+        "plasma": 8.04,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 65.46,
+        "ore": 42.31,
+        "gas": 35.21,
+        "plasma": 8.04,
+        "research": 0
+      },
+      "afterFacilityCell": {
+        "gridKey": "-1,1",
+        "facility": "mining",
+        "exists": true
+      },
+      "rangeHint": {
+        "nearestBody": "小行星-3",
+        "resource": "gas",
+        "distance": 471.8844034262305,
+        "range": 156.76932540675625,
+        "gap": 316,
+        "inRange": false
+      },
+      "result": "build_passed_mining_yield_not_closed"
+    },
+    {
+      "facility": "turret",
+      "targetGridKey": "-2,0",
+      "facilityClickClient": {
+        "x": 678.0259657018254,
+        "y": 529.2012502135574
+      },
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "-2,0",
+        "distance": 0
+      },
+      "beforeFrameResources": {
+        "metal": 73.96,
+        "ore": 44.11,
+        "gas": 36.41,
+        "plasma": 8.29,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 66.1,
+        "ore": 44.14,
+        "gas": 36.43,
+        "plasma": 8.3,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 31.24,
+        "ore": 32.17,
+        "gas": 36.45,
+        "plasma": 8.3,
+        "research": 0
+      },
+      "afterFacilityCell": {
+        "gridKey": "-2,0",
+        "facility": "turret",
+        "exists": true
+      },
+      "result": "passed"
+    },
+    {
+      "facility": "repair",
+      "targetGridKey": "0,-2",
+      "facilityClickClient": {
+        "x": 675.6768387595552,
+        "y": 527.6316166760051
+      },
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "0,-2",
+        "distance": 0
+      },
+      "beforeFrameResources": {
+        "metal": 31.24,
+        "ore": 32.17,
+        "gas": 36.45,
+        "plasma": 8.3,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 23.4,
+        "ore": 32.2,
+        "gas": 36.47,
+        "plasma": 8.31,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 23.53,
+        "ore": 32.23,
+        "gas": 36.49,
+        "plasma": 8.31,
+        "research": 0
+      },
+      "afterFacilityCell": {
+        "gridKey": "0,-2",
+        "facility": "frame",
+        "exists": true
+      },
+      "blockedReason": "repair resource_low: missing metal 21 (need 44, have 23); plasma cost 6 is also required",
+      "result": "failed_resource_low"
+    }
+  ],
+  "miningObservation": {
+    "waitMs": 10000,
+    "targetGridKey": "-1,1",
+    "rangeHint": {
+      "nearestBody": "小行星-3",
+      "resource": "gas",
+      "distance": 471.8844034262305,
+      "range": 156.76932540675625,
+      "gap": 316,
+      "inRange": false
+    },
+    "beforeWait": {
+      "time": 1.72,
+      "resources": {
+        "metal": 65.46,
+        "ore": 42.31,
+        "gas": 35.21,
+        "plasma": 8.04,
+        "research": 0
+      },
+      "reasonKey": "no_mining_station"
+    },
+    "afterWait": {
+      "time": 11.72,
+      "resources": {
+        "metal": 73.96,
+        "ore": 44.11,
+        "gas": 36.41,
+        "plasma": 8.29,
+        "research": 0
+      },
+      "minerCount": 1,
+      "harvestingCount": 0,
+      "allOutOfRange": true,
+      "reasonKey": "all_miners_out_of_range"
+    },
+    "conclusion": "Mining facility exists, but it does not cover the resource outer ring; resource changes during the wait are not mining yield evidence."
+  },
+  "runtime": {
+    "runtimeErrors": [],
+    "consoleErrors": [],
+    "unhandledRejections": [],
+    "logEntries": []
+  },
+  "final": {
+    "resources": {
+      "metal": 23.54,
+      "ore": 32.23,
+      "gas": 36.49,
+      "plasma": 8.31,
+      "research": 0
+    },
+    "counts": {
+      "core": 1,
+      "frame": 5,
+      "power": 1,
+      "mining": 1,
+      "turret": 1
+    },
+    "cells": {
+      "-1,-1": "power",
+      "-1,1": "mining",
+      "-2,0": "turret",
+      "0,-2": "frame"
+    },
+    "lastBuildError": "维修站 资源不足：金属44 等离子6（建造模式已保持）"
+  },
+  "conclusion": {
+    "originalCoordinateFailureClosed": true,
+    "buildReplacementPartiallyClosed": true,
+    "passedFacilities": [
+      "power",
+      "mining",
+      "turret"
+    ],
+    "failedFacilities": [
+      "repair"
+    ],
+    "miningYieldClosed": false,
+    "unlockCombatOrMetaRecommended": false
+  }
+}
