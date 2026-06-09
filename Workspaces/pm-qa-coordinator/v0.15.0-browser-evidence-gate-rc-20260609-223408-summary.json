@@ -1,0 +1,74 @@
+﻿{
+    "collectedAt":  "2026-06-09T22:34:13",
+    "startTime":  "2026-06-09T22:34:08",
+    "browser":  "Chrome 148.0.7778.217",
+    "command":  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe --remote-debugging-port=9305 --user-data-dir=C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v015-cdp-profile-20260609-223408-9305 --no-first-run --disable-default-apps --window-size=1280,720 --new-window file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "url":  "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "cdpPort":  9305,
+    "profile":  "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v015-cdp-profile-20260609-223408-9305",
+    "visibleBrowser":  true,
+    "headless":  false,
+    "viewportRequested":  "1280x720",
+    "viewportActualWidth":  1267,
+    "viewportActualHeight":  627,
+    "viewportActualDpr":  2,
+    "jsonPath":  "Workspaces\\pm-qa-coordinator\\v0.15.0-browser-evidence-gate-rc-20260609-223408.json",
+    "machineSummaryPath":  "Workspaces\\pm-qa-coordinator\\v0.15.0-browser-evidence-gate-rc-20260609-223408-summary.json",
+    "ok":  true,
+    "checksTotal":  13,
+    "blockingChecks":  [
+
+                       ],
+    "failedChecks":  [
+
+                     ],
+    "warningChecks":  [
+                          "runtimeState.signatureStable"
+                      ],
+    "storageBeforeSaveHash32":  null,
+    "storageBeforeCorruptRawHash32":  null,
+    "storageAfterSaveHash32":  null,
+    "storageAfterCorruptRawHash32":  null,
+    "storageSignatureSame":  true,
+    "runtimeStateSignatureSame":  false,
+    "frameTimingMode":  "rAF",
+    "frameTimingSampleCount":  30,
+    "frameTimingAvgMs":  16.14999999960264,
+    "frameTimingMaxMs":  16.800000000000182,
+    "frameTimingLongFrameCount":  0,
+    "frameTimingLongFrameThresholdMs":  33,
+    "runtimeErrorsCount":  0,
+    "consoleErrorsDuringInvocationCount":  0,
+    "headlessProbe":  false,
+    "webdriver":  false,
+    "environmentHeadlessHint":  false,
+    "environmentHeadlessReasons":  [
+
+                                   ],
+    "evidenceCoverage":  {
+                             "automaticPassed":  12,
+                             "automaticFailed":  0,
+                             "automaticUnknown":  0,
+                             "browserCovered":  2,
+                             "browserUncovered":  2,
+                             "manualCovered":  0,
+                             "manualUncovered":  8
+                         },
+    "residualRisks":  [
+                          {
+                              "severity":  "warn",
+                              "kind":  "runtime_state_drift",
+                              "summary":  "运行态关键签名发生变化，需结合调用时机判断是否自然推进"
+                          },
+                          {
+                              "severity":  "info",
+                              "kind":  "browser_uncovered",
+                              "summary":  "browser 层仍需 PM 补充 console 与真实浏览器路径证据"
+                          },
+                          {
+                              "severity":  "info",
+                              "kind":  "manual_uncovered",
+                              "summary":  "manual 层默认未覆盖，自动检查不会标记人工通过"
+                          }
+                      ]
+}
