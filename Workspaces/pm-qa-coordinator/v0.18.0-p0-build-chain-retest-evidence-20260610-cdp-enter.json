@@ -1,0 +1,1806 @@
+{
+  "version": "v0.18.0-p0-build-chain-retest",
+  "createdAt": "2026-06-10T00:24:05+08:00",
+  "environment": {
+    "os": "Windows 10.0.26200",
+    "browser": "Chrome/148.0.7778.217",
+    "protocol": "1.3",
+    "visibleBrowser": true,
+    "cdpPort": 9332,
+    "tempProfile": "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v018-p0-profile-20260610-002346-9332",
+    "entry": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "input": "Visible Chrome + CDP keyboard hotkeys + mouse move then Enter at canvas grid centers",
+    "storagePolicy": "Temporary Chrome profile; no real user profile or save cleared"
+  },
+  "hookBoundary": {
+    "stateRead": "window.__gameState read-only snapshots",
+    "testHookUse": "window.__gameTest.resetRun only to start deterministic fresh run in temporary profile",
+    "placement": "No direct buildAt/state mutation; placement performed by Input.dispatchMouseEvent mouseMoved + Input.dispatchKeyEvent Enter"
+  },
+  "records": [
+    {
+      "label": "00-after-reset",
+      "at": "2026-06-09T16:23:52.061Z",
+      "selectedBuild": "frame",
+      "target": null,
+      "targetCell": null,
+      "resources": {
+        "metal": 130.35,
+        "ore": 60.08,
+        "gas": 35.05,
+        "plasma": 8.01,
+        "research": 0
+      },
+      "power": {
+        "available": 6,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "",
+      "toast": "核心已上线。默认「屏幕方向」移动（W=上）；展开右侧「更多状态」可切换移动模式。鼠标指向决定朝向。",
+      "statusAlerts": [
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 4
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "01-power-frame-before",
+      "at": "2026-06-09T16:23:52.375Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 452.0275499796119,
+          "y": 503.9350957124597,
+          "world": {
+            "x": -779.1410795642424,
+            "y": 379.70184916277583
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 130.62,
+        "ore": 60.13,
+        "gas": 35.09,
+        "plasma": 8.02,
+        "research": 0
+      },
+      "power": {
+        "available": 6,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "",
+      "toast": "核心已上线。默认「屏幕方向」移动（W=上）；展开右侧「更多状态」可切换移动模式。鼠标指向决定朝向。",
+      "statusAlerts": [
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 4
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "01-power-frame-after",
+      "at": "2026-06-09T16:23:52.846Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 452.0275499796119,
+          "y": 503.9350957124597,
+          "world": {
+            "x": -779.1410795642424,
+            "y": 379.70184916277583
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 131.02,
+        "ore": 60.22,
+        "gas": 35.14,
+        "plasma": 8.03,
+        "research": 0
+      },
+      "power": {
+        "available": 6,
+        "used": 0
+      },
+      "lastBuildError": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "buildHint": "",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 4
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "01-power-facility-before",
+      "at": "2026-06-09T16:23:53.108Z",
+      "selectedBuild": "power",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 445.02599485757383,
+          "y": 470.7542128745427,
+          "world": {
+            "x": -791.4163775447112,
+            "y": 413.2794434190577
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 131.25,
+        "ore": 60.26,
+        "gas": 35.18,
+        "plasma": 8.04,
+        "research": 0
+      },
+      "power": {
+        "available": 6,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "放置预览：发电站 · 该格已有设施",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "放置预览：发电站 · 该格已有设施",
+        "建造模式：发电站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 4
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "01-power-facility-after",
+      "at": "2026-06-09T16:23:53.536Z",
+      "selectedBuild": "power",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 445.02599485757383,
+          "y": 470.7542128745427,
+          "world": {
+            "x": -791.4163775447112,
+            "y": 413.2794434190577
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 109.6,
+        "ore": 52.34,
+        "gas": 35.23,
+        "plasma": 8.05,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "放置预览：发电站 · 该格已有设施",
+      "toast": "发电站已建造。",
+      "statusAlerts": [
+        "放置预览：发电站 · 该格已有设施",
+        "建造模式：发电站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "02-mining-frame-before",
+      "at": "2026-06-09T16:23:53.792Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 452.3422932378146,
+          "y": 477.4798800490903,
+          "world": {
+            "x": -776.5178354528289,
+            "y": 442.1134711064051
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 109.83,
+        "ore": 52.39,
+        "gas": 35.26,
+        "plasma": 8.05,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "",
+      "toast": "发电站已建造。",
+      "statusAlerts": [
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "02-mining-frame-after",
+      "at": "2026-06-09T16:23:54.234Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 452.3422932378146,
+          "y": 477.4798800490903,
+          "world": {
+            "x": -776.5178354528289,
+            "y": 442.1134711064051
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 110.2,
+        "ore": 52.47,
+        "gas": 35.31,
+        "plasma": 8.06,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "buildHint": "",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "02-mining-facility-before",
+      "at": "2026-06-09T16:23:54.484Z",
+      "selectedBuild": "mining",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 467.7771037891894,
+          "y": 480.9719582354285,
+          "world": {
+            "x": -745.5983806643032,
+            "y": 451.9800856977162
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 110.41,
+        "ore": 52.51,
+        "gas": 35.34,
+        "plasma": 8.07,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "放置预览：采矿站 · 该格已有设施",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "放置预览：采矿站 · 该格已有设施",
+        "建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "02-mining-facility-after",
+      "at": "2026-06-09T16:23:54.929Z",
+      "selectedBuild": "mining",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 467.7771037891894,
+          "y": 480.9719582354285,
+          "world": {
+            "x": -745.5983806643032,
+            "y": 451.9800856977162
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 110.79,
+        "ore": 52.59,
+        "gas": 35.39,
+        "plasma": 8.08,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "设施只能建造在已连接的空框架上。",
+      "buildHint": "放置预览：采矿站 · 该格已有设施",
+      "toast": "设施只能建造在已连接的空框架上。",
+      "statusAlerts": [
+        "设施只能建造在已连接的空框架上。",
+        "建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "03-turret-frame-before",
+      "at": "2026-06-09T16:23:55.188Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 482.194951474048,
+          "y": 473.26237644134756,
+          "world": {
+            "x": -716.7532487461929,
+            "y": 437.1067468072005
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 111.02,
+        "ore": 52.64,
+        "gas": 35.43,
+        "plasma": 8.09,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "",
+      "toast": "设施只能建造在已连接的空框架上。",
+      "statusAlerts": [
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "03-turret-frame-after",
+      "at": "2026-06-09T16:23:55.659Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 482.194951474048,
+          "y": 473.26237644134756,
+          "world": {
+            "x": -716.7532487461929,
+            "y": 437.1067468072005
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 111.41,
+        "ore": 52.72,
+        "gas": 35.48,
+        "plasma": 8.1,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "buildHint": "",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "03-turret-facility-before",
+      "at": "2026-06-09T16:23:55.906Z",
+      "selectedBuild": "turret",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 487.1407593590391,
+          "y": 457.75621250646543,
+          "world": {
+            "x": -706.8599045386563,
+            "y": 406.19439446517083
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 111.63,
+        "ore": 52.77,
+        "gas": 35.51,
+        "plasma": 8.11,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "放置预览：炮塔 · 该格已有设施",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "放置预览：炮塔 · 该格已有设施",
+        "建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "03-turret-facility-after",
+      "at": "2026-06-09T16:23:56.355Z",
+      "selectedBuild": "turret",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 487.1407593590391,
+          "y": 457.75621250646543,
+          "world": {
+            "x": -706.8599045386563,
+            "y": 406.19439446517083
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 112.01,
+        "ore": 52.85,
+        "gas": 35.57,
+        "plasma": 8.12,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "设施只能建造在已连接的空框架上。",
+      "buildHint": "放置预览：炮塔 · 该格已有设施",
+      "toast": "设施只能建造在已连接的空框架上。",
+      "statusAlerts": [
+        "设施只能建造在已连接的空框架上。",
+        "建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "04-repair-frame-before",
+      "at": "2026-06-09T16:23:56.624Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 479.7133520021758,
+          "y": 443.31700936583815,
+          "world": {
+            "x": -721.7144349612812,
+            "y": 377.33243202525455
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 112.24,
+        "ore": 52.9,
+        "gas": 35.6,
+        "plasma": 8.12,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "",
+      "toast": "设施只能建造在已连接的空框架上。",
+      "statusAlerts": [
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "04-repair-frame-after",
+      "at": "2026-06-09T16:23:57.09Z",
+      "selectedBuild": "frame",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 479.7133520021758,
+          "y": 443.31700936583815,
+          "world": {
+            "x": -721.7144349612812,
+            "y": 377.33243202525455
+          }
+        }
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 112.63,
+        "ore": 52.98,
+        "gas": 35.65,
+        "plasma": 8.14,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "buildHint": "",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+        "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "04-repair-facility-before",
+      "at": "2026-06-09T16:23:57.373Z",
+      "selectedBuild": "repair",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 464.2576735374524,
+          "y": 438.35875523795573,
+          "world": {
+            "x": -752.6257423443731,
+            "y": 367.41878960804667
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 112.87,
+        "ore": 53.03,
+        "gas": 35.69,
+        "plasma": 8.14,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "",
+      "buildHint": "放置预览：维修站 · 该格已有设施",
+      "toast": "该格已有结构，建造模式仍保持；可查看右侧信息或继续点空格建造。",
+      "statusAlerts": [
+        "放置预览：维修站 · 该格已有设施",
+        "建造模式：维修站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "04-repair-facility-after",
+      "at": "2026-06-09T16:23:57.82Z",
+      "selectedBuild": "repair",
+      "target": {
+        "x": -1,
+        "y": -1,
+        "gridKey": "-1,-1",
+        "screen": {
+          "x": 464.2576735374524,
+          "y": 438.35875523795573,
+          "world": {
+            "x": -752.6257423443731,
+            "y": 367.41878960804667
+          }
+        },
+        "targetCell": null
+      },
+      "targetCell": null,
+      "resources": {
+        "metal": 113.24,
+        "ore": 53.11,
+        "gas": 35.74,
+        "plasma": 8.15,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "设施只能建造在已连接的空框架上。",
+      "buildHint": "放置预览：维修站 · 该格已有设施",
+      "toast": "设施只能建造在已连接的空框架上。",
+      "statusAlerts": [
+        "设施只能建造在已连接的空框架上。",
+        "建造模式：维修站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    },
+    {
+      "label": "09-post-mining-observation",
+      "at": "2026-06-09T16:24:05.824Z",
+      "selectedBuild": "repair",
+      "target": null,
+      "targetCell": null,
+      "resources": {
+        "metal": 120.06,
+        "ore": 54.55,
+        "gas": 36.7,
+        "plasma": 8.35,
+        "research": 0
+      },
+      "power": {
+        "available": 16,
+        "used": 0
+      },
+      "lastBuildError": "设施只能建造在已连接的空框架上。",
+      "buildHint": "放置预览：维修站 · 该格已有设施",
+      "toast": "设施只能建造在已连接的空框架上。",
+      "statusAlerts": [
+        "设施只能建造在已连接的空框架上。",
+        "建造模式：维修站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+        "无法放置：该格已有设施"
+      ],
+      "facilityCounts": {
+        "core": 1,
+        "frame": 3,
+        "power": 1
+      },
+      "runtimeErrors": [],
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "gridKey": "0,0",
+          "facility": "core",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 280,
+          "frameHp": 260
+        },
+        {
+          "x": 1,
+          "y": 0,
+          "gridKey": "1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": -1,
+          "y": 0,
+          "gridKey": "-1,0",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "gridKey": "0,1",
+          "facility": "frame",
+          "detached": false,
+          "enabled": true,
+          "active": true,
+          "hp": 70,
+          "frameHp": 70
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "gridKey": "0,-1",
+          "facility": "power",
+          "detached": false,
+          "enabled": true,
+          "active": false,
+          "hp": 105,
+          "frameHp": 70
+        }
+      ]
+    }
+  ]
+}
