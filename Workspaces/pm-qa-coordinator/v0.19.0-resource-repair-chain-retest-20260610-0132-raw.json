@@ -1,0 +1,155 @@
+{
+  "timestamp": "2026-06-10T01:32:56+08:00",
+  "browser": "Chrome visible via CDP",
+  "port": 9999,
+  "profile": "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v019-retest-20260610-0155-9999",
+  "url": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+  "input": {
+    "buildSelection": "DOM button click",
+    "placement": "CDP Input.dispatchMouseEvent",
+    "usedBuildAt": false,
+    "wroteState": false,
+    "clearedRealSave": false
+  },
+  "storage": {
+    "localStorageLength": 0,
+    "sessionStorageLength": 0,
+    "localKeys": [],
+    "sessionKeys": []
+  },
+  "runtime": {
+    "runtimeErrors": 0,
+    "consoleErrors": 0,
+    "unhandledRejections": 0
+  },
+  "buildChain": [
+    {
+      "step": "frame",
+      "gridKey": "-1,-1",
+      "resultFacility": "frame",
+      "beforeResources": { "metal": 155.89, "ore": 65.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "afterResources": { "metal": 147.89, "ore": 65.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "aligned": true,
+      "screenDeltaDistance": 0
+    },
+    {
+      "step": "power",
+      "gridKey": "-1,-1",
+      "resultFacility": "power",
+      "beforeResources": { "metal": 147.89, "ore": 65.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "afterResources": { "metal": 125.89, "ore": 57.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "aligned": true,
+      "screenDeltaDistance": 0
+    },
+    {
+      "step": "frame",
+      "gridKey": "-1,1",
+      "resultFacility": "frame",
+      "beforeResources": { "metal": 125.89, "ore": 57.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "afterResources": { "metal": 117.89, "ore": 57.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "aligned": true,
+      "screenDeltaDistance": 0
+    },
+    {
+      "step": "mining",
+      "gridKey": "-1,1",
+      "resultFacility": "mining",
+      "beforeResources": { "metal": 117.89, "ore": 57.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "afterResources": { "metal": 89.89, "ore": 47.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "aligned": true,
+      "screenDeltaDistance": 0
+    },
+    {
+      "step": "turret",
+      "gridKey": "-2,0",
+      "resultFacility": "turret",
+      "beforeResources": { "metal": 90.58, "ore": 49.32, "gas": 39.88, "plasma": 9.02, "research": 0 },
+      "afterResources": { "metal": 55.58, "ore": 37.32, "gas": 39.88, "plasma": 9.02, "research": 0 },
+      "aligned": true,
+      "screenDeltaDistance": 0
+    },
+    {
+      "step": "repair",
+      "gridKey": "0,-2",
+      "resultFacility": "repair",
+      "beforeResources": { "metal": 96.11, "ore": 45.48, "gas": 46.82, "plasma": 10.15, "research": 0 },
+      "afterResources": { "metal": 52.11, "ore": 45.48, "gas": 46.82, "plasma": 4.15, "research": 0 },
+      "aligned": true,
+      "screenDeltaDistance": 0
+    }
+  ],
+  "waitWindows": [
+    {
+      "label": "after mining 10s",
+      "beforeResources": { "metal": 89.89, "ore": 47.48, "gas": 38.65, "plasma": 8.76, "research": 0 },
+      "afterResources": { "metal": 98.58, "ore": 49.32, "gas": 39.88, "plasma": 9.02, "research": 0 },
+      "harvestingCount": 0,
+      "canAttributeToMining": false
+    },
+    {
+      "label": "after turret 45s",
+      "beforeResources": { "metal": 55.58, "ore": 37.32, "gas": 39.88, "plasma": 9.02, "research": 0 },
+      "afterResources": { "metal": 104.11, "ore": 45.48, "gas": 46.82, "plasma": 10.15, "research": 0 },
+      "harvestingCount": 0,
+      "canAttributeToMining": false
+    },
+    {
+      "label": "after repair 20s",
+      "beforeResources": { "metal": 52.11, "ore": 45.48, "gas": 46.82, "plasma": 4.15, "research": 0 },
+      "afterResources": { "metal": 79.32, "ore": 49.13, "gas": 50.75, "plasma": 4.66, "research": 0 },
+      "harvestingCount": 0,
+      "canAttributeToMining": false
+    }
+  ],
+  "repair": {
+    "gridKey": "0,-2",
+    "facility": "repair",
+    "toast": "维修站已建造。",
+    "postBuildShortageAlert": "当前仍选中「维修站」：下一座还缺 等离子 2（不是刚才建造失败；核心会缓慢产金属）",
+    "misreadClosed": true
+  },
+  "mining": {
+    "gridKey": "-1,1",
+    "facility": "mining",
+    "overall": {
+      "minerCount": 1,
+      "activeCount": 1,
+      "harvestingCount": 0,
+      "outOfRangeCount": 1,
+      "hasMiner": true,
+      "anyHarvesting": false,
+      "allOutOfRange": true,
+      "inactiveRatio": 1,
+      "severity": "critical",
+      "reasonKey": "all_miners_out_of_range"
+    },
+    "miner": {
+      "cellKey": "-1,1",
+      "facility": "mining",
+      "enabled": true,
+      "active": true,
+      "target": null,
+      "nearest": {
+        "bodyName": "行星-1",
+        "resource": "ore",
+        "distance": 354.4911112213327,
+        "range": 228.13274121144786,
+        "gap": 127,
+        "inRange": false
+      },
+      "reasonKey": "out_of_range"
+    },
+    "uiAlerts": [
+      "采矿站待命：距「行星-1」还差 138，请进入彩色外环",
+      "采矿站未覆盖资源"
+    ],
+    "resourceGuideExcerpt": "距离 365 / 采矿范围 228 · 还需靠近 138；采矿站就绪，请进入「行星-1」的彩色外环（还差 138）。",
+    "yieldClosed": false
+  },
+  "pmConclusion": {
+    "repairOriginalFailureClosed": true,
+    "miningYieldClosed": false,
+    "combatMetaUnlocked": false,
+    "blocker": "mining remains out of resource ring and harvestingCount is 0"
+  }
+}
