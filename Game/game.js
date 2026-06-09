@@ -18450,6 +18450,12 @@ async function copyReleaseCandidateSummary() {
   return { ok: false, method: "console" };
 }
 
+function activateReleaseCandidatePlaytestHold() {
+  state.paused = true;
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (pauseBtn) pauseBtn.textContent = "继续";
+}
+
 function openReleaseCandidatePanel() {
   if (typeof document === "undefined") {
     return { ok: false, reason: "no_document" };
@@ -18461,7 +18467,7 @@ function openReleaseCandidatePanel() {
   releaseCandidatePanelEl.classList.remove("hidden");
   syncReleaseCandidateToggleVisibility();
   if (!releaseCandidateLastResult && !releaseCandidatePanelBusy) {
-    refreshReleaseCandidateAutoChecks();
+    setReleaseCandidatePanelStatus("入口已就绪：默认暂停，不自动运行检查。点击“继续”开始手动验收，点击“刷新自动检查”后再采样。");
   }
   return { ok: true };
 }
@@ -18478,6 +18484,7 @@ function closeReleaseCandidatePanel() {
 function initReleaseCandidatePlaytestEntry() {
   releaseCandidatePlaytestUrlEnabled = isReleaseCandidatePlaytestUrlEnabled();
   if (!releaseCandidatePlaytestUrlEnabled) return;
+  activateReleaseCandidatePlaytestHold();
   ensureReleaseCandidateToggleButton();
   openReleaseCandidatePanel();
 }
