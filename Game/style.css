@@ -1424,6 +1424,12 @@ h2 {
   font-size: 11px;
 }
 
+.mining-build-screen-hint {
+  color: #9ed4ff;
+  font-size: 10px;
+  font-family: Consolas, "Courier New", monospace;
+}
+
 .resource-dot {
   display: inline-block;
   width: 8px;

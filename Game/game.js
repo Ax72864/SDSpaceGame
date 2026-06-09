@@ -7708,13 +7708,36 @@ function isExpansionFrameStepBuilt(step) {
   return !!(cell && !cell.detached);
 }
 
+function validateExpansionStepsBuildOrder(steps) {
+  if (!Array.isArray(steps) || steps.length === 0) return true;
+  const built = new Set(getConnectedStationGridKeysForDiagnostics());
+  for (const step of steps) {
+    if (!step?.gridKey) return false;
+    if (built.has(step.gridKey)) continue;
+    const adjacent = neighbors(step.gridX, step.gridY).some((n) => built.has(key(n.x, n.y)));
+    if (!adjacent) return false;
+    built.add(step.gridKey);
+  }
+  return true;
+}
+
+function expansionStepBuildPriority(step) {
+  if (!step) return -1;
+  let score = 0;
+  if (hasConnectedNeighbor(step.gridX, step.gridY)) score += 4;
+  if (isExpansionFrameStepBuilt(step)) score += 2;
+  return score;
+}
+
 function normalizeExpansionStepsToBuildOrder(steps) {
   if (!Array.isArray(steps) || steps.length <= 1) return steps || [];
-  const first = steps[0];
-  const last = steps[steps.length - 1];
-  const firstConnected = hasConnectedNeighbor(first.gridX, first.gridY) || isExpansionFrameStepBuilt(first);
-  const lastConnected = hasConnectedNeighbor(last.gridX, last.gridY) || isExpansionFrameStepBuilt(last);
-  if (!firstConnected && lastConnected) return [...steps].reverse();
+  if (validateExpansionStepsBuildOrder(steps)) return steps;
+  const reversed = [...steps].reverse();
+  if (validateExpansionStepsBuildOrder(reversed)) return reversed;
+  const firstScore = expansionStepBuildPriority(steps[0]);
+  const lastScore = expansionStepBuildPriority(steps[steps.length - 1]);
+  if (firstScore > lastScore) return steps;
+  if (lastScore > firstScore) return reversed;
   return steps;
 }
 
@@ -7872,24 +7895,33 @@ function computeMiningBuildPlan(options = {}) {
 
   const completedSteps = orderedFrameSteps.length - pendingFrameSteps.length
     + (targetCell?.facility === "mining" ? 1 : 0);
-  const currentStep = steps.find((step) => step.actionable) || steps.find((step) => {
+  const firstIncompleteStep = steps.find((step) => {
     if (step.build === "frame") {
       const cell = state.station.cells.get(step.gridKey);
       return !(cell && !cell.detached);
     }
     return targetCell?.facility !== "mining";
   }) || null;
+  const currentStep = steps.find((step) => step.actionable) || firstIncompleteStep;
 
   return {
     ...base,
     applicable: steps.length > 0,
     targetGridKey: targetKey,
     finalAction,
+    orderedFrameGridKeys: orderedFrameSteps.map((step) => step.gridKey),
     totalSteps: steps.length,
     completedSteps,
     currentStepIndex: currentStep?.stepIndex ?? null,
     currentStep,
     selectedBuildRecommended: currentStep?.selectedBuild || null,
+    selectionDiagnostics: {
+      ...base.selectionDiagnostics,
+      matchesRecommended: currentStep
+        ? state.selectedBuild === currentStep.selectedBuild
+        : null,
+      recommendedBuild: currentStep?.selectedBuild || null
+    },
     steps,
     reasonKey: steps.length ? "ready" : "already_complete"
   };
@@ -8238,7 +8270,8 @@ function buildMiningExpansionGuidanceHtml(diagnostics) {
 
   if (bestCandidate?.canReachInRange && suggestedExpansionPath) {
     const targetKey = suggestedExpansionPath.targetGridKey || bestCandidate.gridKey;
-    const pathKeys = (suggestedExpansionPath.frameSteps || [])
+    const orderedFrameSteps = getOrderedExpansionFrameSteps(suggestedExpansionPath);
+    const pathKeys = orderedFrameSteps
       .map((step) => step.gridKey)
       .filter(Boolean);
     const uniquePathKeys = pathKeys.filter((gridKey, index) => gridKey !== targetKey || index < pathKeys.length - 1);
@@ -8273,6 +8306,12 @@ function buildMiningExpansionGuidanceHtml(diagnostics) {
         if (plan.selectedBuildRecommended && state.selectedBuild !== plan.selectedBuildRecommended) {
           lines.push(
             `<div class="resource-line warn mining-selection-hint">建造选择：当前为「${TYPES[state.selectedBuild]?.name || state.selectedBuild || "指针"}」，本步应选「${currentName}」。</div>`
+          );
+        }
+        if (isReleaseCandidatePlaytestUrlEnabled() && plan.currentStep.screenPoint?.clientX != null) {
+          const sp = plan.currentStep.screenPoint;
+          lines.push(
+            `<div class="resource-line mining-build-screen-hint">PM 点击：client (${Math.round(sp.clientX)}, ${Math.round(sp.clientY)}) · 选「${currentName}」</div>`
           );
         }
       }
@@ -8419,10 +8458,11 @@ function computeMiningCoverageDiagnostics(options = {}) {
   const ghostPath = suggestedExpansionPath
     ? {
       targetGridKey: suggestedExpansionPath.targetGridKey,
-      stepGridKeys: (suggestedExpansionPath.frameSteps || []).map((step) => step.gridKey),
+      stepGridKeys: getOrderedExpansionFrameSteps(suggestedExpansionPath).map((step) => step.gridKey),
       frameCount: suggestedExpansionPath.totalFrameSteps ?? 0,
       finalAction: suggestedExpansionPath.finalAction || bestCandidate?.miningAction || null,
-      buildOrder: suggestedExpansionPath.buildOrder || "connected_to_target"
+      buildOrder: suggestedExpansionPath.buildOrder || "connected_to_target",
+      pathValid: validateExpansionStepsBuildOrder(getOrderedExpansionFrameSteps(suggestedExpansionPath))
     }
     : null;
   const buildPlan = computeMiningBuildPlan({ diagnostics: {
@@ -14857,7 +14897,8 @@ function renderMiningExpansionGhostPath() {
   };
   const ghostAlpha = 0.28 + 0.12 * Math.sin(state.time * 2.6);
   const currentStep = plan.currentStep;
-  const pendingFrameSteps = (path.frameSteps || []).filter((step) => !isExpansionFrameStepBuilt(step));
+  const orderedFrameSteps = getOrderedExpansionFrameSteps(path);
+  const pendingFrameSteps = orderedFrameSteps.filter((step) => !isExpansionFrameStepBuilt(step));
 
   for (const step of pendingFrameSteps) {
     const p = cellWorldPositionByTransform(
