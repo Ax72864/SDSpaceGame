@@ -1,0 +1,6147 @@
+{
+  "meta": {
+    "capturedAt": "2026-06-09T17:16:39.7249021Z",
+    "url": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "port": 9393,
+    "profile": "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v019-profile-20260610-011454-9393",
+    "input": "visible Chrome + CDP Input.dispatchMouseEvent + DOM build buttons + UI pause",
+    "usedBuildAt": false,
+    "directStateMutation": false,
+    "resetRunCalled": false
+  },
+  "helperAvailability": {
+    "getBuildPaletteDiagnostics": true,
+    "getPlacementDiagnostics": true,
+    "getGridScreenPoint": true,
+    "getGridInteractionDiagnostics": true,
+    "compareGridClickAlignment": true,
+    "getResourceReachability": true,
+    "snapshot": true
+  },
+  "initial": {
+    "paused": true,
+    "time": 31.29,
+    "resources": {
+      "metal": 160.59,
+      "ore": 65.63,
+      "gas": 39.35,
+      "plasma": 8.78,
+      "research": 0
+    },
+    "counts": {
+      "core": 1,
+      "frame": 4
+    },
+    "costs": {
+      "frame": {
+        "cost": {
+          "metal": 8
+        },
+        "baseCost": {
+          "metal": 8
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": "已有较多同类设施，先检查电力。"
+      },
+      "power": {
+        "cost": {
+          "metal": 22,
+          "ore": 8
+        },
+        "baseCost": {
+          "metal": 22,
+          "ore": 8
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": "推荐：先补供电，避免关键设施断电。"
+      },
+      "mining": {
+        "cost": {
+          "metal": 28,
+          "ore": 10
+        },
+        "baseCost": {
+          "metal": 28,
+          "ore": 10
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+      },
+      "turret": {
+        "cost": {
+          "metal": 35,
+          "ore": 12
+        },
+        "baseCost": {
+          "metal": 35,
+          "ore": 12
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": "推荐：敌袭前补基础火力。"
+      },
+      "repair": {
+        "cost": {
+          "metal": 44,
+          "plasma": 6
+        },
+        "baseCost": {
+          "metal": 44,
+          "plasma": 6
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": "推荐：维修能力不足，受损后恢复慢。"
+      }
+    },
+    "reachability": {
+      "generatedAt": 31.119899999999603,
+      "miners": [],
+      "overall": {
+        "minerCount": 0,
+        "activeCount": 0,
+        "harvestingCount": 0,
+        "outOfRangeCount": 0,
+        "hasMiner": false,
+        "anyHarvesting": false,
+        "allOutOfRange": false,
+        "inactiveRatio": 1,
+        "severity": "critical",
+        "reasonKey": "no_mining_station"
+      }
+    },
+    "statusAlerts": [
+      "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+    ],
+    "toast": "雷达发现敌对目标。",
+    "runtimeErrors": [],
+    "storage": {
+      "localStorageLength": 0,
+      "sessionStorageLength": 0,
+      "localKeys": [],
+      "sessionKeys": []
+    },
+    "cells": {
+      "-1,-1": null,
+      "-1,1": null,
+      "-2,0": null,
+      "0,-2": null
+    },
+    "snapshotResource": {
+      "metal": 160,
+      "ore": 65,
+      "gas": 39,
+      "plasma": 8,
+      "research": 0,
+      "powerUsed": 0,
+      "powerAvailable": 6
+    }
+  },
+  "scan": [
+    {
+      "gridKey": "5,3",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 323.5140648163931,
+        "range": 206.29109532339498,
+        "gap": 118,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "6,2",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 325.08746378114176,
+        "range": 206.29109532339498,
+        "gap": 119,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "4,4",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 327.4764742090577,
+        "range": 206.29109532339498,
+        "gap": 122,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "7,1",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 332.11800324776874,
+        "range": 206.29109532339498,
+        "gap": 126,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "3,5",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 336.77935237595227,
+        "range": 206.29109532339498,
+        "gap": 131,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "8,0",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 344.2715164734293,
+        "range": 206.29109532339498,
+        "gap": 138,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "5,2",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 344.80662596621494,
+        "range": 206.29109532339498,
+        "gap": 139,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "4,3",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 345.93511000847474,
+        "range": 206.29109532339498,
+        "gap": 140,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "6,1",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 348.8726390587761,
+        "range": 206.29109532339498,
+        "gap": 143,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "2,6",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 350.998323661433,
+        "range": 206.29109532339498,
+        "gap": 145,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "3,4",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 352.2081648158454,
+        "range": 206.29109532339498,
+        "gap": 146,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "7,0",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 357.95618063872683,
+        "range": 206.29109532339498,
+        "gap": 152,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "2,5",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 363.3594396590186,
+        "range": 206.29109532339498,
+        "gap": 158,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "4,2",
+      "manhattan": 6,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 365.92534691212,
+        "range": 206.29109532339498,
+        "gap": 160,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "5,1",
+      "manhattan": 6,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 367.31712250640476,
+        "range": 206.29109532339498,
+        "gap": 162,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "3,3",
+      "manhattan": 6,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 369.4331475911787,
+        "range": 206.29109532339498,
+        "gap": 164,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "1,7",
+      "manhattan": 8,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 369.5663867825459,
+        "range": 206.29109532339498,
+        "gap": 164,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "6,0",
+      "manhattan": 6,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 373.55371429021415,
+        "range": 206.29109532339498,
+        "gap": 168,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "2,4",
+      "manhattan": 6,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 377.70403964677934,
+        "range": 206.29109532339498,
+        "gap": 172,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    },
+    {
+      "gridKey": "1,6",
+      "manhattan": 7,
+      "rangeHint": {
+        "kind": "mining",
+        "nearestBody": "行星-1",
+        "resource": "gas",
+        "distance": 378.958537858281,
+        "range": 206.29109532339498,
+        "gap": 173,
+        "inRange": false
+      },
+      "placement": {
+        "valid": false,
+        "reasonKey": "no_neighbor",
+        "connectedToCore": false
+      },
+      "warnings": [
+        "placement_invalid",
+        "out_of_mining_range"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "facility": "frame",
+      "gridKey": "-1,-1",
+      "before": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 160.59,
+          "ore": 65.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：先补供电，避免关键设施断电。"
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "雷达发现敌对目标。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": null,
+          "-1,1": null,
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 160,
+          "ore": 65,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "point": {
+        "gridKey": "-1,-1",
+        "gridX": -1,
+        "gridY": -1,
+        "world": {
+          "x": -736.612424813211,
+          "y": -279.25271968822926
+        },
+        "clientX": 671.9999999999993,
+        "clientY": 441.99999999999983,
+        "deviceX": 1343.9999999999986,
+        "deviceY": 883.9999999999997,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "-1,-1",
+        "pointerGridKey": "-1,-1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,-1",
+          "gridX": -1,
+          "gridY": -1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -279.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 441.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 883.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 442
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -279.2527196882289
+          },
+          "grid": {
+            "x": -1,
+            "y": -1
+          },
+          "gridKey": "-1,-1",
+          "cell": null,
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": true,
+              "reasonKey": null,
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 6,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": []
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 441.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "-1,-1",
+        "pointerGridKey": "-1,-1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,-1",
+          "gridX": -1,
+          "gridY": -1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -279.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 441.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 883.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 442
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -279.2527196882289
+          },
+          "grid": {
+            "x": -1,
+            "y": -1
+          },
+          "gridKey": "-1,-1",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 6,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 441.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 152.59,
+          "ore": 65.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：先补供电，避免关键设施断电。"
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": null,
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 152,
+          "ore": 65,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "power",
+      "gridKey": "-1,-1",
+      "before": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 152.59,
+          "ore": 65.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：先补供电，避免关键设施断电。"
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": null,
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 152,
+          "ore": 65,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "point": {
+        "gridKey": "-1,-1",
+        "gridX": -1,
+        "gridY": -1,
+        "world": {
+          "x": -736.612424813211,
+          "y": -279.25271968822926
+        },
+        "clientX": 671.9999999999993,
+        "clientY": 441.99999999999983,
+        "deviceX": 1343.9999999999986,
+        "deviceY": 883.9999999999997,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "-1,-1",
+        "pointerGridKey": "-1,-1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,-1",
+          "gridX": -1,
+          "gridY": -1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -279.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 441.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 883.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 442
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -279.2527196882289
+          },
+          "grid": {
+            "x": -1,
+            "y": -1
+          },
+          "gridKey": "-1,-1",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "power",
+          "placement": {
+            "facility": "power",
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 16,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid",
+              "power_tip"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 441.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "wouldBuild": true,
+            "facility": "power"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "-1,-1",
+        "pointerGridKey": "-1,-1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,-1",
+          "gridX": -1,
+          "gridY": -1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -279.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 441.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 883.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 442
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -279.2527196882289
+          },
+          "grid": {
+            "x": -1,
+            "y": -1
+          },
+          "gridKey": "-1,-1",
+          "cell": {
+            "facility": "power",
+            "detached": false,
+            "active": false
+          },
+          "selectedBuild": "power",
+          "placement": {
+            "facility": "power",
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 16,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid",
+              "power_tip"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 441.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,-1",
+            "gridX": -1,
+            "gridY": -1,
+            "wouldBuild": true,
+            "facility": "power"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 130.59,
+          "ore": 57.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "放置预览：发电站 · 该格已有设施",
+          "建造模式：发电站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "发电站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": null,
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 130,
+          "ore": 57,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "frame",
+      "gridKey": "-1,1",
+      "before": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 130.59,
+          "ore": 57.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "放置预览：发电站 · 该格已有设施",
+          "建造模式：发电站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "发电站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": null,
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 130,
+          "ore": 57,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "point": {
+        "gridKey": "-1,1",
+        "gridX": -1,
+        "gridY": 1,
+        "world": {
+          "x": -736.612424813211,
+          "y": -219.25271968822926
+        },
+        "clientX": 671.9999999999993,
+        "clientY": 471.99999999999983,
+        "deviceX": 1343.9999999999986,
+        "deviceY": 943.9999999999997,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "-1,1",
+        "pointerGridKey": "-1,1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,1",
+          "gridX": -1,
+          "gridY": 1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -219.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 471.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 943.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 472
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -219.25271968822892
+          },
+          "grid": {
+            "x": -1,
+            "y": 1
+          },
+          "gridKey": "-1,1",
+          "cell": null,
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": true,
+              "reasonKey": null,
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 6,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": []
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 471.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "-1,1",
+        "pointerGridKey": "-1,1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,1",
+          "gridX": -1,
+          "gridY": 1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -219.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 471.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 943.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 472
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -219.25271968822892
+          },
+          "grid": {
+            "x": -1,
+            "y": 1
+          },
+          "gridKey": "-1,1",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 6,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 471.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 122.59,
+          "ore": 57.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5,
+          "power": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 122,
+          "ore": 57,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "mining",
+      "gridKey": "-1,1",
+      "before": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 122.59,
+          "ore": 57.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5,
+          "power": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：当前无采矿能力，先建立资源收入。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 122,
+          "ore": 57,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "point": {
+        "gridKey": "-1,1",
+        "gridX": -1,
+        "gridY": 1,
+        "world": {
+          "x": -736.612424813211,
+          "y": -219.25271968822926
+        },
+        "clientX": 671.9999999999993,
+        "clientY": 471.99999999999983,
+        "deviceX": 1343.9999999999986,
+        "deviceY": 943.9999999999997,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "-1,1",
+        "pointerGridKey": "-1,1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,1",
+          "gridX": -1,
+          "gridY": 1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -219.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 471.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 943.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 472
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -219.25271968822892
+          },
+          "grid": {
+            "x": -1,
+            "y": 1
+          },
+          "gridKey": "-1,1",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "mining",
+          "placement": {
+            "facility": "mining",
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 3,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": {
+              "kind": "mining",
+              "nearestBody": "行星-1",
+              "resource": "gas",
+              "distance": 501.9764632945313,
+              "range": 206.29109532339498,
+              "gap": 296,
+              "inRange": false
+            },
+            "warnings": [
+              "placement_invalid",
+              "out_of_mining_range"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 471.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "wouldBuild": true,
+            "facility": "mining"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "-1,1",
+        "pointerGridKey": "-1,1",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 1.7053025658242404E-13,
+          "distance": 3.8131724593878115E-13
+        },
+        "target": {
+          "gridKey": "-1,1",
+          "gridX": -1,
+          "gridY": 1,
+          "world": {
+            "x": -736.612424813211,
+            "y": -219.25271968822926
+          },
+          "clientX": 671.9999999999993,
+          "clientY": 471.99999999999983,
+          "deviceX": 1343.9999999999986,
+          "deviceY": 943.9999999999997,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 671.999999999999,
+            "y": 472
+          },
+          "world": {
+            "x": -736.6124248132116,
+            "y": -219.25271968822892
+          },
+          "grid": {
+            "x": -1,
+            "y": 1
+          },
+          "gridKey": "-1,1",
+          "cell": {
+            "facility": "mining",
+            "detached": false,
+            "active": false
+          },
+          "selectedBuild": "mining",
+          "placement": {
+            "facility": "mining",
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 6,
+              "marginAfter": 3,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": {
+              "kind": "mining",
+              "nearestBody": "行星-1",
+              "resource": "gas",
+              "distance": 501.9764632945313,
+              "range": 206.29109532339498,
+              "gap": 296,
+              "inRange": false
+            },
+            "warnings": [
+              "placement_invalid",
+              "out_of_mining_range"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 671.9999999999993,
+            "clientY": 471.99999999999983,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 1.7053025658242404E-13,
+              "distance": 3.8131724593878115E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-1,1",
+            "gridX": -1,
+            "gridY": 1,
+            "wouldBuild": true,
+            "facility": "mining"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 94.59,
+          "ore": 47.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：同类设施已建但未运作，先检查供电。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "1 座采矿站因电力不足停机",
+          "建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "因电力或优先级未运作：采矿站",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "采矿站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 94,
+          "ore": 47,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "frame",
+      "gridKey": "-2,0",
+      "before": {
+        "paused": true,
+        "time": 41.29,
+        "resources": {
+          "metal": 103.09,
+          "ore": 49.43,
+          "gas": 40.55,
+          "plasma": 9.03,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 41.287600000000246,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 463.593309395008,
+                "range": 206.29109532339498,
+                "gap": 258,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "放置预览：采矿站 · 该格已有设施",
+          "建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "采矿站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 103,
+          "ore": 49,
+          "gas": 40,
+          "plasma": 9,
+          "research": 0,
+          "powerUsed": 3,
+          "powerAvailable": 16
+        }
+      },
+      "point": {
+        "gridKey": "-2,0",
+        "gridX": -2,
+        "gridY": 0,
+        "world": {
+          "x": -664.186017942017,
+          "y": -206.82631281703755
+        },
+        "clientX": 708.2132034355964,
+        "clientY": 478.2132034355957,
+        "deviceX": 1416.4264068711927,
+        "deviceY": 956.4264068711914,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "-2,0",
+        "pointerGridKey": "-2,0",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 2.8421709430404007E-13,
+          "distance": 4.439612937350521E-13
+        },
+        "target": {
+          "gridKey": "-2,0",
+          "gridX": -2,
+          "gridY": 0,
+          "world": {
+            "x": -664.186017942017,
+            "y": -206.82631281703755
+          },
+          "clientX": 708.2132034355964,
+          "clientY": 478.2132034355957,
+          "deviceX": 1416.4264068711927,
+          "deviceY": 956.4264068711914,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": -2,
+            "y": 0
+          },
+          "gridKey": "-2,0",
+          "cell": null,
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": true,
+              "reasonKey": null,
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 13,
+              "marginAfter": 13,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": []
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355964,
+            "clientY": 478.2132034355957,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 2.8421709430404007E-13,
+              "distance": 4.439612937350521E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "-2,0",
+        "pointerGridKey": "-2,0",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 2.8421709430404007E-13,
+          "distance": 4.439612937350521E-13
+        },
+        "target": {
+          "gridKey": "-2,0",
+          "gridX": -2,
+          "gridY": 0,
+          "world": {
+            "x": -664.186017942017,
+            "y": -206.82631281703755
+          },
+          "clientX": 708.2132034355964,
+          "clientY": 478.2132034355957,
+          "deviceX": 1416.4264068711927,
+          "deviceY": 956.4264068711914,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": -2,
+            "y": 0
+          },
+          "gridKey": "-2,0",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 13,
+              "marginAfter": 13,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355964,
+            "clientY": 478.2132034355957,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 2.8421709430404007E-13,
+              "distance": 4.439612937350521E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 41.29,
+        "resources": {
+          "metal": 95.09,
+          "ore": 49.43,
+          "gas": 40.55,
+          "plasma": 9.03,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5,
+          "power": 1,
+          "mining": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 41.287600000000246,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 463.593309395008,
+                "range": 206.29109532339498,
+                "gap": 258,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 95,
+          "ore": 49,
+          "gas": 40,
+          "plasma": 9,
+          "research": 0,
+          "powerUsed": 3,
+          "powerAvailable": 16
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "turret",
+      "gridKey": "-2,0",
+      "before": {
+        "paused": true,
+        "time": 41.29,
+        "resources": {
+          "metal": 95.09,
+          "ore": 49.43,
+          "gas": 40.55,
+          "plasma": 9.03,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5,
+          "power": 1,
+          "mining": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 41.287600000000246,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 463.593309395008,
+                "range": 206.29109532339498,
+                "gap": 258,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 95,
+          "ore": 49,
+          "gas": 40,
+          "plasma": 9,
+          "research": 0,
+          "powerUsed": 3,
+          "powerAvailable": 16
+        }
+      },
+      "point": {
+        "gridKey": "-2,0",
+        "gridX": -2,
+        "gridY": 0,
+        "world": {
+          "x": -664.186017942017,
+          "y": -206.82631281703755
+        },
+        "clientX": 708.2132034355964,
+        "clientY": 478.2132034355957,
+        "deviceX": 1416.4264068711927,
+        "deviceY": 956.4264068711914,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "-2,0",
+        "pointerGridKey": "-2,0",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 2.8421709430404007E-13,
+          "distance": 4.439612937350521E-13
+        },
+        "target": {
+          "gridKey": "-2,0",
+          "gridX": -2,
+          "gridY": 0,
+          "world": {
+            "x": -664.186017942017,
+            "y": -206.82631281703755
+          },
+          "clientX": 708.2132034355964,
+          "clientY": 478.2132034355957,
+          "deviceX": 1416.4264068711927,
+          "deviceY": 956.4264068711914,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": -2,
+            "y": 0
+          },
+          "gridKey": "-2,0",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "turret",
+          "placement": {
+            "facility": "turret",
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 13,
+              "marginAfter": 10,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid",
+              "weapon_tip"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355964,
+            "clientY": 478.2132034355957,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 2.8421709430404007E-13,
+              "distance": 4.439612937350521E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "wouldBuild": true,
+            "facility": "turret"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "-2,0",
+        "pointerGridKey": "-2,0",
+        "aligned": true,
+        "screenDelta": {
+          "dx": -3.410605131648481E-13,
+          "dy": 2.8421709430404007E-13,
+          "distance": 4.439612937350521E-13
+        },
+        "target": {
+          "gridKey": "-2,0",
+          "gridX": -2,
+          "gridY": 0,
+          "world": {
+            "x": -664.186017942017,
+            "y": -206.82631281703755
+          },
+          "clientX": 708.2132034355964,
+          "clientY": 478.2132034355957,
+          "deviceX": 1416.4264068711927,
+          "deviceY": 956.4264068711914,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": -2,
+            "y": 0
+          },
+          "gridKey": "-2,0",
+          "cell": {
+            "facility": "turret",
+            "detached": false,
+            "active": false
+          },
+          "selectedBuild": "turret",
+          "placement": {
+            "facility": "turret",
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 13,
+              "marginAfter": 10,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid",
+              "weapon_tip"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355964,
+            "clientY": 478.2132034355957,
+            "deltaFromInput": {
+              "dx": -3.410605131648481E-13,
+              "dy": 2.8421709430404007E-13,
+              "distance": 4.439612937350521E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "-2,0",
+            "gridX": -2,
+            "gridY": 0,
+            "wouldBuild": true,
+            "facility": "turret"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 41.29,
+        "resources": {
+          "metal": 60.09,
+          "ore": 37.43,
+          "gas": 40.55,
+          "plasma": 9.03,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1,
+          "turret": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：同类设施已建但未运作，先检查供电。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 41.287600000000246,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 463.593309395008,
+                "range": 206.29109532339498,
+                "gap": 258,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "因电力或优先级未运作：炮塔",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "炮塔已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 60,
+          "ore": 37,
+          "gas": 40,
+          "plasma": 9,
+          "research": 0,
+          "powerUsed": 3,
+          "powerAvailable": 16
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "frame",
+      "gridKey": "0,-2",
+      "before": {
+        "paused": true,
+        "time": 86.29,
+        "resources": {
+          "metal": 108.35,
+          "ore": 45.53,
+          "gas": 47.46,
+          "plasma": 10.16,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1,
+          "turret": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 86.29200000000665,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 523.5355434247351,
+                "range": 206.29109532339498,
+                "gap": 318,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "贸易商船 - 接近交易 · 距离 567 · 4秒",
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "放置预览：炮塔 · 可放置 · 建后余量 7 · 建议放在外缘，减少自机遮挡射线",
+          "建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "雷达发现敌对目标。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 108,
+          "ore": 45,
+          "gas": 47,
+          "plasma": 10,
+          "research": 0,
+          "powerUsed": 6,
+          "powerAvailable": 16
+        }
+      },
+      "point": {
+        "gridKey": "0,-2",
+        "gridX": 0,
+        "gridY": -2,
+        "world": {
+          "x": -664.1860179420177,
+          "y": -206.82631281703686
+        },
+        "clientX": 708.2132034355959,
+        "clientY": 478.21320343559603,
+        "deviceX": 1416.4264068711918,
+        "deviceY": 956.4264068711921,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "0,-2",
+        "pointerGridKey": "0,-2",
+        "aligned": true,
+        "screenDelta": {
+          "dx": 1.1368683772161603E-13,
+          "dy": -5.684341886080802E-14,
+          "distance": 1.2710574864626038E-13
+        },
+        "target": {
+          "gridKey": "0,-2",
+          "gridX": 0,
+          "gridY": -2,
+          "world": {
+            "x": -664.1860179420177,
+            "y": -206.82631281703686
+          },
+          "clientX": 708.2132034355959,
+          "clientY": 478.21320343559603,
+          "deviceX": 1416.4264068711918,
+          "deviceY": 956.4264068711921,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": 0,
+            "y": -2
+          },
+          "gridKey": "0,-2",
+          "cell": null,
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": true,
+              "reasonKey": null,
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 10,
+              "marginAfter": 10,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": []
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355959,
+            "clientY": 478.21320343559603,
+            "deltaFromInput": {
+              "dx": 1.1368683772161603E-13,
+              "dy": -5.684341886080802E-14,
+              "distance": 1.2710574864626038E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "0,-2",
+        "pointerGridKey": "0,-2",
+        "aligned": true,
+        "screenDelta": {
+          "dx": 1.1368683772161603E-13,
+          "dy": -5.684341886080802E-14,
+          "distance": 1.2710574864626038E-13
+        },
+        "target": {
+          "gridKey": "0,-2",
+          "gridX": 0,
+          "gridY": -2,
+          "world": {
+            "x": -664.1860179420177,
+            "y": -206.82631281703686
+          },
+          "clientX": 708.2132034355959,
+          "clientY": 478.21320343559603,
+          "deviceX": 1416.4264068711918,
+          "deviceY": 956.4264068711921,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": 0,
+            "y": -2
+          },
+          "gridKey": "0,-2",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "frame",
+          "placement": {
+            "facility": "frame",
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 10,
+              "marginAfter": 10,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355959,
+            "clientY": 478.21320343559603,
+            "deltaFromInput": {
+              "dx": 1.1368683772161603E-13,
+              "dy": -5.684341886080802E-14,
+              "distance": 1.2710574864626038E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "wouldBuild": true,
+            "facility": "frame"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 86.29,
+        "resources": {
+          "metal": 100.35,
+          "ore": 45.53,
+          "gas": 47.46,
+          "plasma": 10.16,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5,
+          "power": 1,
+          "mining": 1,
+          "turret": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 86.29200000000665,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 523.5355434247351,
+                "range": 206.29109532339498,
+                "gap": 318,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "贸易商船 - 接近交易 · 距离 567 · 4秒",
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": {
+            "gridKey": "0,-2",
+            "x": 0,
+            "y": -2,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          }
+        },
+        "snapshotResource": {
+          "metal": 100,
+          "ore": 45,
+          "gas": 47,
+          "plasma": 10,
+          "research": 0,
+          "powerUsed": 6,
+          "powerAvailable": 16
+        }
+      },
+      "built": true
+    },
+    {
+      "facility": "repair",
+      "gridKey": "0,-2",
+      "before": {
+        "paused": true,
+        "time": 86.29,
+        "resources": {
+          "metal": 100.35,
+          "ore": 45.53,
+          "gas": 47.46,
+          "plasma": 10.16,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 5,
+          "power": 1,
+          "mining": 1,
+          "turret": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 86.29200000000665,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 523.5355434247351,
+                "range": 206.29109532339498,
+                "gap": 318,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "贸易商船 - 接近交易 · 距离 567 · 4秒",
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "框架已扩展。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": {
+            "gridKey": "0,-2",
+            "x": 0,
+            "y": -2,
+            "facility": "frame",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          }
+        },
+        "snapshotResource": {
+          "metal": 100,
+          "ore": 45,
+          "gas": 47,
+          "plasma": 10,
+          "research": 0,
+          "powerUsed": 6,
+          "powerAvailable": 16
+        }
+      },
+      "point": {
+        "gridKey": "0,-2",
+        "gridX": 0,
+        "gridY": -2,
+        "world": {
+          "x": -664.1860179420177,
+          "y": -206.82631281703686
+        },
+        "clientX": 708.2132034355959,
+        "clientY": 478.21320343559603,
+        "deviceX": 1416.4264068711918,
+        "deviceY": 956.4264068711921,
+        "visible": true,
+        "viewport": {
+          "deviceWidth": 2748,
+          "deviceHeight": 1828,
+          "dpr": 2,
+          "innerWidth": 1374,
+          "innerHeight": 914,
+          "devicePixelRatio": 2
+        },
+        "camera": {
+          "x": -706.6124248132096,
+          "y": -249.25271968822892,
+          "shakeX": 0,
+          "shakeY": 0,
+          "zoom": 1
+        }
+      },
+      "alignBefore": {
+        "targetGridKey": "0,-2",
+        "pointerGridKey": "0,-2",
+        "aligned": true,
+        "screenDelta": {
+          "dx": 1.1368683772161603E-13,
+          "dy": -5.684341886080802E-14,
+          "distance": 1.2710574864626038E-13
+        },
+        "target": {
+          "gridKey": "0,-2",
+          "gridX": 0,
+          "gridY": -2,
+          "world": {
+            "x": -664.1860179420177,
+            "y": -206.82631281703686
+          },
+          "clientX": 708.2132034355959,
+          "clientY": 478.21320343559603,
+          "deviceX": 1416.4264068711918,
+          "deviceY": 956.4264068711921,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": 0,
+            "y": -2
+          },
+          "gridKey": "0,-2",
+          "cell": {
+            "facility": "frame",
+            "detached": false,
+            "active": true
+          },
+          "selectedBuild": "repair",
+          "placement": {
+            "facility": "repair",
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "affordability": {
+              "affordable": true,
+              "missingResources": []
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 10,
+              "marginAfter": 6,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid",
+              "repair_tip"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355959,
+            "clientY": 478.21320343559603,
+            "deltaFromInput": {
+              "dx": 1.1368683772161603E-13,
+              "dy": -5.684341886080802E-14,
+              "distance": 1.2710574864626038E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "wouldBuild": true,
+            "facility": "repair"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "alignAfter": {
+        "targetGridKey": "0,-2",
+        "pointerGridKey": "0,-2",
+        "aligned": true,
+        "screenDelta": {
+          "dx": 1.1368683772161603E-13,
+          "dy": -5.684341886080802E-14,
+          "distance": 1.2710574864626038E-13
+        },
+        "target": {
+          "gridKey": "0,-2",
+          "gridX": 0,
+          "gridY": -2,
+          "world": {
+            "x": -664.1860179420177,
+            "y": -206.82631281703686
+          },
+          "clientX": 708.2132034355959,
+          "clientY": 478.21320343559603,
+          "deviceX": 1416.4264068711918,
+          "deviceY": 956.4264068711921,
+          "visible": true,
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        },
+        "pointer": {
+          "inputSource": "screen",
+          "screen": {
+            "x": 708.213203435596,
+            "y": 478.213203435596
+          },
+          "world": {
+            "x": -664.1860179420175,
+            "y": -206.82631281703698
+          },
+          "grid": {
+            "x": 0,
+            "y": -2
+          },
+          "gridKey": "0,-2",
+          "cell": {
+            "facility": "repair",
+            "detached": false,
+            "active": false
+          },
+          "selectedBuild": "repair",
+          "placement": {
+            "facility": "repair",
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "affordability": {
+              "affordable": false,
+              "missingResources": [
+                {
+                  "name": "plasma",
+                  "need": 6,
+                  "have": 4,
+                  "gap": 2
+                }
+              ]
+            },
+            "placement": {
+              "valid": false,
+              "reasonKey": "occupied",
+              "connectedToCore": true
+            },
+            "powerForecast": {
+              "powerHeadroomBefore": 10,
+              "marginAfter": 6,
+              "willCausePowerPressure": false,
+              "willCausePowerNegative": false
+            },
+            "rangeHint": null,
+            "warnings": [
+              "placement_invalid",
+              "resource_low",
+              "repair_tip"
+            ]
+          },
+          "roundTripFromGridCenter": {
+            "clientX": 708.2132034355959,
+            "clientY": 478.21320343559603,
+            "deltaFromInput": {
+              "dx": 1.1368683772161603E-13,
+              "dy": -5.684341886080802E-14,
+              "distance": 1.2710574864626038E-13
+            }
+          },
+          "handleCanvasClickWouldResolve": {
+            "gridKey": "0,-2",
+            "gridX": 0,
+            "gridY": -2,
+            "wouldBuild": true,
+            "facility": "repair"
+          },
+          "viewport": {
+            "deviceWidth": 2748,
+            "deviceHeight": 1828,
+            "dpr": 2,
+            "innerWidth": 1374,
+            "innerHeight": 914,
+            "devicePixelRatio": 2
+          },
+          "camera": {
+            "x": -706.6124248132096,
+            "y": -249.25271968822892,
+            "shakeX": 0,
+            "shakeY": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 86.29,
+        "resources": {
+          "metal": 56.35,
+          "ore": 45.53,
+          "gas": 47.46,
+          "plasma": 4.16,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1,
+          "turret": 1,
+          "repair": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": false,
+            "missingResources": [
+              {
+                "name": "plasma",
+                "need": 6,
+                "have": 4,
+                "gap": 2
+              }
+            ],
+            "statusText": "缺等离子 2",
+            "tipText": "警告：缺等离子 2，当前不能建造。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 86.29200000000665,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 523.5355434247351,
+                "range": 206.29109532339498,
+                "gap": 318,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "贸易商船 - 接近交易 · 距离 567 · 4秒",
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：维修站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "因电力或优先级未运作：维修站",
+          "建造「维修站」资源不足：金属44 等离子6（核心会缓慢产金属）"
+        ],
+        "toast": "维修站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": {
+            "gridKey": "0,-2",
+            "x": 0,
+            "y": -2,
+            "facility": "repair",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          }
+        },
+        "snapshotResource": {
+          "metal": 56,
+          "ore": 45,
+          "gas": 47,
+          "plasma": 4,
+          "research": 0,
+          "powerUsed": 6,
+          "powerAvailable": 16
+        }
+      },
+      "built": true
+    }
+  ],
+  "waits": [
+    {
+      "label": "post-mining-baseline",
+      "ms": 10000,
+      "before": {
+        "paused": true,
+        "time": 31.29,
+        "resources": {
+          "metal": 94.59,
+          "ore": 47.63,
+          "gas": 39.35,
+          "plasma": 8.78,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：同类设施已建但未运作，先检查供电。"
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 31.119899999999603,
+          "miners": [],
+          "overall": {
+            "minerCount": 0,
+            "activeCount": 0,
+            "harvestingCount": 0,
+            "outOfRangeCount": 0,
+            "hasMiner": false,
+            "anyHarvesting": false,
+            "allOutOfRange": false,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "no_mining_station"
+          }
+        },
+        "statusAlerts": [
+          "1 座采矿站因电力不足停机",
+          "建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "因电力或优先级未运作：采矿站",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "采矿站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 94,
+          "ore": 47,
+          "gas": 39,
+          "plasma": 8,
+          "research": 0,
+          "powerUsed": 0,
+          "powerAvailable": 6
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 41.29,
+        "resources": {
+          "metal": 103.09,
+          "ore": 49.43,
+          "gas": 40.55,
+          "plasma": 9.03,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：敌袭前补基础火力。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 41.287600000000246,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 463.593309395008,
+                "range": 206.29109532339498,
+                "gap": 258,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "放置预览：采矿站 · 该格已有设施",
+          "建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "采矿站已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": null,
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 103,
+          "ore": 49,
+          "gas": 40,
+          "plasma": 9,
+          "research": 0,
+          "powerUsed": 3,
+          "powerAvailable": 16
+        }
+      }
+    },
+    {
+      "label": "resource-gap-fill-attempt",
+      "ms": 45000,
+      "before": {
+        "paused": true,
+        "time": 41.29,
+        "resources": {
+          "metal": 60.09,
+          "ore": 37.43,
+          "gas": 40.55,
+          "plasma": 9.03,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1,
+          "turret": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：同类设施已建但未运作，先检查供电。"
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 41.287600000000246,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 463.593309395008,
+                "range": 206.29109532339498,
+                "gap": 258,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+          "因电力或优先级未运作：炮塔",
+          "无法放置：该格已有设施"
+        ],
+        "toast": "炮塔已建造。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 60,
+          "ore": 37,
+          "gas": 40,
+          "plasma": 9,
+          "research": 0,
+          "powerUsed": 3,
+          "powerAvailable": 16
+        }
+      },
+      "after": {
+        "paused": true,
+        "time": 86.29,
+        "resources": {
+          "metal": 108.35,
+          "ore": 45.53,
+          "gas": 47.46,
+          "plasma": 10.16,
+          "research": 0
+        },
+        "counts": {
+          "core": 1,
+          "frame": 4,
+          "power": 1,
+          "mining": 1,
+          "turret": 1
+        },
+        "costs": {
+          "frame": {
+            "cost": {
+              "metal": 8
+            },
+            "baseCost": {
+              "metal": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "已有较多同类设施，先检查电力。"
+          },
+          "power": {
+            "cost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "baseCost": {
+              "metal": 22,
+              "ore": 8
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "mining": {
+            "cost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "baseCost": {
+              "metal": 28,
+              "ore": 10
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "turret": {
+            "cost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "baseCost": {
+              "metal": 35,
+              "ore": 12
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": ""
+          },
+          "repair": {
+            "cost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "baseCost": {
+              "metal": 44,
+              "plasma": 6
+            },
+            "affordable": true,
+            "missingResources": [],
+            "statusText": "可建造",
+            "tipText": "推荐：维修能力不足，受损后恢复慢。"
+          }
+        },
+        "reachability": {
+          "generatedAt": 86.29200000000665,
+          "miners": [
+            {
+              "cellKey": "-1,1",
+              "facility": "mining",
+              "enabled": true,
+              "active": true,
+              "detached": false,
+              "target": null,
+              "nearest": {
+                "bodyName": "行星-1",
+                "resource": "gas",
+                "distance": 523.5355434247351,
+                "range": 206.29109532339498,
+                "gap": 318,
+                "inRange": false
+              },
+              "reasonKey": "out_of_range"
+            }
+          ],
+          "overall": {
+            "minerCount": 1,
+            "activeCount": 1,
+            "harvestingCount": 0,
+            "outOfRangeCount": 1,
+            "hasMiner": true,
+            "anyHarvesting": false,
+            "allOutOfRange": true,
+            "inactiveRatio": 1,
+            "severity": "critical",
+            "reasonKey": "all_miners_out_of_range"
+          }
+        },
+        "statusAlerts": [
+          "贸易商船 - 接近交易 · 距离 567 · 4秒",
+          "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+          "采矿站未覆盖资源",
+          "放置预览：炮塔 · 可放置 · 建后余量 7 · 建议放在外缘，减少自机遮挡射线",
+          "建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出"
+        ],
+        "toast": "雷达发现敌对目标。",
+        "runtimeErrors": [],
+        "storage": {
+          "localStorageLength": 0,
+          "sessionStorageLength": 0,
+          "localKeys": [],
+          "sessionKeys": []
+        },
+        "cells": {
+          "-1,-1": {
+            "gridKey": "-1,-1",
+            "x": -1,
+            "y": -1,
+            "facility": "power",
+            "active": false,
+            "enabled": true,
+            "detached": false
+          },
+          "-1,1": {
+            "gridKey": "-1,1",
+            "x": -1,
+            "y": 1,
+            "facility": "mining",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "-2,0": {
+            "gridKey": "-2,0",
+            "x": -2,
+            "y": 0,
+            "facility": "turret",
+            "active": true,
+            "enabled": true,
+            "detached": false
+          },
+          "0,-2": null
+        },
+        "snapshotResource": {
+          "metal": 108,
+          "ore": 45,
+          "gas": 47,
+          "plasma": 10,
+          "research": 0,
+          "powerUsed": 6,
+          "powerAvailable": 16
+        }
+      }
+    }
+  ],
+  "final": {
+    "paused": true,
+    "time": 86.29,
+    "resources": {
+      "metal": 56.35,
+      "ore": 45.53,
+      "gas": 47.46,
+      "plasma": 4.16,
+      "research": 0
+    },
+    "counts": {
+      "core": 1,
+      "frame": 4,
+      "power": 1,
+      "mining": 1,
+      "turret": 1,
+      "repair": 1
+    },
+    "costs": {
+      "frame": {
+        "cost": {
+          "metal": 8
+        },
+        "baseCost": {
+          "metal": 8
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": "已有较多同类设施，先检查电力。"
+      },
+      "power": {
+        "cost": {
+          "metal": 22,
+          "ore": 8
+        },
+        "baseCost": {
+          "metal": 22,
+          "ore": 8
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": ""
+      },
+      "mining": {
+        "cost": {
+          "metal": 28,
+          "ore": 10
+        },
+        "baseCost": {
+          "metal": 28,
+          "ore": 10
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": ""
+      },
+      "turret": {
+        "cost": {
+          "metal": 35,
+          "ore": 12
+        },
+        "baseCost": {
+          "metal": 35,
+          "ore": 12
+        },
+        "affordable": true,
+        "missingResources": [],
+        "statusText": "可建造",
+        "tipText": ""
+      },
+      "repair": {
+        "cost": {
+          "metal": 44,
+          "plasma": 6
+        },
+        "baseCost": {
+          "metal": 44,
+          "plasma": 6
+        },
+        "affordable": false,
+        "missingResources": [
+          {
+            "name": "plasma",
+            "need": 6,
+            "have": 4,
+            "gap": 2
+          }
+        ],
+        "statusText": "缺等离子 2",
+        "tipText": "警告：缺等离子 2，当前不能建造。"
+      }
+    },
+    "reachability": {
+      "generatedAt": 86.29200000000665,
+      "miners": [
+        {
+          "cellKey": "-1,1",
+          "facility": "mining",
+          "enabled": true,
+          "active": true,
+          "detached": false,
+          "target": null,
+          "nearest": {
+            "bodyName": "行星-1",
+            "resource": "gas",
+            "distance": 523.5355434247351,
+            "range": 206.29109532339498,
+            "gap": 318,
+            "inRange": false
+          },
+          "reasonKey": "out_of_range"
+        }
+      ],
+      "overall": {
+        "minerCount": 1,
+        "activeCount": 1,
+        "harvestingCount": 0,
+        "outOfRangeCount": 1,
+        "hasMiner": true,
+        "anyHarvesting": false,
+        "allOutOfRange": true,
+        "inactiveRatio": 1,
+        "severity": "critical",
+        "reasonKey": "all_miners_out_of_range"
+      }
+    },
+    "statusAlerts": [
+      "贸易商船 - 接近交易 · 距离 567 · 4秒",
+      "采矿站待命：距「行星-1」还差 290，请进入彩色外环",
+      "采矿站未覆盖资源",
+      "建造模式：维修站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+      "因电力或优先级未运作：维修站",
+      "建造「维修站」资源不足：金属44 等离子6（核心会缓慢产金属）"
+    ],
+    "toast": "维修站已建造。",
+    "runtimeErrors": [],
+    "storage": {
+      "localStorageLength": 0,
+      "sessionStorageLength": 0,
+      "localKeys": [],
+      "sessionKeys": []
+    },
+    "cells": {
+      "-1,-1": {
+        "gridKey": "-1,-1",
+        "x": -1,
+        "y": -1,
+        "facility": "power",
+        "active": false,
+        "enabled": true,
+        "detached": false
+      },
+      "-1,1": {
+        "gridKey": "-1,1",
+        "x": -1,
+        "y": 1,
+        "facility": "mining",
+        "active": true,
+        "enabled": true,
+        "detached": false
+      },
+      "-2,0": {
+        "gridKey": "-2,0",
+        "x": -2,
+        "y": 0,
+        "facility": "turret",
+        "active": true,
+        "enabled": true,
+        "detached": false
+      },
+      "0,-2": {
+        "gridKey": "0,-2",
+        "x": 0,
+        "y": -2,
+        "facility": "repair",
+        "active": false,
+        "enabled": true,
+        "detached": false
+      }
+    },
+    "snapshotResource": {
+      "metal": 56,
+      "ore": 45,
+      "gas": 47,
+      "plasma": 4,
+      "research": 0,
+      "powerUsed": 6,
+      "powerAvailable": 16
+    }
+  }
+}
