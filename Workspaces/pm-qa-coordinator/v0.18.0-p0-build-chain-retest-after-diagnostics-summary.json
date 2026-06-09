@@ -1,0 +1,255 @@
+{
+  "version": "v0.18.0-p0-build-chain-retest",
+  "task": "#5",
+  "createdAt": "2026-06-10T00:41:17+08:00",
+  "environment": {
+    "os": "Windows 10.0.26200",
+    "browser": "Chrome/148.0.7778.217",
+    "cdpPort": 9356,
+    "entry": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "viewport": {
+      "innerWidth": 1387,
+      "innerHeight": 807,
+      "devicePixelRatio": 2
+    },
+    "input": "Visible Chrome/CDP Runtime.evaluate dispatches PointerEvent to canvas at getGridScreenPoint centers; no buildAt/state mutation helper used",
+    "storagePolicy": "Temporary Chrome profile; no real user profile or save cleared",
+    "localStorageLength": 0,
+    "sessionStorageLength": 0
+  },
+  "baseline": {
+    "resources": {
+      "metal": 130.04,
+      "ore": 60.01,
+      "gas": 35.01,
+      "plasma": 8,
+      "research": 0
+    },
+    "counts": {
+      "frame": 4,
+      "core": 1
+    }
+  },
+  "steps": [
+    {
+      "facility": "power",
+      "targetGridKey": "-1,-1",
+      "clientX": 346.7477983739227,
+      "clientY": 274.3311600802466,
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "-1,-1",
+        "distance": 4.889855783314162e-13
+      },
+      "beforeFrameResources": {
+        "metal": 130.04,
+        "ore": 60.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 122.04,
+        "ore": 60.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 100.04,
+        "ore": 52.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityCounts": {
+        "power": 1,
+        "frame": 4,
+        "core": 1
+      },
+      "afterFacilityCell": {
+        "gridKey": "-1,-1",
+        "facility": "power",
+        "exists": true
+      }
+    },
+    {
+      "facility": "mining",
+      "targetGridKey": "-1,1",
+      "clientX": 346.7477983739227,
+      "clientY": 304.3311600802466,
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "-1,1",
+        "distance": 4.889855783314162e-13
+      },
+      "beforeFrameResources": {
+        "metal": 100.04,
+        "ore": 52.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 92.04,
+        "ore": 52.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 64.04,
+        "ore": 42.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityCounts": {
+        "power": 1,
+        "frame": 4,
+        "mining": 1,
+        "core": 1
+      },
+      "afterFacilityCell": {
+        "gridKey": "-1,1",
+        "facility": "mining",
+        "exists": true
+      },
+      "rangeHint": {
+        "resource": "ore",
+        "distance": 472.98723186106974,
+        "range": 237.4891756591387,
+        "gap": 236,
+        "inRange": false
+      }
+    },
+    {
+      "facility": "turret",
+      "targetGridKey": "-2,0",
+      "clientX": 331.7477983739227,
+      "clientY": 289.3311600802466,
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "-2,0",
+        "distance": 4.889855783314162e-13
+      },
+      "beforeFrameResources": {
+        "metal": 64.04,
+        "ore": 42.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 56.04,
+        "ore": 42.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 21.04,
+        "ore": 30.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityCounts": {
+        "power": 1,
+        "frame": 4,
+        "mining": 1,
+        "turret": 1,
+        "core": 1
+      },
+      "afterFacilityCell": {
+        "gridKey": "-2,0",
+        "facility": "turret",
+        "exists": true
+      }
+    },
+    {
+      "facility": "repair",
+      "targetGridKey": "0,-2",
+      "clientX": 361.7477983739227,
+      "clientY": 259.3311600802466,
+      "alignment": {
+        "aligned": true,
+        "pointerGridKey": "0,-2",
+        "distance": 4.889855783314162e-13
+      },
+      "beforeFrameResources": {
+        "metal": 21.04,
+        "ore": 30.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFrameResources": {
+        "metal": 13.04,
+        "ore": 30.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityResources": {
+        "metal": 13.04,
+        "ore": 30.01,
+        "gas": 35.01,
+        "plasma": 8,
+        "research": 0
+      },
+      "afterFacilityCounts": {
+        "power": 1,
+        "frame": 5,
+        "mining": 1,
+        "turret": 1,
+        "core": 1
+      },
+      "afterFacilityCell": {
+        "gridKey": "0,-2",
+        "facility": "frame",
+        "exists": true
+      },
+      "blockedReason": "repair resource_low: missing metal 31 (need 44, have 13)"
+    }
+  ],
+  "miningObservation": {
+    "beforeWaitResources": {
+      "metal": 13.04,
+      "ore": 30.01,
+      "gas": 35.01,
+      "plasma": 8,
+      "research": 0
+    },
+    "afterWaitResources": {
+      "metal": 13.04,
+      "ore": 30.01,
+      "gas": 35.01,
+      "plasma": 8,
+      "research": 0
+    },
+    "reachabilityReasonKey": "no_mining_station",
+    "note": "Mining facility exists in station counts, but the browser run did not advance simulation time in this CDP PointerEvent session; no harvesting/resource growth evidence was produced."
+  },
+  "runtime": {
+    "errors": [],
+    "rejections": []
+  },
+  "final": {
+    "resources": {
+      "metal": 13.04,
+      "ore": 30.01,
+      "gas": 35.01,
+      "plasma": 8,
+      "research": 0
+    },
+    "counts": {
+      "power": 1,
+      "frame": 5,
+      "mining": 1,
+      "turret": 1,
+      "core": 1
+    },
+    "lastBuildError": "repair resource insufficient"
+  }
+}
