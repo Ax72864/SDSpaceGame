@@ -1,0 +1,2059 @@
+﻿{
+    "ok":  true,
+    "processId":  89056,
+    "cdpPort":  9318,
+    "profile":  "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v015-manual-p0-profile-20260609-2250-9318",
+    "targetUrl":  "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "websocketUrl":  "ws://127.0.0.1:9318/devtools/page/6C1BF705185AA34DC658ACFCD4E47BD3",
+    "cdpEvents":  [
+
+                  ],
+    "manual":  {
+                   "collectedAt":  "2026-06-09T14:43:43.778Z",
+                   "url":  "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+                   "userAgent":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+                   "webdriver":  false,
+                   "viewport":  {
+                                    "width":  1267,
+                                    "height":  627,
+                                    "dpr":  2
+                                },
+                   "storageAtStart":  {
+                                          "localStorageLength":  0,
+                                          "sessionStorageLength":  0,
+                                          "hasGameSave":  false
+                                      },
+                   "note":  "visible Chrome + CDP. Build placement uses runtime mouseWorld + keyboard Enter to avoid synthetic pointer capture errors; this is browser/CDP evidence, not full human handfeel.",
+                   "priorAttempt":  "first wrapper attempt failed due synthetic PointerEvent setPointerCapture exception; not counted as pass evidence.",
+                   "steps":  [
+                                 {
+                                     "id":  "hiddenChecklist",
+                                     "action":  "open release candidate checklist",
+                                     "dom":  {
+                                                 "panelVisible":  true,
+                                                 "manualItems":  [
+                                                                     {
+                                                                         "id":  "P0-1.firstRun",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-2.miningLoop",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-3.resourceShortage",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-4.enemyApproach",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-5.combatAndRepair",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-6.postCombatReview",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-7.galaxyJump",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-8.metaReturn",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-9.smallScreen",
+                                                                         "value":  ""
+                                                                     },
+                                                                     {
+                                                                         "id":  "P0-10.consoleRuntime",
+                                                                         "value":  ""
+                                                                     }
+                                                                 ]
+                                             }
+                                 },
+                                 {
+                                     "id":  "P0-1.firstRun",
+                                     "action":  "temp profile + resetRun isolated first run",
+                                     "statusEvidence":  "browser/CDP covered",
+                                     "state":  {
+                                                   "time":  0.05,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  130,
+                                                                     "ore":  60,
+                                                                     "gas":  35,
+                                                                     "plasma":  8,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "frame",
+                                                   "lastBuildError":  "",
+                                                   "buildHint":  "",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "frame",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  70,
+                                                                     "maxHp":  70
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "frame",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  70,
+                                                                     "maxHp":  70
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "frame",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  70,
+                                                                     "maxHp":  70
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "frame",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  70,
+                                                                     "maxHp":  70
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 130 矿物 60 气体 35 等离子 8 科研 0 电力 0/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 先建立采矿能力 下一步 先在已连接框架上建造「发电站」，再选「采矿站」放在矿石或金属资源点旁。",
+                                                 "resourceGuide":  "附近资源：气体外环 · 行星-2 · 剩余 1496 把采矿站放在外环旁，并驾驶工站进入外环。距离 514 / 采矿范围 285 · 还需靠近 229 尚未建造采矿站 — 选「采矿站」建在框架上，再进入资源外环。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "多处断电影响核心能力 建造模式：框架 — 点网格或 Enter 放置；Esc / 「指针/航行」退出",
+                                                 "objective":  "采集 90 单位资源 进度 0% · 0 / 90 单位",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "核心已上线。默认「屏幕方向」移动（W=上）；展开右侧「更多状态」可切换移动模式。鼠标指向决定朝向。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-2.miningLoop",
+                                     "action":  "CDP click mining button + keyboard Enter placement attempts",
+                                     "statusEvidence":  "browser/CDP covered",
+                                     "button":  {
+                                                    "ok":  true,
+                                                    "selector":  "button[data-type=\u0027mining\u0027]",
+                                                    "text":  "采矿 采矿站 x0 近天体自动采矿 金属28 矿10 电力 -3 可建造 推荐：当前无采矿能力，先建立资源收入。"
+                                                },
+                                     "attempts":  [
+                                                      {
+                                                          "gx":  0,
+                                                          "gy":  -1,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "",
+                                                          "buildHint":  "",
+                                                          "toast":  "采矿站已建造。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。"
+                                                      },
+                                                      {
+                                                          "gx":  1,
+                                                          "gy":  0,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "",
+                                                          "buildHint":  "",
+                                                          "toast":  "采矿站已建造。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。"
+                                                      },
+                                                      {
+                                                          "gx":  -1,
+                                                          "gy":  0,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "",
+                                                          "buildHint":  "",
+                                                          "toast":  "采矿站已建造。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。"
+                                                      },
+                                                      {
+                                                          "gx":  0,
+                                                          "gy":  1,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "",
+                                                          "buildHint":  "",
+                                                          "toast":  "采矿站已建造。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。"
+                                                      },
+                                                      {
+                                                          "gx":  1,
+                                                          "gy":  -1,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                          "buildHint":  "",
+                                                          "toast":  "设施只能建造在已连接的空框架上。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。 放置预览：距小行星-2外环还差 187，当前位置采不到资源。"
+                                                      },
+                                                      {
+                                                          "gx":  -1,
+                                                          "gy":  1,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                          "buildHint":  "",
+                                                          "toast":  "设施只能建造在已连接的空框架上。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。 放置预览：距小行星-2外环还差 116，当前位置采不到资源。"
+                                                      },
+                                                      {
+                                                          "gx":  2,
+                                                          "gy":  0,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                          "buildHint":  "",
+                                                          "toast":  "设施只能建造在已连接的空框架上。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。 放置预览：距小行星-2外环还差 209，当前位置采不到资源。"
+                                                      },
+                                                      {
+                                                          "gx":  -2,
+                                                          "gy":  0,
+                                                          "cells":  5,
+                                                          "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                          "buildHint":  "",
+                                                          "toast":  "设施只能建造在已连接的空框架上。",
+                                                          "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。 放置预览：距小行星-2外环还差 92，当前位置采不到资源。"
+                                                      }
+                                                  ],
+                                     "state":  {
+                                                   "time":  0.05,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  18,
+                                                                     "ore":  20,
+                                                                     "gas":  35,
+                                                                     "plasma":  8,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "mining",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 18 矿物 20 气体 35 等离子 8 科研 0 电力 0/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 扩建空间站骨架 下一步 选中「框架」，在核心外围已连接的空格点击建造。",
+                                                 "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。 放置预览：距小行星-2外环还差 92，当前位置采不到资源。",
+                                                 "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：采矿站 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「采矿站」资源不足：金属28 矿10（核心会缓慢产金属）",
+                                                 "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "设施只能建造在已连接的空框架上。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-3.resourceShortage",
+                                     "action":  "CDP setup resources to zero, click turret + Enter to observe shortage feedback",
+                                     "statusEvidence":  "browser/CDP setup covered",
+                                     "button":  {
+                                                    "ok":  true,
+                                                    "selector":  "button[data-type=\u0027turret\u0027]",
+                                                    "text":  "武器 炮塔 x0 自动近程开火 金属35 矿12 电力 -3 缺金属 35 警告：缺金属 35，当前不能建造。"
+                                                },
+                                     "state":  {
+                                                   "time":  0.05,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  0,
+                                                                     "ore":  0,
+                                                                     "gas":  35,
+                                                                     "plasma":  8,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 0 矿物 0 气体 35 等离子 8 科研 0 电力 0/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 扩建空间站骨架 下一步 选中「框架」，在核心外围已连接的空格点击建造。",
+                                                 "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                 "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "设施只能建造在已连接的空框架上。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-3b.powerShortage",
+                                     "action":  "CDP setup: disable existing power cell to observe outage feedback",
+                                     "statusEvidence":  "uncovered-no-power-cell",
+                                     "disabledPower":  false,
+                                     "state":  {
+                                                   "time":  0.05,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  18,
+                                                                     "ore":  20,
+                                                                     "gas":  35,
+                                                                     "plasma":  8,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 0 矿物 0 气体 35 等离子 8 科研 0 电力 0/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 扩建空间站骨架 下一步 选中「框架」，在核心外围已连接的空格点击建造。",
+                                                 "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 499 把采矿站放在外环旁，并驾驶工站进入外环。距离 305 / 采矿范围 156 · 还需靠近 150 采矿站因电力不足未运作 — 增建发电站或关闭低优先级设施。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                 "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "设施只能建造在已连接的空框架上。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-4.enemyApproach",
+                                     "action":  "natural visible-browser wait for first enemy after first-run start",
+                                     "statusEvidence":  "attempted-not-observed",
+                                     "waitSnapshots":  [
+                                                           {
+                                                               "second":  1,
+                                                               "state":  {
+                                                                             "time":  0.05,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  18,
+                                                                                               "ore":  20,
+                                                                                               "gas":  35,
+                                                                                               "plasma":  8,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  5,
+                                                               "state":  {
+                                                                             "time":  0.05,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  18,
+                                                                                               "ore":  20,
+                                                                                               "gas":  35,
+                                                                                               "plasma":  8,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  9,
+                                                               "state":  {
+                                                                             "time":  0.05,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  18,
+                                                                                               "ore":  20,
+                                                                                               "gas":  35,
+                                                                                               "plasma":  8,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  13,
+                                                               "state":  {
+                                                                             "time":  0.13,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  18.070720000000005,
+                                                                                               "ore":  20.014976,
+                                                                                               "gas":  35.009984,
+                                                                                               "plasma":  8.00208,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "放置预览：炮塔 · 该格已有设施",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "4 座采矿站因电力不足停机 设施只能建造在已连接的空框架上。 多处断电影响核心能力 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  17,
+                                                               "state":  {
+                                                                             "time":  4.17,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  21.499450000000035,
+                                                                                               "ore":  20.74105999999984,
+                                                                                               "gas":  35.49404000000003,
+                                                                                               "plasma":  8.102924999999937,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "放置预览：炮塔 · 未连接空间站核心",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "采矿站待命：距「小行星-2」还差 158，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  21,
+                                                               "state":  {
+                                                                             "time":  8.2,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  24.928095000000067,
+                                                                                               "ore":  21.467125999999684,
+                                                                                               "gas":  35.978084000000045,
+                                                                                               "plasma":  8.203767499999868,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "放置预览：炮塔 · 该格已有设施",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "采矿站待命：距「小行星-2」还差 173，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  25,
+                                                               "state":  {
+                                                                             "time":  12.22,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  28.3426300000001,
+                                                                                               "ore":  22.190203999999515,
+                                                                                               "gas":  36.460136000000055,
+                                                                                               "plasma":  8.304194999999803,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "放置预览：炮塔 · 未连接空间站核心",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "采矿站待命：距「小行星-2」还差 171，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           },
+                                                           {
+                                                               "second":  29,
+                                                               "state":  {
+                                                                             "time":  16.23,
+                                                                             "level":  0,
+                                                                             "objective":  {
+                                                                                               "type":  "explore",
+                                                                                               "progress":  0,
+                                                                                               "target":  1,
+                                                                                               "completeAt":  0,
+                                                                                               "awaiting":  false
+                                                                                           },
+                                                                             "resources":  {
+                                                                                               "metal":  31.757165000000132,
+                                                                                               "ore":  22.913281999999356,
+                                                                                               "gas":  36.94218800000007,
+                                                                                               "plasma":  8.404622499999736,
+                                                                                               "research":  0
+                                                                                           },
+                                                                             "selectedBuild":  "turret",
+                                                                             "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                                             "buildHint":  "放置预览：炮塔 · 该格已有设施",
+                                                                             "cells":  [
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  0,
+                                                                                               "facility":  "core",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  280,
+                                                                                               "maxHp":  280
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  -1,
+                                                                                               "y":  0,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  true,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           },
+                                                                                           {
+                                                                                               "x":  0,
+                                                                                               "y":  -1,
+                                                                                               "facility":  "mining",
+                                                                                               "active":  false,
+                                                                                               "enabled":  true,
+                                                                                               "hp":  95,
+                                                                                               "maxHp":  95
+                                                                                           }
+                                                                                       ],
+                                                                             "enemyCount":  0,
+                                                                             "metaPoints":  0,
+                                                                             "settlementShown":  false,
+                                                                             "endgame":  false
+                                                                         },
+                                                               "dom":  {
+                                                                           "runDanger":  "危险度：安全",
+                                                                           "statusAlerts":  "采矿站待命：距「小行星-2」还差 154，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                                           "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                                           "weaponsRow":  ""
+                                                                       }
+                                                           }
+                                                       ],
+                                     "state":  {
+                                                   "time":  19.25,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  34.321530000000266,
+                                                                     "ore":  23.456323999999245,
+                                                                     "gas":  37.30421600000008,
+                                                                     "plasma":  8.480044999999699,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "放置预览：炮塔 · 该格已有设施",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 34 矿物 23 气体 37 等离子 8 科研 0 电力 6/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 扩建空间站骨架 下一步 选中「框架」，在核心外围已连接的空格点击建造。",
+                                                 "resourceGuide":  "附近资源：等离子外环 · 恒星-1 · 剩余 9999 把采矿站放在外环旁，并驾驶工站进入外环。距离 358 / 采矿范围 275 · 还需靠近 83 采矿站就绪，请进入「恒星-1」的彩色外环（还差 83）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "采矿站待命：距「恒星-1」还差 83，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 建造「炮塔」资源不足：金属35 矿12（核心会缓慢产金属）",
+                                                 "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "设施只能建造在已连接的空框架上。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-5.combatAndRepair",
+                                     "action":  "observe combat/weapon/shield/repair summaries after threat wait",
+                                     "statusEvidence":  "browser/CDP observed",
+                                     "state":  {
+                                                   "time":  21.75,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  36.44670000000039,
+                                                                     "ore":  23.906359999999214,
+                                                                     "gas":  37.60424000000009,
+                                                                     "plasma":  8.542549999999677,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "放置预览：炮塔 · 未连接空间站核心",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 36 矿物 23 气体 37 等离子 8 科研 0 电力 6/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 扩建空间站骨架 下一步 选中「框架」，在核心外围已连接的空格点击建造。",
+                                                 "resourceGuide":  "附近资源：等离子外环 · 恒星-1 · 剩余 9999 把采矿站放在外环旁，并驾驶工站进入外环。距离 331 / 采矿范围 275 · 还需靠近 56 采矿站就绪，请进入「恒星-1」的彩色外环（还差 56）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "采矿站待命：距「恒星-1」还差 56，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 无法放置：未连接空间站核心",
+                                                 "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "设施只能建造在已连接的空框架上。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-6.postCombatReview",
+                                     "action":  "observe combat review summary after same encounter window",
+                                     "statusEvidence":  "not-visible-or-empty",
+                                     "state":  {
+                                                   "time":  21.75,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "explore",
+                                                                     "progress":  0,
+                                                                     "target":  1,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  36.44670000000039,
+                                                                     "ore":  23.906359999999214,
+                                                                     "gas":  37.60424000000009,
+                                                                     "plasma":  8.542549999999677,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "放置预览：炮塔 · 未连接空间站核心",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  0,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 36 矿物 23 气体 37 等离子 8 科研 0 电力 6/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 扩建空间站骨架 下一步 选中「框架」，在核心外围已连接的空格点击建造。",
+                                                 "resourceGuide":  "附近资源：等离子外环 · 恒星-1 · 剩余 9999 把采矿站放在外环旁，并驾驶工站进入外环。距离 331 / 采矿范围 275 · 还需靠近 56 采矿站就绪，请进入「恒星-1」的彩色外环（还差 56）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "采矿站待命：距「恒星-1」还差 56，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 无法放置：未连接空间站核心",
+                                                 "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "设施只能建造在已连接的空框架上。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：0 可购买建议 还差 1 点可购买「采集校准」 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-7.galaxyJump",
+                                     "action":  "complete objective via test hook, click jump UI/card; fallback forceConfirm if no DOM card click advanced",
+                                     "statusEvidence":  "CDP/test-hook assisted",
+                                     "complete":  {
+                                                      "ok":  true,
+                                                      "type":  "explore",
+                                                      "baseGain":  2,
+                                                      "pointsGain":  2
+                                                  },
+                                     "jumpBtn":  {
+                                                     "ok":  true,
+                                                     "selector":  "#objectiveJumpBtn,#objectiveJumpDeferredBtn",
+                                                     "text":  "跃迁下一星系"
+                                                 },
+                                     "galaxyBefore":  {
+                                                          "runInfo":  "已完成 1 项任务 / 1 人缩放",
+                                                          "runDanger":  "危险度：安全",
+                                                          "runProgress":  "第 1 关 / 共 7 关",
+                                                          "resources":  "金属 37 矿物 24 气体 37 等离子 8 科研 4 电力 6/6",
+                                                          "weaponsRow":  "· 留意：威胁 1 · 最近 海盗 1097m → 右侧",
+                                                          "guide":  "当前目标 选择下一跳目的地 下一步 比较候选星系的奖励和风险；按 Esc 或「暂时停留」可返回当前星系，不会消耗跃迁选择。",
+                                                          "resourceGuide":  "附近资源：等离子外环 · 恒星-1 · 剩余 9999 把采矿站放在外环旁，并驾驶工站进入外环。距离 300 / 采矿范围 275 · 还需靠近 25 采矿站就绪，请进入「恒星-1」的彩色外环（还差 25）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                          "statusAlerts":  "星系任务已完成：可以跃迁下一星系，也可以暂时停留整理防御和资源。 设施只能建造在已连接的空框架上。 敌袭临近：无火力或无防御 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 无法放置：未连接空间站核心 采矿站待命：距「恒星-1」还差 25，请进入彩色外环",
+                                                          "objective":  "抵达信标区域 进度 100% · 已抵达 任务已完成 · 请选择跃迁或停留",
+                                                          "combatStatus":  "战斗：留意 · 1 个敌对目标 最近：海盗 1097m → 右侧接近 构成：海盗 x1 火力：当前无炮塔或导弹井 护盾：当前无护盾设施 受损：暂无明显损伤 维修：当前无可修对象",
+                                                          "combatReview":  "",
+                                                          "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                          "toast":  "雷达发现敌对目标。",
+                                                          "galaxyPanelVisible":  true,
+                                                          "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 稳定贸易区 低风险 和平的星际港，商船频繁，敌意稀少。 敌人 ×0.7 资源：金属 ×1.2 突击概率 ×0.5 任务：采矿 ×1.5 / 生存 ×1.5 事件：贸易 ×3 海盗领地 高风险 海盗盘踞之地，战利品丰厚但险象环生。 敌人 ×1.5 资源：金属 ×1.3 / 等离子 ×1.1 任务：战斗 ×2 / 拾荒 ×1.2 事件：伏击 ×2 / 求救 ×1.5 暂时停留（Esc）",
+                                                          "settlementVisible":  false,
+                                                          "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：1 / 7累计基础奖励：2 点终局加成：+1（+50%）总点数：3 点 局外成长 本局获得局外天赋点：+2 当前可用局外天赋点：2 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点可购买「科研洞察」(探索型 T1)，消耗 1 点可购买「框架强化」(防御型 T1)，消耗 1 点 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                          "metaVisible":  false,
+                                                          "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                          "moreStatusOpen":  true
+                                                      },
+                                     "galaxyCard":  {
+                                                        "ok":  true,
+                                                        "selector":  ".galaxy-map-card:not(.disabled),.galaxy-map-card button:not(:disabled)",
+                                                        "text":  "稳定贸易区低风险和平的星际港，商船频繁，敌意稀少。敌人 ×0.7资源：金属 ×1.2突击概率 ×0.5任务：采矿 ×1.5 / 生存 ×1.5事件：贸易 ×3"
+                                                    },
+                                     "forcedGalaxy":  null,
+                                     "state":  {
+                                                   "time":  23.79,
+                                                   "level":  1,
+                                                   "objective":  {
+                                                                     "type":  "mine",
+                                                                     "progress":  0,
+                                                                     "target":  90,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  104.17526000000046,
+                                                                     "ore":  49.2724079999992,
+                                                                     "gas":  55.848272000000094,
+                                                                     "plasma":  8.593389999999664,
+                                                                     "research":  4
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "放置预览：炮塔 · 未连接空间站核心",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  2,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 1 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 2 关 / 共 7 关",
+                                                 "resources":  "金属 104 矿物 49 气体 55 等离子 8 科研 4 电力 6/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 靠近带彩色外环的资源点 下一步 橙色外环产矿石，银色外环产金属；驾驶工站进入外环后，采矿站采集更有效。",
+                                                 "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 481 把采矿站放在外环旁，并驾驶工站进入外环。距离 494 / 采矿范围 164 · 还需靠近 330 采矿站就绪，请进入「小行星-2」的彩色外环（还差 330）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "采矿站待命：距「小行星-2」还差 330，请进入彩色外环 设施只能建造在已连接的空框架上。 敌袭临近：无火力或无防御 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 无法放置：未连接空间站核心",
+                                                 "objective":  "采集 90 单位资源 进度 0% · 0 / 90 单位",
+                                                 "combatStatus":  "战斗：留意 · 可能有敌袭接近 火力：当前无炮塔或导弹井 护盾：当前无护盾设施 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "跃迁到下一星系。可以继续扩建或停留战斗。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 稳定贸易区低风险和平的星际港，商船频繁，敌意稀少。敌人 ×0.7资源：金属 ×1.2突击概率 ×0.5任务：采矿 ×1.5 / 生存 ×1.5事件：贸易 ×3海盗领地高风险海盗盘踞之地，战利品丰厚但险象环生。敌人 ×1.5资源：金属 ×1.3 / 等离子 ×1.1任务：战斗 ×2 / 拾荒 ×1.2事件：伏击 ×2 / 求救 ×1.5 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：1 / 7累计基础奖励：2 点终局加成：+1（+50%）总点数：3 点 局外成长 本局获得局外天赋点：+2 当前可用局外天赋点：2 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点可购买「科研洞察」(探索型 T1)，消耗 1 点可购买「框架强化」(防御型 T1)，消耗 1 点 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "galaxyPath":  [
+                                                        {
+                                                            "id":  "node-2",
+                                                            "level":  0,
+                                                            "galaxyType":  "emptyVoid",
+                                                            "visited":  true,
+                                                            "current":  false
+                                                        },
+                                                        {
+                                                            "id":  "node-3",
+                                                            "level":  1,
+                                                            "galaxyType":  "tradeHub",
+                                                            "visited":  true,
+                                                            "current":  true
+                                                        }
+                                                    ],
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 },
+                                 {
+                                     "id":  "P0-8.metaReturn",
+                                     "action":  "CDP test setup settlement state, then resetRun as non-destructive new-run equivalent; did not click reload/startNewRun inside eval",
+                                     "statusEvidence":  "CDP/test-hook assisted; actual UI restart click not covered",
+                                     "settlementBefore":  {
+                                                              "runInfo":  "已完成 1 项任务 / 1 人缩放",
+                                                              "runDanger":  "危险度：致命",
+                                                              "runProgress":  "第 7 关 / 共 7 关",
+                                                              "resources":  "金属 104 矿物 49 气体 55 等离子 8 科研 4 电力 6/6",
+                                                              "weaponsRow":  "",
+                                                              "guide":  "当前目标 靠近带彩色外环的资源点 下一步 橙色外环产矿石，银色外环产金属；驾驶工站进入外环后，采矿站采集更有效。",
+                                                              "resourceGuide":  "附近资源：气体外环 · 小行星-2 · 剩余 481 把采矿站放在外环旁，并驾驶工站进入外环。距离 494 / 采矿范围 164 · 还需靠近 330 采矿站就绪，请进入「小行星-2」的彩色外环（还差 330）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                              "statusAlerts":  "采矿站待命：距「小行星-2」还差 330，请进入彩色外环 守护者已击毁：请在结算面板选择「开始新局」或「留在终结星系自由游玩」。 设施只能建造在已连接的空框架上。 敌袭临近：无火力或无防御 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 无法放置：未连接空间站核心",
+                                                              "objective":  "采集 90 单位资源 进度 0% · 0 / 90 单位",
+                                                              "combatStatus":  "战斗：留意 · 可能有敌袭接近 火力：当前无炮塔或导弹井 护盾：当前无护盾设施 受损：暂无明显损伤 维修：当前无可修对象",
+                                                              "combatReview":  "",
+                                                              "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                              "toast":  "跃迁到下一星系。可以继续扩建或停留战斗。",
+                                                              "galaxyPanelVisible":  false,
+                                                              "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 稳定贸易区低风险和平的星际港，商船频繁，敌意稀少。敌人 ×0.7资源：金属 ×1.2突击概率 ×0.5任务：采矿 ×1.5 / 生存 ×1.5事件：贸易 ×3海盗领地高风险海盗盘踞之地，战利品丰厚但险象环生。敌人 ×1.5资源：金属 ×1.3 / 等离子 ×1.1任务：战斗 ×2 / 拾荒 ×1.2事件：伏击 ×2 / 求救 ×1.5 暂时停留（Esc）",
+                                                              "settlementVisible":  false,
+                                                              "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：1 / 7累计基础奖励：4 点终局加成：+2（+50%）总点数：6 点 局外成长 本局获得局外天赋点：+2 当前可用局外天赋点：2 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点可购买「科研洞察」(探索型 T1)，消耗 1 点可购买「框架强化」(防御型 T1)，消耗 1 点 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                              "metaVisible":  false,
+                                                              "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                              "moreStatusOpen":  true
+                                                          },
+                                     "state":  {
+                                                   "time":  25.12,
+                                                   "level":  0,
+                                                   "objective":  {
+                                                                     "type":  "mine",
+                                                                     "progress":  0,
+                                                                     "target":  90,
+                                                                     "completeAt":  0,
+                                                                     "awaiting":  false
+                                                                 },
+                                                   "resources":  {
+                                                                     "metal":  130.6943650000002,
+                                                                     "ore":  60.147041999999985,
+                                                                     "gas":  35.098028,
+                                                                     "plasma":  8.020422499999986,
+                                                                     "research":  0
+                                                                 },
+                                                   "selectedBuild":  "turret",
+                                                   "lastBuildError":  "设施只能建造在已连接的空框架上。",
+                                                   "buildHint":  "放置预览：炮塔 · 未连接空间站核心",
+                                                   "cells":  [
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  0,
+                                                                     "facility":  "core",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  280,
+                                                                     "maxHp":  280
+                                                                 },
+                                                                 {
+                                                                     "x":  1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  -1,
+                                                                     "y":  0,
+                                                                     "facility":  "mining",
+                                                                     "active":  true,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 },
+                                                                 {
+                                                                     "x":  0,
+                                                                     "y":  -1,
+                                                                     "facility":  "mining",
+                                                                     "active":  false,
+                                                                     "enabled":  true,
+                                                                     "hp":  95,
+                                                                     "maxHp":  95
+                                                                 }
+                                                             ],
+                                                   "enemyCount":  0,
+                                                   "metaPoints":  2,
+                                                   "settlementShown":  false,
+                                                   "endgame":  false
+                                               },
+                                     "dom":  {
+                                                 "runInfo":  "已完成 0 项任务 / 1 人缩放",
+                                                 "runDanger":  "危险度：安全",
+                                                 "runProgress":  "第 1 关 / 共 7 关",
+                                                 "resources":  "金属 130 矿物 60 气体 35 等离子 8 科研 0 电力 6/6",
+                                                 "weaponsRow":  "",
+                                                 "guide":  "当前目标 靠近带彩色外环的资源点 下一步 橙色外环产矿石，银色外环产金属；驾驶工站进入外环后，采矿站和工站采集更有效。",
+                                                 "resourceGuide":  "附近资源：矿石外环，适合补采矿站成本 · 行星-1 · 剩余 1205 把采矿站放在外环旁，并驾驶工站进入外环。距离 615 / 采矿范围 246 · 还需靠近 370 采矿站就绪，请进入「行星-1」的彩色外环（还差 370）。 橙=矿石，银=金属，绿=气体，紫=等离子。",
+                                                 "statusAlerts":  "采矿站待命：距「行星-1」还差 370，请进入彩色外环 设施只能建造在已连接的空框架上。 建造模式：炮塔 — 点网格或 Enter 放置；Esc / 「指针/航行」退出 电力紧张：6/6，优先级低的设施会自动停机 因电力或优先级未运作：采矿站 等 无法放置：未连接空间站核心",
+                                                 "objective":  "采集 90 单位资源 进度 0% · 0 / 90 单位",
+                                                 "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                 "combatReview":  "",
+                                                 "designHealth":  "空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 2，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 4，有效 0，断电 2。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 防御 短板 缺少防御 护盾 0/0，装甲 0，护盾恢复中 0。 维修 注意 维修有缺口 维修站 0/0，受损 0，未覆盖 0。",
+                                                 "toast":  "跃迁到下一星系。可以继续扩建或停留战斗。",
+                                                 "galaxyPanelVisible":  false,
+                                                 "galaxyText":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 稳定贸易区低风险和平的星际港，商船频繁，敌意稀少。敌人 ×0.7资源：金属 ×1.2突击概率 ×0.5任务：采矿 ×1.5 / 生存 ×1.5事件：贸易 ×3海盗领地高风险海盗盘踞之地，战利品丰厚但险象环生。敌人 ×1.5资源：金属 ×1.3 / 等离子 ×1.1任务：战斗 ×2 / 拾荒 ×1.2事件：伏击 ×2 / 求救 ×1.5 暂时停留（Esc）",
+                                                 "settlementVisible":  false,
+                                                 "settlementText":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7累计基础奖励：0 点终局加成：+0（+50%）总点数：0 点 局外成长 本局获得局外天赋点：+0 当前可用局外天赋点：2 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点可购买「科研洞察」(探索型 T1)，消耗 1 点可购买「框架强化」(防御型 T1)，消耗 1 点 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定的节点；或开始新局前选择开局协议。 开始新局 留在终结星系自由游玩",
+                                                 "metaVisible":  false,
+                                                 "metaText":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 天赋树 开局协议 说明 当前版本暂不支持局外天赋重置；后续平衡期可能提供一次性重置入口。",
+                                                 "moreStatusOpen":  true
+                                             },
+                                     "runtimeErrors":  [
+
+                                                       ]
+                                 }
+                             ],
+                   "releaseCandidateAfter":  {
+                                                 "ok":  true,
+                                                 "checks":  [
+                                                                {
+                                                                    "id":  "runtimeErrors.empty",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "未发现新的 runtime error"
+                                                                },
+                                                                {
+                                                                    "id":  "keyDom.present",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "关键 DOM 全部可见或存在"
+                                                                },
+                                                                {
+                                                                    "id":  "viewport.recorded",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "viewport 字段有效"
+                                                                },
+                                                                {
+                                                                    "id":  "design.hooks",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "design hooks 与字段均可用"
+                                                                },
+                                                                {
+                                                                    "id":  "combat.hooks",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "combat hooks 与字段均可用"
+                                                                },
+                                                                {
+                                                                    "id":  "build.hooks",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "build hooks 与字段均可用"
+                                                                },
+                                                                {
+                                                                    "id":  "meta.hooks",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "meta hooks 与字段均可用"
+                                                                },
+                                                                {
+                                                                    "id":  "galaxy.hooks",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "galaxy hooks 与字段均可用"
+                                                                },
+                                                                {
+                                                                    "id":  "storage.schemaStable",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "SAVE_KEY 与 META_SCHEMA_VERSION 均稳定"
+                                                                },
+                                                                {
+                                                                    "id":  "storage.unchanged",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "storage signature 未变化"
+                                                                },
+                                                                {
+                                                                    "id":  "frameTiming.available",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "frame timing 采样成功"
+                                                                },
+                                                                {
+                                                                    "id":  "frameTiming.longFrame",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "pass",
+                                                                    "severity":  "info",
+                                                                    "summary":  "未检测到长帧"
+                                                                },
+                                                                {
+                                                                    "id":  "runtimeState.signatureStable",
+                                                                    "layer":  "automatic",
+                                                                    "status":  "warn",
+                                                                    "severity":  "warn",
+                                                                    "summary":  "运行态签名有变化（可能来自自然帧推进）"
+                                                                }
+                                                            ],
+                                                 "coverage":  {
+                                                                  "automaticPassed":  12,
+                                                                  "automaticFailed":  0,
+                                                                  "automaticUnknown":  0,
+                                                                  "browserCovered":  2,
+                                                                  "browserUncovered":  2,
+                                                                  "manualCovered":  0,
+                                                                  "manualUncovered":  8
+                                                              },
+                                                 "runtimeErrors":  {
+                                                                       "count":  0,
+                                                                       "latest":  [
+
+                                                                                  ]
+                                                                   },
+                                                 "storageSignature":  {
+                                                                          "capturedAt":  1781016291019,
+                                                                          "saveKey":  "star-ring-station-meta-v1",
+                                                                          "corruptRawKey":  "star-ring-station-meta-corrupt-raw",
+                                                                          "save":  {
+                                                                                       "supported":  true,
+                                                                                       "hasValue":  true,
+                                                                                       "length":  354,
+                                                                                       "head32":  "{\"schemaVersion\":2,\"migrationVer",
+                                                                                       "tail32":  "lectedStartProtocol\":\"balanced\"}",
+                                                                                       "hash32":  "0x14a19d77"
+                                                                                   },
+                                                                          "corruptRaw":  {
+                                                                                             "supported":  true,
+                                                                                             "hasValue":  false,
+                                                                                             "length":  null,
+                                                                                             "head32":  null,
+                                                                                             "tail32":  null,
+                                                                                             "hash32":  null
+                                                                                         }
+                                                                      },
+                                                 "frameTiming":  {
+                                                                     "available":  true,
+                                                                     "reason":  null,
+                                                                     "mode":  "rAF",
+                                                                     "requestedFrames":  30,
+                                                                     "effectiveFrames":  30,
+                                                                     "durationMs":  496,
+                                                                     "sampleCount":  30,
+                                                                     "avgMs":  16.43999999920537,
+                                                                     "maxMs":  16.80000000000291,
+                                                                     "longFrameCount":  0,
+                                                                     "longFrameThresholdMs":  33,
+                                                                     "truncated":  false,
+                                                                     "context":  {
+                                                                                     "paused":  false,
+                                                                                     "capturedAt":  1781016291019,
+                                                                                     "sampleStartedAt":  1781016290523,
+                                                                                     "sampleEndedAt":  1781016291019
+                                                                                 }
+                                                                 },
+                                                 "viewport":  {
+                                                                  "width":  1267,
+                                                                  "height":  627,
+                                                                  "devicePixelRatio":  2,
+                                                                  "narrowViewport":  false
+                                                              },
+                                                 "residualRisks":  [
+                                                                       {
+                                                                           "kind":  "runtime_state_drift",
+                                                                           "severity":  "warn",
+                                                                           "summary":  "运行态关键签名发生变化，需结合调用时机判断是否自然推进",
+                                                                           "details":  {
+                                                                                           "before":  {
+                                                                                                          "capturedAt":  1781016290523,
+                                                                                                          "resources":  {
+                                                                                                                            "metal":  130,
+                                                                                                                            "ore":  60,
+                                                                                                                            "gas":  35,
+                                                                                                                            "plasma":  8,
+                                                                                                                            "research":  0,
+                                                                                                                            "powerUsed":  6,
+                                                                                                                            "powerAvailable":  6
+                                                                                                                        },
+                                                                                                          "enemiesCount":  0,
+                                                                                                          "projectilesCount":  0,
+                                                                                                          "run":  {
+                                                                                                                      "level":  0,
+                                                                                                                      "currentGalaxyType":  "emptyVoid",
+                                                                                                                      "seed":  1505002,
+                                                                                                                      "objectiveType":  "mine",
+                                                                                                                      "awaitingObjectiveChoice":  false
+                                                                                                                  },
+                                                                                                          "priorityTarget":  {
+                                                                                                                                 "active":  false,
+                                                                                                                                 "enemyId":  null,
+                                                                                                                                 "enemyKind":  null,
+                                                                                                                                 "validUntil":  null
+                                                                                                                             }
+                                                                                                      },
+                                                                                           "after":  {
+                                                                                                         "capturedAt":  1781016291020,
+                                                                                                         "resources":  {
+                                                                                                                           "metal":  131,
+                                                                                                                           "ore":  60,
+                                                                                                                           "gas":  35,
+                                                                                                                           "plasma":  8,
+                                                                                                                           "research":  0,
+                                                                                                                           "powerUsed":  6,
+                                                                                                                           "powerAvailable":  6
+                                                                                                                       },
+                                                                                                         "enemiesCount":  0,
+                                                                                                         "projectilesCount":  0,
+                                                                                                         "run":  {
+                                                                                                                     "level":  0,
+                                                                                                                     "currentGalaxyType":  "emptyVoid",
+                                                                                                                     "seed":  1505002,
+                                                                                                                     "objectiveType":  "mine",
+                                                                                                                     "awaitingObjectiveChoice":  false
+                                                                                                                 },
+                                                                                                         "priorityTarget":  {
+                                                                                                                                "active":  false,
+                                                                                                                                "enemyId":  null,
+                                                                                                                                "enemyKind":  null,
+                                                                                                                                "validUntil":  null
+                                                                                                                            }
+                                                                                                     }
+                                                                                       }
+                                                                       },
+                                                                       {
+                                                                           "kind":  "browser_uncovered",
+                                                                           "severity":  "info",
+                                                                           "summary":  "browser 层仍需 PM 补充 console 与真实浏览器路径证据",
+                                                                           "details":  {
+
+                                                                                       }
+                                                                       },
+                                                                       {
+                                                                           "kind":  "manual_uncovered",
+                                                                           "severity":  "info",
+                                                                           "summary":  "manual 层默认未覆盖，自动检查不会标记人工通过",
+                                                                           "details":  {
+                                                                                           "checklistIds":  [
+                                                                                                                "P0-1.firstRun",
+                                                                                                                "P0-2.miningLoop",
+                                                                                                                "P0-3.resourceShortage",
+                                                                                                                "P0-4.enemyApproach",
+                                                                                                                "P0-5.combatAndRepair",
+                                                                                                                "P0-6.postCombatReview",
+                                                                                                                "P0-7.galaxyJump",
+                                                                                                                "P0-8.metaReturn"
+                                                                                                            ]
+                                                                                       }
+                                                                       }
+                                                                   ]
+                                             },
+                   "finalRuntimeErrors":  [
+
+                                          ]
+               }
+}
