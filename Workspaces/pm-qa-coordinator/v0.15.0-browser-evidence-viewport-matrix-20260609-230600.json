@@ -1,0 +1,1264 @@
+﻿{
+    "task":  "v0.15.0 #6 viewport matrix / copy summary / touch hypothesis evidence",
+    "recordedAt":  "2026-06-09T23:06:37.5629348+08:00",
+    "repo":  "D:\\work\\project\\agentgame",
+    "url":  "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "browserExecutable":  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "browserVersion":  "Chrome/148.0.7778.217",
+    "userAgent":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    "setup":  "Visible Chrome app windows launched with fixed --window-size per viewport; minimal CDP Runtime.evaluate used for DOM evidence. Actual inner viewport is recorded.",
+    "touchCoverage":  "No real touch device was used; mouse/CDP viewport evidence is not a real touch pass.",
+    "results":  [
+                    {
+                        "requested":  {
+                                          "port":  9921,
+                                          "w":  760,
+                                          "name":  "760x640",
+                                          "h":  640
+                                      },
+                        "profile":  "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v015-sync-profile-20260609-230600-760x640",
+                        "observed":  {
+                                         "viewport":  {
+                                                          "w":  747,
+                                                          "h":  605,
+                                                          "dpr":  2,
+                                                          "outerWidth":  760,
+                                                          "outerHeight":  640,
+                                                          "ready":  "complete"
+                                                      },
+                                         "ua":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+                                         "touch":  {
+                                                       "maxTouchPoints":  0,
+                                                       "pointerCoarse":  false,
+                                                       "anyPointerCoarse":  false
+                                                   },
+                                         "rcPanel":  {
+                                                         "visible":  true,
+                                                         "text":  "PM 人工 Playtest Checklist 刷新自动检查 复制摘要 关闭 自动检查、浏览器取证、人工结论分层展示。人工项默认未完成，脚本不会自动标记通过。 未由自动检查覆盖的路径需真实浏览器人工补证；无真实人工体验时结论应为「发布候选证据不足」。 正在运行 runReleaseCandidateChecks… 自动检查结果 等待刷新… 浏览器取证 等待",
+                                                         "rect":  {
+                                                                      "l":  8,
+                                                                      "t":  8,
+                                                                      "r":  739,
+                                                                      "b":  262,
+                                                                      "w":  731,
+                                                                      "h":  254
+                                                                  },
+                                                         "scroll":  {
+                                                                        "h":  760,
+                                                                        "c":  252,
+                                                                        "canY":  true
+                                                                    },
+                                                         "inViewport":  true,
+                                                         "hitSelf":  true,
+                                                         "hit":  {
+                                                                     "tag":  "DIV",
+                                                                     "id":  "",
+                                                                     "text":  "正在运行 runReleaseCandidateChecks…"
+                                                                 }
+                                                     },
+                                         "rcStatus":  "正在运行 runReleaseCandidateChecks…",
+                                         "buildPanel":  {
+                                                            "visible":  true,
+                                                            "text":  "建造 指针/航行 支撑 框架 x4 扩展结构与连接面 金属8 电力 0 可建造 已有较多同类设施，先检查电力。 供电 发电站 x0 供应空间站电力 金属22 矿8 电力 +10 可建造 推荐：先补供电，避免关键设施断电。 推进 推进器 x0 提供推进与机动 金属26 气8 电力 -2 可建造 推荐：跃迁前补推进能力。 采矿 采矿站 x0 近天体自动采矿 金属",
+                                                            "rect":  {
+                                                                         "l":  8,
+                                                                         "t":  391,
+                                                                         "r":  739,
+                                                                         "b":  597,
+                                                                         "w":  731,
+                                                                         "h":  206
+                                                                     },
+                                                            "scroll":  {
+                                                                           "h":  827,
+                                                                           "c":  204,
+                                                                           "canY":  true
+                                                                       },
+                                                            "inViewport":  true,
+                                                            "hitSelf":  true,
+                                                            "hit":  {
+                                                                        "tag":  "BUTTON",
+                                                                        "id":  "",
+                                                                        "text":  "支撑 框架 x4 扩展结构与连接面 金属8 电力 0 可建造 已有较多同类设施，先检查电力。"
+                                                                    }
+                                                        },
+                                         "statusPanel":  {
+                                                             "visible":  true,
+                                                             "text":  "引导 当前目标 查看本局结算 下一步 确认本局结果、获得的局外天赋点，以及下一步是新局、局外天赋购买或开局协议选择。 资源采集 附近资源：矿石外环，适合补采矿站成本 · 小行星-3 · 剩余 347 把采矿站放在外环旁，并驾驶工站进入外环。距离 320 / 采矿范围 177 · 还需靠近 144 尚未建造采矿站 — 选「采矿站」建在框架上，再进入资源外环。 ",
+                                                             "rect":  {
+                                                                          "l":  499,
+                                                                          "t":  136,
+                                                                          "r":  739,
+                                                                          "b":  366,
+                                                                          "w":  240,
+                                                                          "h":  230
+                                                                      },
+                                                             "scroll":  {
+                                                                            "h":  860,
+                                                                            "c":  228,
+                                                                            "canY":  true
+                                                                        },
+                                                             "inViewport":  true,
+                                                             "hitSelf":  false,
+                                                             "hit":  {
+                                                                         "tag":  "DIV",
+                                                                         "id":  "",
+                                                                         "text":  "等待刷新…"
+                                                                     }
+                                                         },
+                                         "moreStatus":  {
+                                                            "visible":  true,
+                                                            "text":  "更多状态 状态 核心耐久：280/280 结构：5 个，运作：5，脱落：0 速度：0 / 科技等级：0 空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 ",
+                                                            "rect":  {
+                                                                         "l":  512,
+                                                                         "t":  752,
+                                                                         "r":  711,
+                                                                         "b":  985,
+                                                                         "w":  199,
+                                                                         "h":  233
+                                                                     },
+                                                            "scroll":  {
+                                                                           "h":  232,
+                                                                           "c":  232,
+                                                                           "canY":  false
+                                                                       },
+                                                            "inViewport":  false,
+                                                            "hitSelf":  false,
+                                                            "hit":  {
+                                                                        "tag":  "CANVAS",
+                                                                        "id":  "game",
+                                                                        "text":  ""
+                                                                    }
+                                                        },
+                                         "moreBody":  {
+                                                          "visible":  true,
+                                                          "text":  "状态 核心耐久：280/280 结构：5 个，运作：5，脱落：0 速度：0 / 科技等级：0 空间站设计健康摘要 电力余量 注意 电力紧张 余量 0.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0。 ",
+                                                          "rect":  {
+                                                                       "l":  512,
+                                                                       "t":  791,
+                                                                       "r":  711,
+                                                                       "b":  985,
+                                                                       "w":  199,
+                                                                       "h":  194
+                                                                   },
+                                                          "scroll":  {
+                                                                         "h":  995,
+                                                                         "c":  194,
+                                                                         "canY":  true
+                                                                     },
+                                                          "inViewport":  false,
+                                                          "hitSelf":  false,
+                                                          "hit":  {
+                                                                      "tag":  "CANVAS",
+                                                                      "id":  "game",
+                                                                      "text":  ""
+                                                                  }
+                                                      },
+                                         "hud":  {
+                                                     "resources":  "金属 130 矿物 60 气体 35 等离子 8 科研 0 电力 0/6",
+                                                     "objective":  "采集 90 单位资源 进度 0% · 0 / 90 单位",
+                                                     "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                     "combatReview":  "",
+                                                     "metaStats":  "局外天赋点：6有可购买 下一局协议：标准开局 局内科研点与本页局外天赋点无关"
+                                                 },
+                                         "buttons":  {
+                                                         "rcCopy":  {
+                                                                        "exists":  true,
+                                                                        "disabled":  false,
+                                                                        "clickable":  true,
+                                                                        "info":  {
+                                                                                     "visible":  true,
+                                                                                     "text":  "复制摘要",
+                                                                                     "rect":  {
+                                                                                                  "l":  252,
+                                                                                                  "t":  43,
+                                                                                                  "r":  480,
+                                                                                                  "b":  75,
+                                                                                                  "w":  227,
+                                                                                                  "h":  32
+                                                                                              },
+                                                                                     "scroll":  {
+                                                                                                    "h":  30,
+                                                                                                    "c":  30,
+                                                                                                    "canY":  false
+                                                                                                },
+                                                                                     "inViewport":  true,
+                                                                                     "hitSelf":  true,
+                                                                                     "hit":  {
+                                                                                                 "tag":  "BUTTON",
+                                                                                                 "id":  "",
+                                                                                                 "text":  "复制摘要"
+                                                                                             }
+                                                                                 }
+                                                                    },
+                                                         "firstBuild":  {
+                                                                            "exists":  true,
+                                                                            "disabled":  false,
+                                                                            "clickable":  true,
+                                                                            "info":  {
+                                                                                         "visible":  true,
+                                                                                         "text":  "指针/航行",
+                                                                                         "rect":  {
+                                                                                                      "l":  21,
+                                                                                                      "t":  432,
+                                                                                                      "r":  362,
+                                                                                                      "b":  531,
+                                                                                                      "w":  341,
+                                                                                                      "h":  98
+                                                                                                  },
+                                                                                         "scroll":  {
+                                                                                                        "h":  96,
+                                                                                                        "c":  96,
+                                                                                                        "canY":  false
+                                                                                                    },
+                                                                                         "inViewport":  true,
+                                                                                         "hitSelf":  true,
+                                                                                         "hit":  {
+                                                                                                     "tag":  "BUTTON",
+                                                                                                     "id":  "",
+                                                                                                     "text":  "指针/航行"
+                                                                                                 }
+                                                                                     }
+                                                                        },
+                                                         "more":  {
+                                                                      "exists":  true,
+                                                                      "disabled":  false,
+                                                                      "clickable":  false,
+                                                                      "info":  {
+                                                                                   "visible":  true,
+                                                                                   "text":  "更多状态",
+                                                                                   "rect":  {
+                                                                                                "l":  512,
+                                                                                                "t":  759,
+                                                                                                "r":  711,
+                                                                                                "b":  791,
+                                                                                                "w":  199,
+                                                                                                "h":  33
+                                                                                            },
+                                                                                   "scroll":  {
+                                                                                                  "h":  31,
+                                                                                                  "c":  31,
+                                                                                                  "canY":  false
+                                                                                              },
+                                                                                   "inViewport":  false,
+                                                                                   "hitSelf":  false,
+                                                                                   "hit":  {
+                                                                                               "tag":  "CANVAS",
+                                                                                               "id":  "game",
+                                                                                               "text":  ""
+                                                                                           }
+                                                                               }
+                                                                  },
+                                                         "meta":  {
+                                                                      "exists":  true,
+                                                                      "disabled":  false,
+                                                                      "clickable":  false,
+                                                                      "info":  {
+                                                                                   "visible":  true,
+                                                                                   "text":  "打开局外天赋面板",
+                                                                                   "rect":  {
+                                                                                                "l":  512,
+                                                                                                "t":  1692,
+                                                                                                "r":  694,
+                                                                                                "b":  1732,
+                                                                                                "w":  182,
+                                                                                                "h":  40
+                                                                                            },
+                                                                                   "scroll":  {
+                                                                                                  "h":  38,
+                                                                                                  "c":  38,
+                                                                                                  "canY":  false
+                                                                                              },
+                                                                                   "inViewport":  false,
+                                                                                   "hitSelf":  false,
+                                                                                   "hit":  {
+                                                                                               "tag":  "CANVAS",
+                                                                                               "id":  "game",
+                                                                                               "text":  ""
+                                                                                           }
+                                                                               }
+                                                                  },
+                                                         "players":  {
+                                                                         "exists":  true,
+                                                                         "disabled":  false,
+                                                                         "clickable":  false,
+                                                                         "info":  {
+                                                                                      "visible":  true,
+                                                                                      "text":  "联机人数缩放",
+                                                                                      "rect":  {
+                                                                                                   "l":  512,
+                                                                                                   "t":  1740,
+                                                                                                   "r":  694,
+                                                                                                   "b":  1778,
+                                                                                                   "w":  182,
+                                                                                                   "h":  38
+                                                                                               },
+                                                                                      "scroll":  {
+                                                                                                     "h":  36,
+                                                                                                     "c":  36,
+                                                                                                     "canY":  false
+                                                                                                 },
+                                                                                      "inViewport":  false,
+                                                                                      "hitSelf":  false,
+                                                                                      "hit":  {
+                                                                                                  "tag":  "CANVAS",
+                                                                                                  "id":  "game",
+                                                                                                  "text":  ""
+                                                                                              }
+                                                                                  }
+                                                                     }
+                                                     },
+                                         "copy":  {
+                                                      "result":  {
+                                                                     "ok":  true,
+                                                                     "method":  "execCommand"
+                                                                 },
+                                                      "length":  437,
+                                                      "includesBrowser":  true,
+                                                      "includesViewport":  true,
+                                                      "includesRuntimeErrors":  true,
+                                                      "includesStorage":  true,
+                                                      "includesManual":  false
+                                                  },
+                                         "meta":  {
+                                                      "drawer":  {
+                                                                     "visible":  false,
+                                                                     "text":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 局外天赋点：0 当前协议：标准开局（协议效果将在下一局开局时应用，本任务仅预览与选择） 天赋树 开局协议 说明 全部资源型防御型武器型探索型 资源型 采集校准 资源型 · T1 等级 0 / 3 当前：暂无效果 下级：采集产出 +10% 升级消耗：1 局外天赋点 局外天赋点不足，还差 1",
+                                                                     "rect":  {
+                                                                                  "l":  0,
+                                                                                  "t":  0,
+                                                                                  "r":  0,
+                                                                                  "b":  0,
+                                                                                  "w":  0,
+                                                                                  "h":  0
+                                                                              },
+                                                                     "scroll":  {
+                                                                                    "h":  0,
+                                                                                    "c":  0,
+                                                                                    "canY":  false
+                                                                                },
+                                                                     "inViewport":  false,
+                                                                     "hitSelf":  false,
+                                                                     "hit":  {
+                                                                                 "tag":  "CANVAS",
+                                                                                 "id":  "game",
+                                                                                 "text":  ""
+                                                                             }
+                                                                 },
+                                                      "body":  {
+                                                                   "visible":  false,
+                                                                   "text":  "全部资源型防御型武器型探索型 资源型 采集校准 资源型 · T1 等级 0 / 3 当前：暂无效果 下级：采集产出 +10% 升级消耗：1 局外天赋点 局外天赋点不足，还差 1 点 局外天赋点不足，还差 1 点 金属精炼 资源型 · T2 等级 0 / 2 当前：暂无效果 下级：建造金属消耗 约 -5% 升级消耗：2 局外天赋点 需要 采集校准 1级（当前 ",
+                                                                   "rect":  {
+                                                                                "l":  0,
+                                                                                "t":  0,
+                                                                                "r":  0,
+                                                                                "b":  0,
+                                                                                "w":  0,
+                                                                                "h":  0
+                                                                            },
+                                                                   "scroll":  {
+                                                                                  "h":  0,
+                                                                                  "c":  0,
+                                                                                  "canY":  false
+                                                                              },
+                                                                   "inViewport":  false,
+                                                                   "hitSelf":  false,
+                                                                   "hit":  {
+                                                                               "tag":  "CANVAS",
+                                                                               "id":  "game",
+                                                                               "text":  ""
+                                                                           }
+                                                               },
+                                                      "close":  {
+                                                                    "exists":  true,
+                                                                    "disabled":  false,
+                                                                    "clickable":  false,
+                                                                    "info":  {
+                                                                                 "visible":  false,
+                                                                                 "text":  "×",
+                                                                                 "rect":  {
+                                                                                              "l":  0,
+                                                                                              "t":  0,
+                                                                                              "r":  0,
+                                                                                              "b":  0,
+                                                                                              "w":  0,
+                                                                                              "h":  0
+                                                                                          },
+                                                                                 "scroll":  {
+                                                                                                "h":  0,
+                                                                                                "c":  0,
+                                                                                                "canY":  false
+                                                                                            },
+                                                                                 "inViewport":  false,
+                                                                                 "hitSelf":  false,
+                                                                                 "hit":  {
+                                                                                             "tag":  "CANVAS",
+                                                                                             "id":  "game",
+                                                                                             "text":  ""
+                                                                                         }
+                                                                             }
+                                                                }
+                                                  },
+                                         "galaxy":  {
+                                                        "opened":  {
+                                                                       "ok":  false,
+                                                                       "choices":  [
+                                                                                       {
+                                                                                           "galaxyType":  "tradeHub",
+                                                                                           "reason":  "random"
+                                                                                       },
+                                                                                       {
+                                                                                           "galaxyType":  "miningBelt",
+                                                                                           "reason":  "random"
+                                                                                       }
+                                                                                   ],
+                                                                       "level":  1
+                                                                   },
+                                                        "panel":  {
+                                                                      "visible":  false,
+                                                                      "text":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 稳定贸易区低风险和平的星际港，商船频繁，敌意稀少。敌人 ×0.7资源：金属 ×1.2突击概率 ×0.5任务：采矿 ×1.5 / 生存 ×1.5事件：贸易 ×3矿产带中风险矿物资源密集，小行星遍布，开采者天堂。敌人 ×0.9资源：矿物 ×1.5 / 金属 ×1.3突击概率 ×0.8任",
+                                                                      "rect":  {
+                                                                                   "l":  0,
+                                                                                   "t":  0,
+                                                                                   "r":  0,
+                                                                                   "b":  0,
+                                                                                   "w":  0,
+                                                                                   "h":  0
+                                                                               },
+                                                                      "scroll":  {
+                                                                                     "h":  0,
+                                                                                     "c":  0,
+                                                                                     "canY":  false
+                                                                                 },
+                                                                      "inViewport":  false,
+                                                                      "hitSelf":  false,
+                                                                      "hit":  {
+                                                                                  "tag":  "CANVAS",
+                                                                                  "id":  "game",
+                                                                                  "text":  ""
+                                                                              }
+                                                                  },
+                                                        "content":  {
+                                                                        "visible":  false,
+                                                                        "text":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 稳定贸易区低风险和平的星际港，商船频繁，敌意稀少。敌人 ×0.7资源：金属 ×1.2突击概率 ×0.5任务：采矿 ×1.5 / 生存 ×1.5事件：贸易 ×3矿产带中风险矿物资源密集，小行星遍布，开采者天堂。敌人 ×0.9资源：矿物 ×1.5 / 金属 ×1.3突击概率 ×0.8任",
+                                                                        "rect":  {
+                                                                                     "l":  0,
+                                                                                     "t":  0,
+                                                                                     "r":  0,
+                                                                                     "b":  0,
+                                                                                     "w":  0,
+                                                                                     "h":  0
+                                                                                 },
+                                                                        "scroll":  {
+                                                                                       "h":  0,
+                                                                                       "c":  0,
+                                                                                       "canY":  false
+                                                                                   },
+                                                                        "inViewport":  false,
+                                                                        "hitSelf":  false,
+                                                                        "hit":  {
+                                                                                    "tag":  "CANVAS",
+                                                                                    "id":  "game",
+                                                                                    "text":  ""
+                                                                                }
+                                                                    },
+                                                        "cancel":  {
+                                                                       "exists":  true,
+                                                                       "disabled":  false,
+                                                                       "clickable":  false,
+                                                                       "info":  {
+                                                                                    "visible":  false,
+                                                                                    "text":  "暂时停留（Esc）",
+                                                                                    "rect":  {
+                                                                                                 "l":  0,
+                                                                                                 "t":  0,
+                                                                                                 "r":  0,
+                                                                                                 "b":  0,
+                                                                                                 "w":  0,
+                                                                                                 "h":  0
+                                                                                             },
+                                                                                    "scroll":  {
+                                                                                                   "h":  0,
+                                                                                                   "c":  0,
+                                                                                                   "canY":  false
+                                                                                               },
+                                                                                    "inViewport":  false,
+                                                                                    "hitSelf":  false,
+                                                                                    "hit":  {
+                                                                                                "tag":  "CANVAS",
+                                                                                                "id":  "game",
+                                                                                                "text":  ""
+                                                                                            }
+                                                                                }
+                                                                   }
+                                                    },
+                                         "settlement":  {
+                                                            "method":  "endRunSettlement test hook",
+                                                            "panel":  {
+                                                                          "visible":  true,
+                                                                          "text":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7 累计基础奖励：4 点 终局加成：+2（+50%） 总点数：6 点 局外成长 本局获得局外天赋点：+6 当前可用局外天赋点：6 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点 可购买「科研洞察」(探索型 T1)，消耗 1 点 可购买「框架强化」(防御型 T1)，消",
+                                                                          "rect":  {
+                                                                                       "l":  512,
+                                                                                       "t":  730,
+                                                                                       "r":  711,
+                                                                                       "b":  740,
+                                                                                       "w":  199,
+                                                                                       "h":  10
+                                                                                   },
+                                                                          "scroll":  {
+                                                                                         "h":  560,
+                                                                                         "c":  8,
+                                                                                         "canY":  true
+                                                                                     },
+                                                                          "inViewport":  false,
+                                                                          "hitSelf":  false,
+                                                                          "hit":  {
+                                                                                      "tag":  "CANVAS",
+                                                                                      "id":  "game",
+                                                                                      "text":  ""
+                                                                                  }
+                                                                      },
+                                                            "restart":  {
+                                                                            "exists":  true,
+                                                                            "disabled":  false,
+                                                                            "clickable":  false,
+                                                                            "info":  {
+                                                                                         "visible":  true,
+                                                                                         "text":  "开始新局",
+                                                                                         "rect":  {
+                                                                                                      "l":  522,
+                                                                                                      "t":  755,
+                                                                                                      "r":  686,
+                                                                                                      "b":  795,
+                                                                                                      "w":  164,
+                                                                                                      "h":  40
+                                                                                                  },
+                                                                                         "scroll":  {
+                                                                                                        "h":  38,
+                                                                                                        "c":  38,
+                                                                                                        "canY":  false
+                                                                                                    },
+                                                                                         "inViewport":  false,
+                                                                                         "hitSelf":  false,
+                                                                                         "hit":  {
+                                                                                                     "tag":  "CANVAS",
+                                                                                                     "id":  "game",
+                                                                                                     "text":  ""
+                                                                                                 }
+                                                                                     }
+                                                                        },
+                                                            "stay":  {
+                                                                         "exists":  true,
+                                                                         "disabled":  false,
+                                                                         "clickable":  false,
+                                                                         "info":  {
+                                                                                      "visible":  true,
+                                                                                      "text":  "留在终结星系自由游玩",
+                                                                                      "rect":  {
+                                                                                                   "l":  522,
+                                                                                                   "t":  801,
+                                                                                                   "r":  686,
+                                                                                                   "b":  841,
+                                                                                                   "w":  164,
+                                                                                                   "h":  40
+                                                                                               },
+                                                                                      "scroll":  {
+                                                                                                     "h":  38,
+                                                                                                     "c":  38,
+                                                                                                     "canY":  false
+                                                                                                 },
+                                                                                      "inViewport":  false,
+                                                                                      "hitSelf":  false,
+                                                                                      "hit":  {
+                                                                                                  "tag":  "CANVAS",
+                                                                                                  "id":  "game",
+                                                                                                  "text":  ""
+                                                                                              }
+                                                                                  }
+                                                                     },
+                                                            "stats":  "完成关卡数：0 / 7 累计基础奖励：4 点 终局加成：+2（+50%） 总点数：6 点",
+                                                            "feedback":  "局外成长 本局获得局外天赋点：+6 当前可用局外天赋点：6 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点 可购买「科研洞察」(探索型 T1)，消耗 1 点 可购买「框架强化」(防御型 T1)，消耗 1 点 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定"
+                                                        }
+                                     }
+                    },
+                    {
+                        "requested":  {
+                                          "port":  9922,
+                                          "w":  420,
+                                          "name":  "420x740",
+                                          "h":  740
+                                      },
+                        "profile":  "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v015-sync-profile-20260609-230600-420x740",
+                        "observed":  {
+                                         "viewport":  {
+                                                          "w":  407,
+                                                          "h":  705,
+                                                          "dpr":  2,
+                                                          "outerWidth":  420,
+                                                          "outerHeight":  740,
+                                                          "ready":  "complete"
+                                                      },
+                                         "ua":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+                                         "touch":  {
+                                                       "maxTouchPoints":  0,
+                                                       "pointerCoarse":  false,
+                                                       "anyPointerCoarse":  false
+                                                   },
+                                         "rcPanel":  {
+                                                         "visible":  true,
+                                                         "text":  "PM 人工 Playtest Checklist 刷新自动检查 复制摘要 关闭 自动检查、浏览器取证、人工结论分层展示。人工项默认未完成，脚本不会自动标记通过。 未由自动检查覆盖的路径需真实浏览器人工补证；无真实人工体验时结论应为「发布候选证据不足」。 自动检查完成。automatic 11/11 pass · browser covered 3 · man",
+                                                         "rect":  {
+                                                                      "l":  8,
+                                                                      "t":  8,
+                                                                      "r":  399,
+                                                                      "b":  276,
+                                                                      "w":  391,
+                                                                      "h":  268
+                                                                  },
+                                                         "scroll":  {
+                                                                        "h":  1570,
+                                                                        "c":  266,
+                                                                        "canY":  true
+                                                                    },
+                                                         "inViewport":  true,
+                                                         "hitSelf":  true,
+                                                         "hit":  {
+                                                                     "tag":  "DIV",
+                                                                     "id":  "",
+                                                                     "text":  "自动检查完成。automatic 11/11 pass · browser covered 3 · "
+                                                                 }
+                                                     },
+                                         "rcStatus":  "自动检查完成。automatic 11/11 pass · browser covered 3 · manual uncovered 8",
+                                         "buildPanel":  {
+                                                            "visible":  true,
+                                                            "text":  "建造 指针/航行 支撑 框架 x4 扩展结构与连接面 金属8 电力 0 可建造 已有较多同类设施，先检查电力。 供电 发电站 x0 供应空间站电力 金属22 矿8 电力 +10 可建造 推荐：先补供电，避免关键设施断电。 推进 推进器 x0 提供推进与机动 金属26 气8 电力 -2 可建造 推荐：跃迁前补推进能力。 采矿 采矿站 x0 近天体自动采矿 金属",
+                                                            "rect":  {
+                                                                         "l":  8,
+                                                                         "t":  457,
+                                                                         "r":  399,
+                                                                         "b":  697,
+                                                                         "w":  391,
+                                                                         "h":  240
+                                                                     },
+                                                            "scroll":  {
+                                                                           "h":  884,
+                                                                           "c":  238,
+                                                                           "canY":  true
+                                                                       },
+                                                            "inViewport":  true,
+                                                            "hitSelf":  true,
+                                                            "hit":  {
+                                                                        "tag":  "BUTTON",
+                                                                        "id":  "",
+                                                                        "text":  "支撑 框架 x4 扩展结构与连接面 金属8 电力 0 可建造 已有较多同类设施，先检查电力。"
+                                                                    }
+                                                        },
+                                         "statusPanel":  {
+                                                             "visible":  true,
+                                                             "text":  "引导 当前目标 查看本局结算 下一步 确认本局结果、获得的局外天赋点，以及下一步是新局、局外天赋购买或开局协议选择。 资源采集 附近资源：气体外环 · 小行星-3 · 剩余 411 把采矿站放在外环旁，并驾驶工站进入外环。距离 522 / 采矿范围 175 · 还需靠近 347 尚未建造采矿站 — 选「采矿站」建在框架上，再进入资源外环。 橙=矿石，银=金属",
+                                                             "rect":  {
+                                                                          "l":  179,
+                                                                          "t":  128,
+                                                                          "r":  399,
+                                                                          "b":  368,
+                                                                          "w":  220,
+                                                                          "h":  240
+                                                                      },
+                                                             "scroll":  {
+                                                                            "h":  841,
+                                                                            "c":  238,
+                                                                            "canY":  true
+                                                                        },
+                                                             "inViewport":  true,
+                                                             "hitSelf":  false,
+                                                             "hit":  {
+                                                                         "tag":  "PRE",
+                                                                         "id":  "",
+                                                                         "text":  "- [pass] runtime errors 为空: 未发现新的 runtime error - "
+                                                                     }
+                                                         },
+                                         "moreStatus":  {
+                                                            "visible":  true,
+                                                            "text":  "更多状态 状态 核心耐久：280/280 结构：5 个，运作：5，脱落：0 速度：0 / 科技等级：0 空间站设计健康摘要 电力余量 良好 电力余量充足 余量 6.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹",
+                                                            "rect":  {
+                                                                         "l":  189,
+                                                                         "t":  696,
+                                                                         "r":  374,
+                                                                         "b":  961,
+                                                                         "w":  185,
+                                                                         "h":  265
+                                                                     },
+                                                            "scroll":  {
+                                                                           "h":  264,
+                                                                           "c":  264,
+                                                                           "canY":  false
+                                                                       },
+                                                            "inViewport":  true,
+                                                            "hitSelf":  false,
+                                                            "hit":  {
+                                                                        "tag":  "CANVAS",
+                                                                        "id":  "game",
+                                                                        "text":  ""
+                                                                    }
+                                                        },
+                                         "moreBody":  {
+                                                          "visible":  true,
+                                                          "text":  "状态 核心耐久：280/280 结构：5 个，运作：5，脱落：0 速度：0 / 科技等级：0 空间站设计健康摘要 电力余量 良好 电力余量充足 余量 6.0，断电 0，手动关闭 0。 采矿能力 短板 无有效采矿 采矿站 0，有效 0，断电 0。 推进能力 短板 缺少推进 推进器 0，通电 0，喷口遮挡 0。 火力 短板 缺少火力 炮塔 0/0，导弹井 0/0",
+                                                          "rect":  {
+                                                                       "l":  189,
+                                                                       "t":  735,
+                                                                       "r":  374,
+                                                                       "b":  961,
+                                                                       "w":  185,
+                                                                       "h":  226
+                                                                   },
+                                                          "scroll":  {
+                                                                         "h":  1013,
+                                                                         "c":  226,
+                                                                         "canY":  true
+                                                                     },
+                                                          "inViewport":  false,
+                                                          "hitSelf":  false,
+                                                          "hit":  {
+                                                                      "tag":  "CANVAS",
+                                                                      "id":  "game",
+                                                                      "text":  ""
+                                                                  }
+                                                      },
+                                         "hud":  {
+                                                     "resources":  "金属 131 矿物 60 气体 35 等离子 8 科研 0 电力 0/6",
+                                                     "objective":  "抵达信标区域 进度 0% · 未设定目标",
+                                                     "combatStatus":  "战斗：安全 · 暂无接近威胁 受损：暂无明显损伤 维修：当前无可修对象",
+                                                     "combatReview":  "",
+                                                     "metaStats":  "局外天赋点：2有可购买 下一局协议：标准开局 局内科研点与本页局外天赋点无关"
+                                                 },
+                                         "buttons":  {
+                                                         "rcCopy":  {
+                                                                        "exists":  true,
+                                                                        "disabled":  false,
+                                                                        "clickable":  true,
+                                                                        "info":  {
+                                                                                     "visible":  true,
+                                                                                     "text":  "复制摘要",
+                                                                                     "rect":  {
+                                                                                                  "l":  139,
+                                                                                                  "t":  43,
+                                                                                                  "r":  253,
+                                                                                                  "b":  75,
+                                                                                                  "w":  114,
+                                                                                                  "h":  32
+                                                                                              },
+                                                                                     "scroll":  {
+                                                                                                    "h":  30,
+                                                                                                    "c":  30,
+                                                                                                    "canY":  false
+                                                                                                },
+                                                                                     "inViewport":  true,
+                                                                                     "hitSelf":  true,
+                                                                                     "hit":  {
+                                                                                                 "tag":  "BUTTON",
+                                                                                                 "id":  "",
+                                                                                                 "text":  "复制摘要"
+                                                                                             }
+                                                                                 }
+                                                                    },
+                                                         "firstBuild":  {
+                                                                            "exists":  true,
+                                                                            "disabled":  false,
+                                                                            "clickable":  true,
+                                                                            "info":  {
+                                                                                         "visible":  true,
+                                                                                         "text":  "指针/航行",
+                                                                                         "rect":  {
+                                                                                                      "l":  21,
+                                                                                                      "t":  498,
+                                                                                                      "r":  193,
+                                                                                                      "b":  597,
+                                                                                                      "w":  172,
+                                                                                                      "h":  98
+                                                                                                  },
+                                                                                         "scroll":  {
+                                                                                                        "h":  96,
+                                                                                                        "c":  96,
+                                                                                                        "canY":  false
+                                                                                                    },
+                                                                                         "inViewport":  true,
+                                                                                         "hitSelf":  true,
+                                                                                         "hit":  {
+                                                                                                     "tag":  "BUTTON",
+                                                                                                     "id":  "",
+                                                                                                     "text":  "指针/航行"
+                                                                                                 }
+                                                                                     }
+                                                                        },
+                                                         "more":  {
+                                                                      "exists":  true,
+                                                                      "disabled":  false,
+                                                                      "clickable":  false,
+                                                                      "info":  {
+                                                                                   "visible":  true,
+                                                                                   "text":  "更多状态",
+                                                                                   "rect":  {
+                                                                                                "l":  189,
+                                                                                                "t":  703,
+                                                                                                "r":  374,
+                                                                                                "b":  735,
+                                                                                                "w":  185,
+                                                                                                "h":  33
+                                                                                            },
+                                                                                   "scroll":  {
+                                                                                                  "h":  31,
+                                                                                                  "c":  31,
+                                                                                                  "canY":  false
+                                                                                              },
+                                                                                   "inViewport":  true,
+                                                                                   "hitSelf":  false,
+                                                                                   "hit":  {
+                                                                                               "tag":  "CANVAS",
+                                                                                               "id":  "game",
+                                                                                               "text":  ""
+                                                                                           }
+                                                                               }
+                                                                  },
+                                                         "meta":  {
+                                                                      "exists":  true,
+                                                                      "disabled":  false,
+                                                                      "clickable":  false,
+                                                                      "info":  {
+                                                                                   "visible":  true,
+                                                                                   "text":  "打开局外天赋面板",
+                                                                                   "rect":  {
+                                                                                                "l":  189,
+                                                                                                "t":  1654,
+                                                                                                "r":  357,
+                                                                                                "b":  1694,
+                                                                                                "w":  168,
+                                                                                                "h":  40
+                                                                                            },
+                                                                                   "scroll":  {
+                                                                                                  "h":  38,
+                                                                                                  "c":  38,
+                                                                                                  "canY":  false
+                                                                                              },
+                                                                                   "inViewport":  false,
+                                                                                   "hitSelf":  false,
+                                                                                   "hit":  {
+                                                                                               "tag":  "CANVAS",
+                                                                                               "id":  "game",
+                                                                                               "text":  ""
+                                                                                           }
+                                                                               }
+                                                                  },
+                                                         "players":  {
+                                                                         "exists":  true,
+                                                                         "disabled":  false,
+                                                                         "clickable":  false,
+                                                                         "info":  {
+                                                                                      "visible":  true,
+                                                                                      "text":  "联机人数缩放",
+                                                                                      "rect":  {
+                                                                                                   "l":  189,
+                                                                                                   "t":  1702,
+                                                                                                   "r":  357,
+                                                                                                   "b":  1740,
+                                                                                                   "w":  168,
+                                                                                                   "h":  38
+                                                                                               },
+                                                                                      "scroll":  {
+                                                                                                     "h":  36,
+                                                                                                     "c":  36,
+                                                                                                     "canY":  false
+                                                                                                 },
+                                                                                      "inViewport":  false,
+                                                                                      "hitSelf":  false,
+                                                                                      "hit":  {
+                                                                                                  "tag":  "CANVAS",
+                                                                                                  "id":  "game",
+                                                                                                  "text":  ""
+                                                                                              }
+                                                                                  }
+                                                                     }
+                                                     },
+                                         "copy":  {
+                                                      "result":  {
+                                                                     "ok":  true,
+                                                                     "method":  "clipboard"
+                                                                 },
+                                                      "length":  1395,
+                                                      "includesBrowser":  true,
+                                                      "includesViewport":  true,
+                                                      "includesRuntimeErrors":  true,
+                                                      "includesStorage":  true,
+                                                      "includesManual":  false
+                                                  },
+                                         "meta":  {
+                                                      "drawer":  {
+                                                                     "visible":  true,
+                                                                     "text":  "局外天赋 局外天赋点来自结算；局内科研点只在本局研发，两者互不转换 × 局外天赋点：0 当前协议：标准开局（协议效果将在下一局开局时应用，本任务仅预览与选择） 天赋树 开局协议 说明 全部 资源型 防御型 武器型 探索型 资源型 采集校准 资源型 · T1 等级 0 / 3 当前：暂无效果 下级：采集产出 +10% 升级消耗：1 局外天赋点 局外天赋点不足，",
+                                                                     "rect":  {
+                                                                                  "l":  0,
+                                                                                  "t":  0,
+                                                                                  "r":  407,
+                                                                                  "b":  705,
+                                                                                  "w":  407,
+                                                                                  "h":  705
+                                                                              },
+                                                                     "scroll":  {
+                                                                                    "h":  705,
+                                                                                    "c":  705,
+                                                                                    "canY":  false
+                                                                                },
+                                                                     "inViewport":  true,
+                                                                     "hitSelf":  true,
+                                                                     "hit":  {
+                                                                                 "tag":  "DIV",
+                                                                                 "id":  "",
+                                                                                 "text":  "下级：采集产出 +10%"
+                                                                             }
+                                                                 },
+                                                      "body":  {
+                                                                   "visible":  true,
+                                                                   "text":  "全部 资源型 防御型 武器型 探索型 资源型 采集校准 资源型 · T1 等级 0 / 3 当前：暂无效果 下级：采集产出 +10% 升级消耗：1 局外天赋点 局外天赋点不足，还差 1 点 局外天赋点不足，还差 1 点 金属精炼 资源型 · T2 等级 0 / 2 当前：暂无效果 下级：建造金属消耗 约 -5% 升级消耗：2 局外天赋点 需要 采集校准 1级",
+                                                                   "rect":  {
+                                                                                "l":  1,
+                                                                                "t":  178,
+                                                                                "r":  407,
+                                                                                "b":  705,
+                                                                                "w":  406,
+                                                                                "h":  527
+                                                                            },
+                                                                   "scroll":  {
+                                                                                  "h":  2720,
+                                                                                  "c":  527,
+                                                                                  "canY":  true
+                                                                              },
+                                                                   "inViewport":  true,
+                                                                   "hitSelf":  true,
+                                                                   "hit":  {
+                                                                               "tag":  "BUTTON",
+                                                                               "id":  "",
+                                                                               "text":  "局外天赋点不足，还差 1 点"
+                                                                           }
+                                                               },
+                                                      "close":  {
+                                                                    "exists":  true,
+                                                                    "disabled":  false,
+                                                                    "clickable":  true,
+                                                                    "info":  {
+                                                                                 "visible":  true,
+                                                                                 "text":  "×",
+                                                                                 "rect":  {
+                                                                                              "l":  359,
+                                                                                              "t":  15,
+                                                                                              "r":  393,
+                                                                                              "b":  49,
+                                                                                              "w":  34,
+                                                                                              "h":  34
+                                                                                          },
+                                                                                 "scroll":  {
+                                                                                                "h":  32,
+                                                                                                "c":  32,
+                                                                                                "canY":  false
+                                                                                            },
+                                                                                 "inViewport":  true,
+                                                                                 "hitSelf":  true,
+                                                                                 "hit":  {
+                                                                                             "tag":  "BUTTON",
+                                                                                             "id":  "",
+                                                                                             "text":  "×"
+                                                                                         }
+                                                                             }
+                                                                }
+                                                  },
+                                         "galaxy":  {
+                                                        "opened":  {
+                                                                       "ok":  true,
+                                                                       "choices":  [
+                                                                                       {
+                                                                                           "galaxyType":  "pirateTerritory",
+                                                                                           "reason":  "random"
+                                                                                       },
+                                                                                       {
+                                                                                           "galaxyType":  "tradeHub",
+                                                                                           "reason":  "random"
+                                                                                       }
+                                                                                   ],
+                                                                       "level":  1
+                                                                   },
+                                                        "panel":  {
+                                                                      "visible":  true,
+                                                                      "text":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 海盗领地 高风险 海盗盘踞之地，战利品丰厚但险象环生。 敌人 ×1.5 资源：金属 ×1.3 / 等离子 ×1.1 任务：战斗 ×2 / 拾荒 ×1.2 事件：伏击 ×2 / 求救 ×1.5 稳定贸易区 低风险 和平的星际港，商船频繁，敌意稀少。 敌人 ×0.7 资源：金属 ×1.",
+                                                                      "rect":  {
+                                                                                   "l":  180,
+                                                                                   "t":  129,
+                                                                                   "r":  383,
+                                                                                   "b":  367,
+                                                                                   "w":  203,
+                                                                                   "h":  238
+                                                                               },
+                                                                      "scroll":  {
+                                                                                     "h":  238,
+                                                                                     "c":  238,
+                                                                                     "canY":  false
+                                                                                 },
+                                                                      "inViewport":  true,
+                                                                      "hitSelf":  false,
+                                                                      "hit":  {
+                                                                                  "tag":  "PRE",
+                                                                                  "id":  "",
+                                                                                  "text":  "- [pass] runtime errors 为空: 未发现新的 runtime error - "
+                                                                              }
+                                                                  },
+                                                        "content":  {
+                                                                        "visible":  true,
+                                                                        "text":  "选择跃迁目的地 扫描数据已就绪，请选择下一跳目的地。按 Esc 可暂时停留。 海盗领地 高风险 海盗盘踞之地，战利品丰厚但险象环生。 敌人 ×1.5 资源：金属 ×1.3 / 等离子 ×1.1 任务：战斗 ×2 / 拾荒 ×1.2 事件：伏击 ×2 / 求救 ×1.5 稳定贸易区 低风险 和平的星际港，商船频繁，敌意稀少。 敌人 ×0.7 资源：金属 ×1.",
+                                                                        "rect":  {
+                                                                                     "l":  188,
+                                                                                     "t":  137,
+                                                                                     "r":  375,
+                                                                                     "b":  359,
+                                                                                     "w":  187,
+                                                                                     "h":  222
+                                                                                 },
+                                                                        "scroll":  {
+                                                                                       "h":  712,
+                                                                                       "c":  205,
+                                                                                       "canY":  true
+                                                                                   },
+                                                                        "inViewport":  true,
+                                                                        "hitSelf":  false,
+                                                                        "hit":  {
+                                                                                    "tag":  "PRE",
+                                                                                    "id":  "",
+                                                                                    "text":  "- [pass] runtime errors 为空: 未发现新的 runtime error - "
+                                                                                }
+                                                                    },
+                                                        "cancel":  {
+                                                                       "exists":  true,
+                                                                       "disabled":  false,
+                                                                       "clickable":  true,
+                                                                       "info":  {
+                                                                                    "visible":  true,
+                                                                                    "text":  "暂时停留（Esc）",
+                                                                                    "rect":  {
+                                                                                                 "l":  184,
+                                                                                                 "t":  289,
+                                                                                                 "r":  364,
+                                                                                                 "b":  331,
+                                                                                                 "w":  180,
+                                                                                                 "h":  42
+                                                                                             },
+                                                                                    "scroll":  {
+                                                                                                   "h":  40,
+                                                                                                   "c":  40,
+                                                                                                   "canY":  false
+                                                                                               },
+                                                                                    "inViewport":  true,
+                                                                                    "hitSelf":  true,
+                                                                                    "hit":  {
+                                                                                                "tag":  "BUTTON",
+                                                                                                "id":  "",
+                                                                                                "text":  "暂时停留（Esc）"
+                                                                                            }
+                                                                                }
+                                                                   }
+                                                    },
+                                         "settlement":  {
+                                                            "method":  "endRunSettlement test hook",
+                                                            "panel":  {
+                                                                          "visible":  true,
+                                                                          "text":  "本局结算 通关奖励已转化为局外天赋点，可以规划下一条路线。 完成关卡数：0 / 7 累计基础奖励：4 点 终局加成：+2（+50%） 总点数：6 点 局外成长 本局获得局外天赋点：+2 当前可用局外天赋点：2 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点 可购买「科研洞察」(探索型 T1)，消耗 1 点 可购买「框架强化」(防御型 T1)，消",
+                                                                          "rect":  {
+                                                                                       "l":  189,
+                                                                                       "t":  674,
+                                                                                       "r":  374,
+                                                                                       "b":  684,
+                                                                                       "w":  185,
+                                                                                       "h":  10
+                                                                                   },
+                                                                          "scroll":  {
+                                                                                         "h":  591,
+                                                                                         "c":  8,
+                                                                                         "canY":  true
+                                                                                     },
+                                                                          "inViewport":  true,
+                                                                          "hitSelf":  false,
+                                                                          "hit":  {
+                                                                                      "tag":  "BUTTON",
+                                                                                      "id":  "",
+                                                                                      "text":  "推进 推进器 x0 提供推进与机动 金属26 气8 电力 -2 可建造 推荐：跃迁前补推进能力。"
+                                                                                  }
+                                                                      },
+                                                            "restart":  {
+                                                                            "exists":  true,
+                                                                            "disabled":  false,
+                                                                            "clickable":  false,
+                                                                            "info":  {
+                                                                                         "visible":  true,
+                                                                                         "text":  "开始新局",
+                                                                                         "rect":  {
+                                                                                                      "l":  199,
+                                                                                                      "t":  699,
+                                                                                                      "r":  349,
+                                                                                                      "b":  739,
+                                                                                                      "w":  150,
+                                                                                                      "h":  40
+                                                                                                  },
+                                                                                         "scroll":  {
+                                                                                                        "h":  38,
+                                                                                                        "c":  38,
+                                                                                                        "canY":  false
+                                                                                                    },
+                                                                                         "inViewport":  true,
+                                                                                         "hitSelf":  false,
+                                                                                         "hit":  {
+                                                                                                     "tag":  "CANVAS",
+                                                                                                     "id":  "game",
+                                                                                                     "text":  ""
+                                                                                                 }
+                                                                                     }
+                                                                        },
+                                                            "stay":  {
+                                                                         "exists":  true,
+                                                                         "disabled":  false,
+                                                                         "clickable":  false,
+                                                                         "info":  {
+                                                                                      "visible":  true,
+                                                                                      "text":  "留在终结星系自由游玩",
+                                                                                      "rect":  {
+                                                                                                   "l":  199,
+                                                                                                   "t":  745,
+                                                                                                   "r":  349,
+                                                                                                   "b":  785,
+                                                                                                   "w":  150,
+                                                                                                   "h":  40
+                                                                                               },
+                                                                                      "scroll":  {
+                                                                                                     "h":  38,
+                                                                                                     "c":  38,
+                                                                                                     "canY":  false
+                                                                                                 },
+                                                                                      "inViewport":  false,
+                                                                                      "hitSelf":  false,
+                                                                                      "hit":  {
+                                                                                                  "tag":  "CANVAS",
+                                                                                                  "id":  "game",
+                                                                                                  "text":  ""
+                                                                                              }
+                                                                                  }
+                                                                     },
+                                                            "stats":  "完成关卡数：0 / 7 累计基础奖励：4 点 终局加成：+2（+50%） 总点数：6 点",
+                                                            "feedback":  "局外成长 本局获得局外天赋点：+2 当前可用局外天赋点：2 可购买建议 可购买「采集校准」(资源型 T1)，消耗 1 点 可购买「科研洞察」(探索型 T1)，消耗 1 点 可购买「框架强化」(防御型 T1)，消耗 1 点 下一局协议建议 下一局协议建议：目标「防御起步」，需要局外天赋「核心加固」1级（当前 0级）。 下一步：打开局外天赋，购买能让下一局更稳定"
+                                                        }
+                                     }
+                    },
+                    {
+                        "requested":  {
+                                          "port":  9923,
+                                          "w":  390,
+                                          "name":  "390x844",
+                                          "h":  844
+                                      },
+                        "profile":  "C:\\Users\\ylswd\\AppData\\Local\\Temp\\agentgame-v015-sync-profile-20260609-230600-390x844",
+                        "observed":  {
+                                         "viewport":  {
+                                                          "w":  377,
+                                                          "h":  809,
+                                                          "dpr":  2,
+                                                          "outerWidth":  390,
+                                                          "outerHeight":  844,
+                                                          "ready":  "complete"
+                                                      },
+                                         "ua":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+                                         "touch":  {
+                                                       "maxTouchPoints":  0,
+                                                       "pointerCoarse":  false,
+                                                       "anyPointerCoarse":  false
+                                                   },
+                                         "rcPanel":  null,
+                                         "rcStatus":  "",
+                                         "buildPanel":  null,
+                                         "statusPanel":  null,
+                                         "moreStatus":  null,
+                                         "moreBody":  null,
+                                         "hud":  {
+                                                     "resources":  "",
+                                                     "objective":  "",
+                                                     "combatStatus":  "",
+                                                     "combatReview":  "",
+                                                     "metaStats":  ""
+                                                 },
+                                         "buttons":  {
+                                                         "rcCopy":  {
+                                                                        "exists":  false,
+                                                                        "disabled":  false,
+                                                                        "clickable":  false,
+                                                                        "info":  null
+                                                                    },
+                                                         "firstBuild":  {
+                                                                            "exists":  false,
+                                                                            "disabled":  false,
+                                                                            "clickable":  false,
+                                                                            "info":  null
+                                                                        },
+                                                         "more":  {
+                                                                      "exists":  false,
+                                                                      "disabled":  false,
+                                                                      "clickable":  false,
+                                                                      "info":  null
+                                                                  },
+                                                         "meta":  {
+                                                                      "exists":  false,
+                                                                      "disabled":  false,
+                                                                      "clickable":  false,
+                                                                      "info":  null
+                                                                  },
+                                                         "players":  {
+                                                                         "exists":  false,
+                                                                         "disabled":  false,
+                                                                         "clickable":  false,
+                                                                         "info":  null
+                                                                     }
+                                                     },
+                                         "copy":  {
+                                                      "result":  {
+                                                                     "ok":  false,
+                                                                     "method":  "pending"
+                                                                 },
+                                                      "length":  0,
+                                                      "includesBrowser":  false,
+                                                      "includesViewport":  false,
+                                                      "includesRuntimeErrors":  false,
+                                                      "includesStorage":  false,
+                                                      "includesManual":  false
+                                                  },
+                                         "meta":  {
+                                                      "drawer":  null,
+                                                      "body":  null,
+                                                      "close":  {
+                                                                    "exists":  false,
+                                                                    "disabled":  false,
+                                                                    "clickable":  false,
+                                                                    "info":  null
+                                                                }
+                                                  },
+                                         "galaxy":  {
+                                                        "opened":  {
+                                                                       "ok":  false,
+                                                                       "reason":  "missing_hook"
+                                                                   },
+                                                        "panel":  null,
+                                                        "content":  null,
+                                                        "cancel":  {
+                                                                       "exists":  false,
+                                                                       "disabled":  false,
+                                                                       "clickable":  false,
+                                                                       "info":  null
+                                                                   }
+                                                    },
+                                         "settlement":  {
+                                                            "method":  "missing"
+                                                        }
+                                     }
+                    }
+                ]
+}

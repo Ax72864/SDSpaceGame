@@ -1,0 +1,115 @@
+{
+  "task": "v0.15.0 #6 三视口/小屏/复制摘要/触控假设证据",
+  "recordedAt": "2026-06-09T23:07:35+08:00",
+  "environment": {
+    "os": "Windows 10.0.26200",
+    "browser": "Chrome/148.0.7778.217",
+    "url": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+    "method": "Visible Chrome app windows with fixed --window-size plus CDP Runtime.evaluate",
+    "rawJson": "Workspaces/pm-qa-coordinator/v0.15.0-browser-evidence-viewport-matrix-20260609-230716.json"
+  },
+  "viewports": [
+    {
+      "requested": "760x640",
+      "actual": "747x605",
+      "dpr": 2,
+      "releaseCandidatePanel": "visible_scrollable",
+      "buildPanel": "visible_scrollable",
+      "hudMoreStatus": "status_visible_scrollable_more_status_deep_scroll_or_offscreen",
+      "keyButtons": {
+        "copySummary": "clickable",
+        "firstBuild": "clickable",
+        "moreStatus": "not_clickable_in_current_open_state",
+        "metaEntry": "not_clickable_without_deep_scroll"
+      },
+      "copySummary": {
+        "ok": true,
+        "method": "execCommand",
+        "fields": {
+          "browser": true,
+          "viewport": true,
+          "runtimeErrors": true,
+          "storageHash": true,
+          "manualStatusExactMarkerConfirmed": false
+        }
+      },
+      "p0Impact": "recorded_with_non_blocking_polish_risk"
+    },
+    {
+      "requested": "420x740",
+      "actual": "407x705",
+      "dpr": 2,
+      "releaseCandidatePanel": "visible_scrollable",
+      "buildPanel": "visible_scrollable",
+      "hudMoreStatus": "visible_scrollable_with_overlap_hit_risk",
+      "keyButtons": {
+        "copySummary": "clickable",
+        "firstBuild": "clickable",
+        "metaDrawerClose": "clickable",
+        "galaxyCancel": "clickable",
+        "settlementRestart": "visible_but_center_hit_blocked_in_forced_overlay_state"
+      },
+      "copySummary": {
+        "ok": true,
+        "method": "clipboard",
+        "fields": {
+          "browser": true,
+          "viewport": true,
+          "runtimeErrors": true,
+          "storageHash": true,
+          "manualStatusExactMarkerConfirmed": false
+        }
+      },
+      "p0Impact": "recorded_with_non_blocking_polish_risk"
+    },
+    {
+      "requested": "390x844",
+      "actual": "377x809",
+      "dpr": 2,
+      "releaseCandidatePanel": "visible_scrollable",
+      "buildPanel": "visible_scrollable",
+      "hudMoreStatus": "visible_scrollable_with_overlap_hit_risk",
+      "keyButtons": {
+        "copySummary": "clickable",
+        "firstBuild": "clickable",
+        "metaDrawerClose": "clickable",
+        "galaxyCancel": "clickable",
+        "settlementRestart": "visible_but_center_hit_blocked_in_forced_overlay_state"
+      },
+      "copySummary": {
+        "ok": true,
+        "method": "clipboard",
+        "fields": {
+          "browser": true,
+          "viewport": true,
+          "runtimeErrors": true,
+          "storageHash": true,
+          "manualStatusExactMarkerConfirmed": false
+        }
+      },
+      "p0Impact": "recorded_with_non_blocking_polish_risk"
+    }
+  ],
+  "touch": {
+    "realDeviceCovered": false,
+    "maxTouchPoints": 0,
+    "pointerCoarse": false,
+    "conclusion": "touch_hypothesis_uncovered_mouse_and_cdp_are_not_touch_pass"
+  },
+  "conclusion": {
+    "viewportEvidence": "completed",
+    "blockingP0": false,
+    "nonBlockingPolish": [
+      "release candidate panel can overlap status panel hit targets while open",
+      "more status and Meta entry require deep scrolling on small screens",
+      "settlement restart is visible but center hit is blocked in forced overlay state"
+    ],
+    "uncovered": [
+      "real touch device",
+      "full human small-screen playthrough",
+      "natural combat review after weapon/shield/repair interaction",
+      "real Meta restart click path"
+    ],
+    "releaseGateRecommendationImpact": "do_not_enter_release_preparation_from_this_evidence_alone"
+  }
+}
