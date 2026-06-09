@@ -7045,6 +7045,13 @@ function getBuildPaletteMissingResources(cost) {
     }));
 }
 
+function formatMissingResourceGaps(missingResources = []) {
+  return missingResources
+    .filter((item) => item && item.gap > 0)
+    .map((item) => `${shortResource(item.name)} ${item.gap}`)
+    .join("、");
+}
+
 function getBuildPaletteRecommendation(facilityId, role, count, roleCounts, activeRoleCounts, powerHeadroom, powerUse) {
   if (role === "mining" && !(roleCounts.mining > 0)) {
     return { priority: "high", reasonKey: "core_capability_missing" };
@@ -7092,7 +7099,7 @@ function getBuildPaletteStatusText(entry) {
 function getBuildPaletteTipText(entry) {
   if (!entry.affordable && entry.missingResources.length) {
     const primary = entry.missingResources.reduce((best, item) => (item.gap > best.gap ? item : best));
-    return `警告：缺${shortResource(primary.name)} ${primary.gap}，当前不能建造。`;
+    return `警告：当前这座缺${shortResource(primary.name)} ${primary.gap}，暂时不能建造。`;
   }
   if (entry.powerRiskAfterBuild) {
     return "警告：建造后电力余量为负，关键设施可能断电。";
@@ -12318,7 +12325,8 @@ function buildAt(x, y, facility) {
   const def = TYPES[facility];
   const cost = getBuildCost(facility);
   if (!canPay(cost)) {
-    setBuildError(`${def.name} 资源不足：${formatCost(cost)}（建造模式已保持）`);
+    const missingSummary = formatMissingResourceGaps(getBuildPaletteMissingResources(cost)) || formatCost(cost);
+    setBuildError(`${def.name} 当前资源不足：还缺 ${missingSummary}（建造模式已保持）`);
     return false;
   }
   pay(cost);
@@ -14499,11 +14507,12 @@ function buildStatusAlerts() {
   }
   if (state.selectedBuild) {
     const cost = getBuildCost(state.selectedBuild);
-    const missing = Object.entries(cost).filter(([res, value]) => state.resources[res] < value);
+    const missing = getBuildPaletteMissingResources(cost);
     if (missing.length) {
+      const missingSummary = formatMissingResourceGaps(missing) || formatCost(cost);
       alerts.push({
         level: "warn",
-        text: `建造「${TYPES[state.selectedBuild].name}」资源不足：${formatCost(cost)}（核心会缓慢产金属）`
+        text: `当前仍选中「${TYPES[state.selectedBuild].name}」：下一座还缺 ${missingSummary}（不是刚才建造失败；核心会缓慢产金属）`
       });
     } else if (
       state.selectedBuild !== "frame"
