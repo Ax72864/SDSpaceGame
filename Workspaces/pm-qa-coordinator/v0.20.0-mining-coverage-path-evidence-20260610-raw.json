@@ -1,0 +1,163 @@
+{
+  "version": "v0.20.0-mining-coverage-path-evidence",
+  "recordedBy": "/pm-qa-coordinator",
+  "recordedAt": "2026-06-10T02:00:00+08:00",
+  "entryUrl": "file:///D:/work/project/agentgame/Game/index.html?playtest=1",
+  "scope": {
+    "modifiedGame": false,
+    "modifiedRules": false,
+    "calledBuildAt": false,
+    "directStateWrite": false,
+    "clearedUserStorage": false,
+    "published": false,
+    "tagged": false
+  },
+  "evidenceFiles": {
+    "plan": "Workspaces/pm-qa-coordinator/v0.20.0-mining-coverage-path-evidence-plan.md",
+    "summary": "Workspaces/pm-qa-coordinator/v0.20.0-mining-coverage-path-evidence.md"
+  },
+  "browserRuns": [
+    {
+      "id": "attempt-a-9920",
+      "browser": "visible Chrome + CDP",
+      "port": 9920,
+      "profile": "temporary",
+      "inputType": "DOM build buttons + CDP mouse grid clicks + readonly playtest hooks",
+      "storageSignature": {
+        "localStorageLength": 0,
+        "sessionStorageLength": 0,
+        "localKeys": [],
+        "sessionKeys": []
+      },
+      "readonlyCandidate": {
+        "targetGridKey": "-1,-6",
+        "resourceBody": {
+          "name": "小行星-2",
+          "type": "asteroid",
+          "resource": "ore",
+          "x": -748.53,
+          "y": -579.41,
+          "r": 47.27,
+          "range": 177.27,
+          "amount": 573
+        },
+        "distance": 176.37,
+        "range": 177.27,
+        "gap": 0,
+        "directPlacement": {
+          "valid": false,
+          "reasonKey": "no_neighbor"
+        },
+        "reachableByExpansion": true
+      },
+      "browserResult": {
+        "success": false,
+        "minerCount": 0,
+        "activeCount": 0,
+        "harvestingCount": 0,
+        "target": null,
+        "reason": "input_mapping_failed",
+        "attribution": "no mining station; resource growth cannot be attributed to mining"
+      },
+      "runtimeErrors": 0
+    },
+    {
+      "id": "attempt-b-9921",
+      "browser": "visible Chrome + CDP",
+      "port": 9921,
+      "profile": "C:/Users/ylswd/AppData/Local/Temp/agentgame-v020-mining-20260610-020114-9921",
+      "inputType": "DOM build buttons + CDP mouse grid clicks + readonly playtest hooks",
+      "path": {
+        "power": "1,0",
+        "frames": ["0,-2", "0,-3", "0,-4", "0,-5", "0,-6", "-1,-6"],
+        "mining": "-1,-6"
+      },
+      "afterBuild": {
+        "minerGridKey": "-1,-6",
+        "facility": "mining",
+        "active": true,
+        "enabled": true,
+        "detached": false,
+        "target": null,
+        "nearest": {
+          "bodyName": "恒星-1",
+          "resource": "plasma",
+          "distance": 696.02,
+          "range": 240.15,
+          "gap": 456,
+          "inRange": false
+        },
+        "overall": {
+          "minerCount": 1,
+          "activeCount": 1,
+          "harvestingCount": 0,
+          "outOfRangeCount": 1,
+          "allOutOfRange": true,
+          "reasonKey": "all_miners_out_of_range"
+        }
+      },
+      "waitWindow": {
+        "durationSec": 10,
+        "resourcesAfter": {
+          "metal": 157.65,
+          "ore": 75.17,
+          "gas": 45.71,
+          "plasma": 10.11,
+          "research": 0
+        },
+        "harvestingCountAfter": 0,
+        "targetAfter": null,
+        "attribution": "not attributable to mining"
+      },
+      "ui": {
+        "toast": "采矿站已建造",
+        "statusAlertMeaning": "mining standby; out of resource ring",
+        "resourceGuideMeaning": "shows nearby resource, range, and remaining distance"
+      },
+      "runtimeErrors": 0,
+      "storageSignature": {
+        "localStorageLength": 0,
+        "sessionStorageLength": 0,
+        "localKeys": [],
+        "sessionKeys": []
+      },
+      "result": "failed_out_of_range_for_this_seed"
+    },
+    {
+      "id": "attempt-c-9920-dynamic",
+      "browser": "visible Chrome + CDP",
+      "port": 9920,
+      "inputType": "dynamic readonly candidate + DOM build button + CDP grid click",
+      "chosen": {
+        "targetGridKey": "-1,-6",
+        "candidateGap": 0,
+        "candidateResource": "小行星-2/ore"
+      },
+      "clickAlignment": {
+        "targetGridKey": "-1,-6",
+        "pointerGridKey": "-1,-6",
+        "aligned": true,
+        "screenDeltaDistance": 0
+      },
+      "browserResult": {
+        "success": false,
+        "minerCount": 0,
+        "harvestingCount": 0,
+        "target": null,
+        "blocking": ["prior_state_pollution", "power_starved_or_settlement_interference"],
+        "attribution": "not attributable to mining"
+      },
+      "runtimeErrors": 0
+    }
+  ],
+  "pmConclusion": {
+    "planAccepted": true,
+    "readonlyAnalysisAccepted": "partial",
+    "browserMiningYieldClosed": false,
+    "harvestingCountGreaterThanZeroObserved": false,
+    "attributableYieldObserved": false,
+    "unlockCombatOrMeta": false,
+    "requiresRuleChangeEvidence": false,
+    "nextRecommendedTask": "#5 only if team accepts that UI/diagnostic should better guide candidate selection; otherwise rerun #4 with isolated per-seed profile"
+  }
+}
